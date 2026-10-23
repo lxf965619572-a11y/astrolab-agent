@@ -1,0 +1,11 @@
+{
+  "title": "UART 接收环形缓冲区与中断服务程序",
+  "target": "sparc",
+  "defects": {
+    "rb-volatile": { "checklist": "C1", "severity": "严重", "description": "rb_head 在中断中修改、主循环中读取，未声明 volatile", "keywords": ["volatile"] },
+    "rb-wrap": { "checklist": "A1", "severity": "严重", "description": "回绕判断应为 next >= RB_SIZE，当前会让 rb_head 等于 RB_SIZE 导致 rb_buf 越界写", "keywords": ["回绕", ">=", "越界", "RB_SIZE"] },
+    "rb-isr-spin": { "checklist": "C3", "severity": "严重", "description": "缓冲区满时 continue 未读取数据寄存器，接收就绪位不清除，中断内死循环", "keywords": ["死循环", "数据寄存器", "UART1_DATA", "continue", "清除"] },
+    "rb-get-null": { "checklist": "A3", "severity": "一般", "description": "out 指针未判空", "keywords": ["判空", "NULL", "空指针"] },
+    "rb-overflow-race": { "checklist": "C2", "severity": "一般", "description": "读取后清零 rb_overflow 非原子，两步之间中断的自增会丢失，需关中断保护", "keywords": ["临界区", "关中断", "原子", "丢失", "竞争"] }
+  }
+}

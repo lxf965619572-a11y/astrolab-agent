@@ -1,0 +1,92 @@
+{
+  "id": "d2000-02-eventlog",
+  "title": "地面设备事件日志",
+  "target": "d2000",
+  "targetText": "D2000（ARMv8，Ubuntu/openEuler）",
+  "defects": [
+    {
+      "id": "log-fopen-unchecked",
+      "file": "src/eventlog.c",
+      "lines": [
+        29
+      ],
+      "checklist": "D2",
+      "severity": "一般",
+      "description": "fopen 失败未检查，仍返回 0（成功）",
+      "keywords": [
+        "fopen",
+        "NULL",
+        "失败",
+        "返回值"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "log-sizeof-ptr",
+      "file": "src/eventlog.c",
+      "lines": [
+        35
+      ],
+      "checklist": "A2",
+      "severity": "严重",
+      "description": "buf 是指针，sizeof(buf) 为 8（aarch64），日志被截断为 7 个字符；应由调用方传入缓冲区长度",
+      "keywords": [
+        "sizeof",
+        "指针",
+        "截断",
+        "8"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "log-null-file",
+      "file": "src/eventlog.c",
+      "lines": [
+        44
+      ],
+      "checklist": "A3",
+      "severity": "严重",
+      "description": "g_log 可能为 NULL（未打开或打开失败），直接 fputs 导致崩溃",
+      "keywords": [
+        "g_log",
+        "NULL",
+        "空指针",
+        "未打开"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "log-fd-leak",
+      "file": "src/eventlog.c",
+      "lines": [
+        63
+      ],
+      "checklist": "资源",
+      "severity": "一般",
+      "description": "目标文件打开失败时未关闭已打开的源文件，文件句柄泄漏",
+      "keywords": [
+        "泄漏",
+        "fclose",
+        "in",
+        "资源"
+      ],
+      "cppcheck": [
+        "resourceLeak"
+      ]
+    }
+  ],
+  "clean": [
+    {
+      "file": "src/eventlog.c",
+      "from": 73,
+      "to": 80
+    }
+  ],
+  "cppcheckFindings": [
+    {
+      "file": "src/eventlog.c",
+      "line": 63,
+      "id": "resourceLeak"
+    }
+  ]
+}

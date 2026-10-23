@@ -1,0 +1,10 @@
+{
+  "title": "三模冗余表决与超时等待",
+  "target": "sparc",
+  "defects": {
+    "tmr-vote-term": { "checklist": "D5", "severity": "严重", "description": "按位多数表决缺少 (a & c) 项，a、c 一致而 b 不同的位被错误表决为 0", "keywords": ["a & c", "a&c", "缺少", "多数表决"] },
+    "tmr-vote-no-err": { "checklist": "D5", "severity": "严重", "description": "三份两两不一致时直接返回 b，未置 *err，上层无法发现失效", "keywords": ["不一致", "err", "都不相同", "两两"] },
+    "tmr-tick-wrap": { "checklist": "B3", "severity": "严重", "description": "uint16_t 相减被整型提升为 int，计数回绕后差值为负，超时判断失效最长约 65.5 s", "keywords": ["回绕", "整型提升", "提升", "负数", "强制转换"] },
+    "tmr-float-eq": { "checklist": "B4", "severity": "一般", "description": "浮点数用 == 比较，应使用容差", "keywords": ["浮点", "==", "容差", "epsilon"] }
+  }
+}

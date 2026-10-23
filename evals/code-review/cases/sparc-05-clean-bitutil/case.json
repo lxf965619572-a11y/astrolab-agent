@@ -1,0 +1,50 @@
+{
+  "id": "sparc-05-clean-bitutil",
+  "title": "无缺陷对照组：字节序与校验工具函数",
+  "target": "sparc",
+  "targetText": "SPARC（BM3803）",
+  "defects": [],
+  "clean": [
+    {
+      "file": "src/bitutil.c",
+      "from": 9,
+      "to": 13
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 15,
+      "to": 22
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 24,
+      "to": 31
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 33,
+      "to": 40
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 42,
+      "to": 51
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 53,
+      "to": 59
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 61,
+      "to": 74
+    },
+    {
+      "file": "src/bitutil.c",
+      "from": 76,
+      "to": 97
+    }
+  ],
+  "cppcheckFindings": []
+}

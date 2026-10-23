@@ -1,0 +1,10 @@
+runtime/
+config/local.env
+mcp/*/node_modules/
+sample/review/
+sample/.dsh/
+evals/results/
+
+# 本地工具与临时文件
+cppcheck-*.msi
+~$*

@@ -1,0 +1,110 @@
+{
+  "id": "d2000-01-tm-udp",
+  "title": "地面设备 UDP 遥测接收（与 SPARC 下位机通信）",
+  "target": "d2000",
+  "targetText": "D2000（ARMv8，Ubuntu/openEuler）",
+  "defects": [
+    {
+      "id": "udp-long-wire",
+      "file": "src/tm_udp.h",
+      "lines": [
+        11
+      ],
+      "checklist": "E4",
+      "severity": "严重",
+      "description": "报文结构体使用 long：D2000（aarch64）上 8 字节、BM3803 上 4 字节，且对齐填充不同，两端布局不一致",
+      "keywords": [
+        "long",
+        "8 字节",
+        "64 位",
+        "布局",
+        "int32_t",
+        "对齐"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "udp-recv-neg",
+      "file": "src/tm_udp.c",
+      "lines": [
+        52
+      ],
+      "checklist": "D2",
+      "severity": "严重",
+      "description": "recv 返回 -1 时强转 size_t 变成极大值，错误判断被绕过",
+      "keywords": [
+        "-1",
+        "size_t",
+        "负",
+        "错误",
+        "返回值"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "udp-sync-endian",
+      "file": "src/tm_udp.c",
+      "lines": [
+        56
+      ],
+      "checklist": "E1",
+      "severity": "严重",
+      "description": "同步字为大端，未用 ntohs 转换，D2000 小端上比较永远失败",
+      "keywords": [
+        "ntohs",
+        "字节序",
+        "大端",
+        "小端"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "udp-len-endian",
+      "file": "src/tm_udp.c",
+      "lines": [
+        59
+      ],
+      "checklist": "E1",
+      "severity": "严重",
+      "description": "长度字段未用 ntohs 转换",
+      "keywords": [
+        "ntohs",
+        "字节序",
+        "大端",
+        "length"
+      ],
+      "cppcheck": false
+    },
+    {
+      "id": "udp-len-unchecked",
+      "file": "src/tm_udp.c",
+      "lines": [
+        60
+      ],
+      "checklist": "A2",
+      "severity": "严重",
+      "description": "复制长度未与 out_size 及实际接收字节数比较，越界读写",
+      "keywords": [
+        "out_size",
+        "越界",
+        "长度",
+        "溢出",
+        "未校验"
+      ],
+      "cppcheck": false
+    }
+  ],
+  "clean": [
+    {
+      "file": "src/tm_udp.c",
+      "from": 20,
+      "to": 38
+    },
+    {
+      "file": "src/tm_udp.c",
+      "from": 64,
+      "to": 70
+    }
+  ],
+  "cppcheckFindings": []
+}

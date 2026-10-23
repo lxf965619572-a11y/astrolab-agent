@@ -1,0 +1,9 @@
+{
+  "title": "1553B 远程终端接收消息处理",
+  "target": "sparc",
+  "defects": {
+    "rt-wc-zero": { "checklist": "领域", "severity": "严重", "description": "1553B 协议中数据字计数 0 表示 32 个数据字，当前按 0 个处理", "keywords": ["32", "计数为 0", "wc == 0", "数据字计数", "0 表示"] },
+    "rt-align-cast": { "checklist": "E2", "severity": "严重", "description": "uint8_t 指针强转为 uint16_t 指针，raw 未保证 2 字节对齐，SPARC 上非对齐访问触发陷阱", "keywords": ["对齐", "强转", "强制转换", "陷阱"] },
+    "rt-tr-bit": { "checklist": "领域", "severity": "严重", "description": "未检查 T/R 位，发送命令（RT→BC）也被当作接收消息写入子地址缓冲区", "keywords": ["T/R", "发送", "bit10", "收发"] }
+  }
+}

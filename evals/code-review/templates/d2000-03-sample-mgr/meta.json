@@ -1,0 +1,10 @@
+{
+  "title": "多线程 AD 采样管理",
+  "target": "d2000",
+  "defects": {
+    "smp-running-flag": { "checklist": "C2", "severity": "一般", "description": "g_running 跨线程读写，无互斥也非原子类型，属数据竞争（可能被优化为不退出）", "keywords": ["g_running", "原子", "atomic", "数据竞争", "volatile"] },
+    "smp-lock-held-return": { "checklist": "C2", "severity": "严重", "description": "缓冲区满时持锁返回，互斥锁永不释放，sample_take 死锁", "keywords": ["死锁", "未释放", "unlock", "持锁"] },
+    "smp-count-unlocked": { "checklist": "C2", "severity": "严重", "description": "在加锁前读取 g_count，与采集线程竞争，加锁后又整体清零，导致样本丢失或读到旧值", "keywords": ["加锁前", "锁外", "竞争", "g_count", "丢失"] },
+    "smp-create-unchecked": { "checklist": "D2", "severity": "一般", "description": "pthread_create 返回值未检查，线程创建失败仍返回成功", "keywords": ["pthread_create", "返回值", "失败"] }
+  }
+}

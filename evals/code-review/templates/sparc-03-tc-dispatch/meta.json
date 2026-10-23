@@ -1,0 +1,10 @@
+{
+  "title": "遥控指令分发",
+  "target": "sparc",
+  "defects": {
+    "tc-crc-no-reject": { "checklist": "D2", "severity": "严重", "description": "CRC 校验失败只计数，未拒绝执行，错误帧仍被分发", "keywords": ["CRC", "校验失败", "仍", "拒绝", "继续执行"] },
+    "tc-table-index": { "checklist": "A1", "severity": "严重", "description": "指令码 code 未检查上限即索引函数指针表，可跳转到任意地址", "keywords": ["code", "函数指针", "越界", "tc_table"] },
+    "tc-switch-default": { "checklist": "D3", "severity": "一般", "description": "switch 无 default，非法模式值静默返回成功", "keywords": ["default", "非法", "无效"] },
+    "tc-param-index": { "checklist": "A1", "severity": "严重", "description": "参数索引 idx 未检查是否小于 PARAM_COUNT，g_param 越界写", "keywords": ["idx", "越界", "g_param", "PARAM_COUNT"] }
+  }
+}

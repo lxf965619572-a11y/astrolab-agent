@@ -1,0 +1,15 @@
+# 部门 DSH 补丁层（home 级，放在 $DSH_HOME\cordis.patch.yml）
+# 由 setup.ps1 从本模板生成：__STARTER_DIR__ 会被替换成本文件夹的绝对路径。
+# 修改后无需重启 dsh：热重载（HMR）会自动应用；若未生效，重启 start-web.ps1。
+
+- insert:
+    # Cppcheck 静态分析服务（stdio，由 dsh 自动拉起）
+    - id: mcp-cppcheck
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: cppcheck
+        transport: stdio
+        command: !!js process.execPath     # 用运行 dsh 的同一个 node.exe，避免 PATH 问题
+        args: ['__STARTER_DIR__/mcp/cppcheck/server.mjs']
+        # CPPCHECK_PATH / CPPCHECK_SUPPRESSIONS 由 start-web.ps1 从 local.env 读入后自动继承
+        toolCallTimeoutMs: 600000   # 静态分析可能较慢，放宽到 10 分钟
