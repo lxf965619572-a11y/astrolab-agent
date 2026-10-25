@@ -35,14 +35,34 @@ elseif ($cpp) {
     if ($LASTEXITCODE -ne 0) { $bad++ }
 }
 
+Write-Step '文档服务 docgen + docreader（示例任务书生成 Word 再读回）'
+$docDeps = @('docreader', 'docgen') | Where-Object { -not (Test-Path (Join-Path $Root "mcp\$_\node_modules")) }
+if ($docDeps) { Write-Fail "依赖未安装：mcp\$($docDeps -join '、mcp\')，运行 scripts\setup.ps1"; $bad++ }
+else {
+    Push-Location (Join-Path $Root 'sample')
+    try { & node (Join-Path $Root 'mcp\docgen\selftest.mjs') } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { $bad++ }
+}
+
+Write-Step '单元测试服务 utest（编译运行自带的小例子）'
+if (-not (Test-Path (Join-Path $Root 'mcp\utest\node_modules'))) { Write-Fail '依赖未安装，运行 scripts\setup.ps1'; $bad++ }
+else {
+    & node (Join-Path $Root 'mcp\utest\selftest.mjs')
+    if ($LASTEXITCODE -eq 2) { Write-Warn2 '本机没有可用的 gcc：单元测试只能设计用例和写测试代码，不能编译运行。安装方法见 README“单元测试”一节' }
+    elseif ($LASTEXITCODE -ne 0) { $bad++ }
+}
+
 Write-Step 'DSH 组合配置'
 if (Test-Path $DshBin) {
     $env:DSH_HOME = $DshHome
     $env:DSH_TELEMETRY_DISABLED = '1'
     $dump = & node $DshBin --profile web --dump-config 2>$null | Out-String
-    if ($dump -match 'id: mcp-cppcheck') { Write-Ok '已加载 mcp-cppcheck' } else { Write-Fail '组合配置中没有 mcp-cppcheck，检查 runtime\dsh-home\cordis.patch.yml'; $bad++ }
-    $skill = Join-Path $DshHome 'skills\code-walkthrough\SKILL.md'
-    if (Test-Path $skill) { Write-Ok 'Skill：code-walkthrough' } else { Write-Fail '缺少 Skill，重新运行 setup.ps1'; $bad++ }
+    foreach ($id in @('mcp-cppcheck', 'mcp-docreader', 'mcp-docgen', 'mcp-utest')) {
+        if ($dump -match "id: $id") { Write-Ok "已加载 $id" } else { Write-Fail "组合配置中没有 $id，重新运行 setup.ps1 或检查 runtime\dsh-home\cordis.patch.yml"; $bad++ }
+    }
+    foreach ($name in @('code-walkthrough', 'requirements-analysis', 'unit-test-design', 'detailed-design')) {
+        if (Test-Path (Join-Path $DshHome "skills\$name\SKILL.md")) { Write-Ok "Skill：$name" } else { Write-Fail "缺少 Skill $name，重新运行 setup.ps1"; $bad++ }
+    }
 }
 
 if ($bad -eq 0) { Write-Host "`n全部通过，可以运行 scripts\start-web.ps1" -ForegroundColor Green }

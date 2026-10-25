@@ -1,0 +1,27 @@
+{
+  "description": "对参考版 cmd_check.c 的单点变异，用于衡量测试的检错能力（变异得分 = 被杀死的变异体 / 全部变异体）。每个变异体都与参考版行为不同（非等价）。",
+  "mutants": [
+    { "id": "M01", "find": "sum = (uint16_t)(sum + buf[i]);", "replace": "sum = (uint16_t)(sum ^ buf[i]);" },
+    { "id": "M02", "find": "for (i = 0u; i < len; i++) {", "replace": "for (i = 1u; i < len; i++) {" },
+    { "id": "M03", "find": "    if (buf == NULL) {\n        return 0u;", "replace": "    if (buf == NULL) {\n        return 0xFFFFu;" },
+    { "id": "M04", "find": "if (frame == NULL) {\n        return CMD_ERR_NULL;", "replace": "if (frame == NULL) {\n        return CMD_ERR_LEN;" },
+    { "id": "M05", "find": "sum = (uint16_t)(((uint16_t)frame[6] << 8) | frame[7]);", "replace": "sum = (uint16_t)(((uint16_t)frame[7] << 8) | frame[6]);" },
+    { "id": "M06", "find": "cmd_checksum(frame, 6u)", "replace": "cmd_checksum(frame, 5u)" },
+    { "id": "M07", "find": "code  = (uint16_t)(((uint16_t)frame[2] << 8) | frame[3]);", "replace": "code  = (uint16_t)(((uint16_t)frame[3] << 8) | frame[2]);" },
+    { "id": "M08", "find": "param = (uint16_t)(((uint16_t)frame[4] << 8) | frame[5]);", "replace": "param = (uint16_t)frame[5];" },
+    { "id": "M09", "find": "    case CODE_UPLOAD_EN:\n    case CODE_SW_RESET:\n", "replace": "    case CODE_UPLOAD_EN:\n" },
+    { "id": "M10", "find": "if ((code == CODE_LOAD_ON || code == CODE_LOAD_OFF) && param != 0u) {", "replace": "if ((code == CODE_LOAD_ON) && param != 0u) {" },
+    { "id": "M11", "find": "code == CODE_UPLOAD_EN && param != UPLOAD_KEY", "replace": "code == CODE_UPLOAD_EN && param == UPLOAD_KEY" },
+    { "id": "M12", "find": "code == CODE_SW_RESET && param != RESET_KEY", "replace": "code == CODE_SW_RESET && param < RESET_KEY" },
+    { "id": "M13", "find": "if ((code == CODE_LOAD_ON || code == CODE_HEAT_LIMIT) && mode == MODE_SAFE) {", "replace": "if ((code == CODE_LOAD_ON || code == CODE_HEAT_LIMIT) && mode != MODE_NORMAL) {" },
+    { "id": "M14", "find": "if ((code == CODE_LOAD_ON || code == CODE_HEAT_LIMIT) && mode == MODE_SAFE) {", "replace": "if ((code == CODE_LOAD_ON || code == CODE_LOAD_OFF) && mode == MODE_SAFE) {" },
+    { "id": "M15", "find": "        s_accept_count++;", "replace": "        s_accept_count += 2u;" },
+    { "id": "M16", "find": "s_error_count < 255u", "replace": "s_error_count < 254u" },
+    { "id": "M17", "find": "    s_accept_count = 0u;\n    s_error_count = 0u;", "replace": "    s_accept_count = 0u;" },
+    { "id": "M18", "find": "uint8_t cmd_get_error_count(void)\n{\n    return s_error_count;", "replace": "uint8_t cmd_get_error_count(void)\n{\n    return s_accept_count;" },
+    { "id": "M19", "find": "if (frame[0] != SYNC_0 || frame[1] != SYNC_1) {", "replace": "if (frame[0] != SYNC_0 && frame[1] != SYNC_1) {" },
+    { "id": "M20", "find": "#define HEAT_LIMIT_MAX  1000u", "replace": "#define HEAT_LIMIT_MAX  1001u" },
+    { "id": "M21", "find": "    if (sum != cmd_checksum(frame, 6u)) {\n        return CMD_ERR_SUM;\n    }\n", "replace": "" },
+    { "id": "M22", "find": "    if (code == CODE_UPLOAD_EN && mode != MODE_MAINT) {\n        return CMD_ERR_MODE;\n    }\n    return check_param(code, param);", "replace": "    return check_param(code, param);" }
+  ]
+}

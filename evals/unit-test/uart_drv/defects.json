@@ -1,0 +1,63 @@
+{
+  "description": "埋入 sample/utest/uart_drv/src/uart_drv.c 的缺陷。每条是对参考版（reference/uart_drv.c）的一处替换，评分时逐条单独应用。样例源码由 build-sample.mjs 生成：D1 和 D2 改的是同一行，样例中合成为一行（sampleReplace，同时含两个缺陷），D1 不再单独应用（inSample: false）。",
+  "defects": [
+    {
+      "id": "D1",
+      "title": "发送超时判断差一个 tick：经过 5 tick 仍继续等待",
+      "design": "详细设计 3.2 第 3 步：经过的 tick 数大于或等于 5 判为超时",
+      "detectBy": "桩控制 tick：等待到第 5 tick 时 TH 仍为 0 应返回超时；第 6 次查询才就绪时不能返回成功",
+      "find": "if ((uint32_t)(sys_ticks() - start) >= UART_TX_TIMEOUT_MS) {",
+      "replace": "if ((uint32_t)(sys_ticks() - start) > UART_TX_TIMEOUT_MS) {",
+      "inSample": false
+    },
+    {
+      "id": "D2",
+      "title": "tick 回绕处理错误：起点接近 0xFFFFFFFF 时误判超时",
+      "design": "详细设计 3.2 第 3 步：按 32 位无符号相减，tick 回绕时结果仍正确；1.5 节 sys_ticks 会回绕",
+      "detectBy": "桩让起点为 0xFFFFFFFE，等待 1～2 tick 后就绪，应返回成功",
+      "find": "if ((uint32_t)(sys_ticks() - start) >= UART_TX_TIMEOUT_MS) {",
+      "replace": "if (sys_ticks() >= start + UART_TX_TIMEOUT_MS) {",
+      "sampleReplace": "if (sys_ticks() > start + UART_TX_TIMEOUT_MS) {"
+    },
+    {
+      "id": "D3",
+      "title": "接收缓冲区满判断错误：第 33 个字节覆盖最早的数据",
+      "design": "详细设计 3.3 第 2 步：缓冲区已满（32 字节）时丢弃新字节，rx_ovf 加 1",
+      "detectBy": "连续接收 33 个字节：rx_ovf 应为 1，读出的应是前 32 个字节",
+      "find": "} else if (s_rx_count >= UART_RX_BUF_SIZE) {",
+      "replace": "} else if (s_rx_count > UART_RX_BUF_SIZE) {"
+    },
+    {
+      "id": "D4",
+      "title": "接收中断只检查校验错，帧错的字节被存入缓冲区",
+      "design": "详细设计 3.3 第 2 步：PE=1 或 FE=1 时丢弃",
+      "detectBy": "只有 FE=1 的字节应被丢弃，rx_err 加 1",
+      "find": "if ((st & (UART_ST_PE | UART_ST_FE)) != 0u) {",
+      "replace": "if ((st & UART_ST_PE) != 0u) {"
+    },
+    {
+      "id": "D5",
+      "title": "缓冲区为空时提前返回，没有恢复中断",
+      "design": "详细设计 3.4 第 4 步：每次 irq_lock 后必须调用且只调用一次 irq_unlock，包括缓冲区为空",
+      "detectBy": "桩记录 irq_lock/irq_unlock 次数和参数：缓冲区为空时读取，两者次数应相等",
+      "find": "    key = irq_lock();\n    while (n < maxlen && s_rx_count > 0u) {",
+      "replace": "    key = irq_lock();\n    if (s_rx_count == 0u) {\n        return 0u;\n    }\n    while (n < maxlen && s_rx_count > 0u) {"
+    },
+    {
+      "id": "D6",
+      "title": "分频值截断取整，19200、38400、57600 时偏小 1",
+      "design": "详细设计 1.4 节：四舍五入取整后减 1",
+      "detectBy": "逐个波特率检查写入 SCALER 的值；只测 9600 和 115200 发现不了",
+      "find": "return (UART_SYS_CLK_HZ + div / 2u) / div - 1u;",
+      "replace": "return UART_SYS_CLK_HZ / div - 1u;"
+    },
+    {
+      "id": "D7",
+      "title": "初始化时先使能收发再写分频值",
+      "design": "详细设计 3.1 第 2 步：分频值必须在收发禁止状态下写入，写入顺序固定",
+      "detectBy": "替换寄存器读写宏，记录写入顺序和值：写 SCALER 时 CTRL 应为 0；只检查最终寄存器值发现不了",
+      "find": "    UART_WR(UART_STATUS, UART_ST_OV | UART_ST_PE | UART_ST_FE);\n    UART_WR(UART_SCALER, baud_scaler(baud));",
+      "replace": "    UART_WR(UART_STATUS, UART_ST_OV | UART_ST_PE | UART_ST_FE);\n    UART_WR(UART_CTRL, ctrl);\n    UART_WR(UART_SCALER, baud_scaler(baud));"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "dept-mcp-docreader",
+  "version": "0.1.0",
+  "private": true,
+  "description": "部门文档读取 MCP 服务（Word/Excel/PDF 转 Markdown）",
+  "type": "module",
+  "bin": { "dept-mcp-docreader": "server.mjs" },
+  "engines": { "node": ">=22.19" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.25.0"
+  },
+  "optionalDependencies": {
+    "pdfjs-dist": "6.2.108"
+  }
+}

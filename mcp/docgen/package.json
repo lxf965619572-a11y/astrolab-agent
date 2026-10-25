@@ -1,0 +1,13 @@
+{
+  "name": "dept-mcp-docgen",
+  "version": "0.1.0",
+  "private": true,
+  "description": "部门文档生成 MCP 服务（Markdown 套 Word 模板生成 docx，表格导出 xlsx）",
+  "type": "module",
+  "bin": { "dept-mcp-docgen": "server.mjs" },
+  "engines": { "node": ">=22.19" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.25.0"
+  }
+}

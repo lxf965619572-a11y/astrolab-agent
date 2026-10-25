@@ -32,13 +32,18 @@ $ver = & node $DshBin --version
 if ($ver.Trim() -ne $DshVersion) { Write-Fail "安装后的版本是 $ver，期望 $DshVersion"; exit 1 }
 Write-Ok "dsh $ver"
 
-Write-Step '安装 Cppcheck MCP 服务依赖'
-Push-Location (Join-Path $Root 'mcp\cppcheck')
-try {
-    & npm install @npmArgs
-    if ($LASTEXITCODE -ne 0) { throw "npm install 失败（退出码 $LASTEXITCODE）" }
-} finally { Pop-Location }
-Write-Ok 'mcp\cppcheck'
+Write-Step '安装 MCP 服务依赖（cppcheck、docreader、docgen、utest）'
+foreach ($svc in @('cppcheck', 'docreader', 'docgen', 'utest')) {
+    Push-Location (Join-Path $Root "mcp\$svc")
+    try {
+        & npm install @npmArgs
+        if ($LASTEXITCODE -ne 0) { throw "mcp\$svc 的 npm install 失败（退出码 $LASTEXITCODE）" }
+    } finally { Pop-Location }
+    Write-Ok "mcp\$svc"
+}
+if (-not (Test-Path (Join-Path $Root 'mcp\docreader\node_modules\pdfjs-dist'))) {
+    Write-Warn2 'PDF 解析组件 pdfjs-dist 未装上（可选依赖），读 PDF 会提示错误；Word/Excel 不受影响'
+}
 
 Write-Step '写入部门配置到 runtime\dsh-home'
 New-Item -ItemType Directory -Force -Path $DshHome | Out-Null
@@ -46,7 +51,7 @@ New-Item -ItemType Directory -Force -Path $DshHome | Out-Null
 $rootFwd = $Root -replace '\\', '/'
 $tpl = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'config\cordis.patch.yml.template')
 [IO.File]::WriteAllText((Join-Path $DshHome 'cordis.patch.yml'), $tpl.Replace('__STARTER_DIR__', $rootFwd), (New-Object Text.UTF8Encoding $false))
-Write-Ok 'cordis.patch.yml（注册 Cppcheck MCP 服务）'
+Write-Ok 'cordis.patch.yml（注册 cppcheck、docreader、docgen、utest 四个 MCP 服务）'
 # 部门 Skills：复制到 DSH 用户级 skills 目录
 $skillsDst = Join-Path $DshHome 'skills'
 New-Item -ItemType Directory -Force -Path $skillsDst | Out-Null

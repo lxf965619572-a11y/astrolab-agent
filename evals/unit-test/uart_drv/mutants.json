@@ -1,0 +1,135 @@
+{
+  "description": "对参考版 uart_drv.c 的单点变异，用于衡量测试的检错能力。每个变异体都与参考版行为不同（非等价）。",
+  "mutants": [
+    {
+      "id": "M01",
+      "find": "return (UART_SYS_CLK_HZ + div / 2u) / div - 1u;",
+      "replace": "return (UART_SYS_CLK_HZ + div / 4u) / div - 1u;"
+    },
+    {
+      "id": "M02",
+      "find": "    case 57600u:\n",
+      "replace": ""
+    },
+    {
+      "id": "M03",
+      "find": "parity > UART_PARITY_EVEN",
+      "replace": "parity >= UART_PARITY_EVEN"
+    },
+    {
+      "id": "M04",
+      "find": "        ctrl |= UART_CTRL_PE | UART_CTRL_PS;",
+      "replace": "        ctrl |= UART_CTRL_PE;"
+    },
+    {
+      "id": "M05",
+      "find": "ctrl = UART_CTRL_RE | UART_CTRL_TE | UART_CTRL_RI;",
+      "replace": "ctrl = UART_CTRL_RE | UART_CTRL_TE;"
+    },
+    {
+      "id": "M06",
+      "find": "    UART_WR(UART_STATUS, UART_ST_OV | UART_ST_PE | UART_ST_FE);\n",
+      "replace": ""
+    },
+    {
+      "id": "M07",
+      "find": "    s_rx_err = 0u;\n",
+      "replace": ""
+    },
+    {
+      "id": "M08",
+      "find": "if (buf == NULL || sent == NULL) {",
+      "replace": "if (buf == NULL && sent == NULL) {"
+    },
+    {
+      "id": "M09",
+      "find": "    *sent = 0u;\n",
+      "replace": ""
+    },
+    {
+      "id": "M10",
+      "find": "*sent = (uint16_t)(i + 1u);",
+      "replace": "*sent = i;"
+    },
+    {
+      "id": "M11",
+      "find": "uint32_t start = sys_ticks();",
+      "replace": "uint32_t start = 0u;"
+    },
+    {
+      "id": "M12",
+      "find": "UART_WR(UART_DATA, buf[i]);",
+      "replace": "UART_WR(UART_DATA, buf[0]);"
+    },
+    {
+      "id": "M13",
+      "find": "while ((n < UART_ISR_MAX_BYTES) && ((st & UART_ST_DR) != 0u)) {",
+      "replace": "while ((st & UART_ST_DR) != 0u) {"
+    },
+    {
+      "id": "M14",
+      "find": "while ((n < UART_ISR_MAX_BYTES) && ((st & UART_ST_DR) != 0u)) {",
+      "replace": "while ((n <= UART_ISR_MAX_BYTES) && ((st & UART_ST_DR) != 0u)) {"
+    },
+    {
+      "id": "M15",
+      "find": "            UART_WR(UART_STATUS, UART_ST_PE | UART_ST_FE);\n",
+      "replace": ""
+    },
+    {
+      "id": "M16",
+      "find": "            s_rx_err++;",
+      "replace": "            s_rx_ovf++;"
+    },
+    {
+      "id": "M17",
+      "find": "s_rx_head = (uint16_t)((s_rx_head + 1u) % UART_RX_BUF_SIZE);",
+      "replace": "s_rx_head = (uint16_t)((s_rx_head + 1u) % (UART_RX_BUF_SIZE - 1u));"
+    },
+    {
+      "id": "M18",
+      "find": "s_rx_tail = (uint16_t)((s_rx_tail + 1u) % UART_RX_BUF_SIZE);",
+      "replace": "s_rx_tail = (uint16_t)((s_rx_tail + 1u) % (UART_RX_BUF_SIZE - 1u));"
+    },
+    {
+      "id": "M19",
+      "find": "    if ((st & UART_ST_OV) != 0u) {",
+      "replace": "    if ((st & UART_ST_OV) == 0u) {"
+    },
+    {
+      "id": "M20",
+      "find": "        UART_WR(UART_STATUS, UART_ST_OV);\n",
+      "replace": ""
+    },
+    {
+      "id": "M21",
+      "find": "    irq_unlock(key);\n    return n;",
+      "replace": "    irq_unlock(0u);\n    return n;"
+    },
+    {
+      "id": "M22",
+      "find": "while (n < maxlen && s_rx_count > 0u) {",
+      "replace": "while (n <= maxlen && s_rx_count > 0u) {"
+    },
+    {
+      "id": "M23",
+      "find": "if (buf == NULL || maxlen == 0u) {",
+      "replace": "if (buf == NULL) {"
+    },
+    {
+      "id": "M24",
+      "find": "    st->rx_err = s_rx_err;",
+      "replace": "    st->rx_err = s_rx_ovf;"
+    },
+    {
+      "id": "M25",
+      "find": "    key = irq_lock();\n    st->rx_err",
+      "replace": "    key = 0u;\n    st->rx_err"
+    },
+    {
+      "id": "M26",
+      "find": "        byte = (uint8_t)UART_RD(UART_DATA);\n",
+      "replace": "        byte = (uint8_t)UART_RD(UART_DATA);\n        n++;\n"
+    }
+  ]
+}

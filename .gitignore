@@ -2,8 +2,18 @@ runtime/
 config/local.env
 mcp/*/node_modules/
 sample/review/
+sample/req/
 sample/.dsh/
+sample/.acl-recovery/
+sample/req-*/
+sample/utest/*/test/
 evals/results/
+evals/unit-test/results/
+.utest/
+sample/design/*/doc*/
+evals/detailed-design/results/
+sample/design/*/src/
+sample/design/*/include/
 
 # 本地工具与临时文件
 cppcheck-*.msi

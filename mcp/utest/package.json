@@ -1,0 +1,13 @@
+{
+  "name": "dept-mcp-utest",
+  "version": "0.1.0",
+  "private": true,
+  "description": "部门单元测试 MCP 服务（编译运行手写驱动/gtest，gcov 语句、分支、MC/DC 覆盖率）",
+  "type": "module",
+  "bin": { "dept-mcp-utest": "server.mjs" },
+  "engines": { "node": ">=22.19" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.20.0",
+    "zod": "^3.25.0"
+  }
+}

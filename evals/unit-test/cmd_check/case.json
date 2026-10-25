@@ -1,0 +1,8 @@
+{
+  "description": "遥控指令帧合法性检查模块（虚构）。工作区中是埋缺陷版，本目录下是正确的参考版。",
+  "reference": "reference/cmd_check.c",
+  "sampleSource": "sample/utest/cmd_check/src/cmd_check.c",
+  "sampleInclude": "sample/utest/cmd_check/include",
+  "sampleTestDir": "sample/utest/cmd_check/test",
+  "sourceName": "cmd_check.c"
+}

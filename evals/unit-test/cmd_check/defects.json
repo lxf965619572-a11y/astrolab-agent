@@ -1,0 +1,53 @@
+{
+  "description": "埋入 sample/utest/cmd_check/src/cmd_check.c 的缺陷。每条是对参考版（reference/cmd_check.c）的一处替换；样例源码由 build-sample.mjs 把全部缺陷应用到参考版生成。",
+  "defects": [
+    {
+      "id": "D1",
+      "title": "温度门限上边界错误：1000 被判为非法",
+      "design": "详细设计 2 节：0x0201 参数 0～1000（含两端）",
+      "detectBy": "边界值：参数 1000 应返回 CMD_OK",
+      "find": "code == CODE_HEAT_LIMIT && param > HEAT_LIMIT_MAX",
+      "replace": "code == CODE_HEAT_LIMIT && param >= HEAT_LIMIT_MAX"
+    },
+    {
+      "id": "D2",
+      "title": "安全模式禁止条件缺括号：载荷加电在所有模式下都被拒绝",
+      "design": "详细设计 2 节：0x0101 在正常、维护模式允许",
+      "detectBy": "0x0101 在正常模式应返回 CMD_OK；MC/DC 设计会覆盖这一组合",
+      "find": "if ((code == CODE_LOAD_ON || code == CODE_HEAT_LIMIT) && mode == MODE_SAFE) {",
+      "replace": "if (code == CODE_LOAD_ON || code == CODE_HEAT_LIMIT && mode == MODE_SAFE) {"
+    },
+    {
+      "id": "D3",
+      "title": "错误计数回绕，应饱和在 255",
+      "design": "详细设计 3.3 节：错误计数到 255 后保持 255",
+      "detectBy": "边界值：错误 256 次后错误计数应为 255",
+      "find": "    } else if (s_error_count < 255u) {\n        s_error_count++;\n    } else {\n        /* 错误计数饱和，保持 255 */\n    }",
+      "replace": "    } else {\n        s_error_count++;\n    }"
+    },
+    {
+      "id": "D4",
+      "title": "长度检查只拒绝过短的帧，长度大于 8 被接受",
+      "design": "详细设计 3.2 节：len 等于 8",
+      "detectBy": "等价类：len = 9 应返回 CMD_ERR_LEN",
+      "find": "if (len != CMD_FRAME_LEN) {",
+      "replace": "if (len < CMD_FRAME_LEN) {"
+    },
+    {
+      "id": "D5",
+      "title": "程序上注使能在正常模式也被接受，应仅维护模式",
+      "design": "详细设计 2 节：0x0301 仅维护模式",
+      "detectBy": "0x0301 在正常模式应返回 CMD_ERR_MODE",
+      "find": "if (code == CODE_UPLOAD_EN && mode != MODE_MAINT) {",
+      "replace": "if (code == CODE_UPLOAD_EN && mode == MODE_SAFE) {"
+    },
+    {
+      "id": "D6",
+      "title": "同步字只检查了第 1 个字节",
+      "design": "详细设计 3.2 节：字节 0 为 0xEB 且字节 1 为 0x90",
+      "detectBy": "同步字第 2 字节错误（0xEB、0x00）应返回 CMD_ERR_SYNC；MC/DC 设计会覆盖",
+      "find": "if (frame[0] != SYNC_0 || frame[1] != SYNC_1) {",
+      "replace": "if (frame[0] != SYNC_0) {"
+    }
+  ]
+}

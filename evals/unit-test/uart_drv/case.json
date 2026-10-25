@@ -1,0 +1,8 @@
+{
+  "description": "RS-422 串口收发驱动（虚构）：寄存器读写宏、下层函数 sys_ticks/irq_lock、发送超时、接收中断和环形缓冲。工作区中是埋缺陷版，本目录下是正确的参考版。",
+  "reference": "reference/uart_drv.c",
+  "sampleSource": "sample/utest/uart_drv/src/uart_drv.c",
+  "sampleInclude": "sample/utest/uart_drv/include",
+  "sampleTestDir": "sample/utest/uart_drv/test",
+  "sourceName": "uart_drv.c"
+}

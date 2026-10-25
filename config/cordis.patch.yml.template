@@ -13,3 +13,35 @@
         args: ['__STARTER_DIR__/mcp/cppcheck/server.mjs']
         # CPPCHECK_PATH / CPPCHECK_SUPPRESSIONS 由 start-web.ps1 从 local.env 读入后自动继承
         toolCallTimeoutMs: 600000   # 静态分析可能较慢，放宽到 10 分钟
+
+    # 文档读取服务：Word/Excel/PDF 转 Markdown（只读）
+    - id: mcp-docreader
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docreader
+        transport: stdio
+        command: !!js process.execPath
+        args: ['__STARTER_DIR__/mcp/docreader/server.mjs']
+        toolCallTimeoutMs: 120000   # 大文档或 PDF 解析可能较慢
+
+    # 文档生成服务：Markdown 套 Word 模板生成 .docx，表格导出 .xlsx
+    # 模板目录默认 config/templates；DOC_ALLOWED_ROOTS / DOCGEN_TEMPLATE_DIR 由 start-web.ps1 从 local.env 读入后继承
+    - id: mcp-docgen
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docgen
+        transport: stdio
+        command: !!js process.execPath
+        args: ['__STARTER_DIR__/mcp/docgen/server.mjs']
+        toolCallTimeoutMs: 120000
+
+    # 单元测试服务：主机上编译运行手写驱动/桩或 gtest，gcov 统计语句、分支、MC/DC 覆盖率
+    # 编译器 UTEST_CC 等由 start-web.ps1 从 local.env 读入后继承；构建目录在工作区的 .utest 下
+    - id: mcp-utest
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: utest
+        transport: stdio
+        command: !!js process.execPath
+        args: ['__STARTER_DIR__/mcp/utest/server.mjs']
+        toolCallTimeoutMs: 600000   # 编译、运行和覆盖率统计，大模块可能较慢
