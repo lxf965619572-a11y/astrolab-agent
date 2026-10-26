@@ -1,0 +1,86 @@
+{
+  "description": "埋入 sample/utest/rt1553/src 的缺陷。每条是对参考版中 file 指定文件的一处替换，评分时逐条单独应用。",
+  "defects": [
+    {
+      "id": "D1",
+      "file": "rt_drv.c",
+      "title": "RT 地址校验位按偶校验计算",
+      "design": "详细设计 1.1：ADDR 的 bit5～0 中共有奇数个 1；2.2 第 5 步",
+      "detectBy": "用地址 0（校验位应为 1，写入 0x0020）、地址 1（应写入 0x0001）、地址 3（应写入 0x0023）初始化，检查写入 ADDR 的值",
+      "find": "return ((ones & 1u) != 0u) ? 0u : RT_ADDR_PAR;",
+      "replace": "return ((ones & 1u) != 0u) ? RT_ADDR_PAR : 0u;"
+    },
+    {
+      "id": "D2",
+      "file": "rt_drv.c",
+      "title": "复位等待超时差一个 tick：经过 10 tick 仍继续等待",
+      "design": "详细设计 2.2 第 3 步：经过的 tick 数大于或等于 10 时返回超时",
+      "detectBy": "READY 始终为 0，桩让 tick 每次读取加 1：应在经过 10 tick 时返回 RT_ERR_TIMEOUT；或 READY 在经过 10 tick 后才置 1，应返回超时而不是成功",
+      "find": "if ((uint32_t)(sys_ticks() - start) >= RT_RESET_TIMEOUT) {",
+      "replace": "if ((uint32_t)(sys_ticks() - start) > RT_RESET_TIMEOUT) {"
+    },
+    {
+      "id": "D3",
+      "file": "rt_drv.c",
+      "title": "描述符堆栈读指针不回绕",
+      "design": "详细设计 2.3 第 5 步：s_next 到 0x0100 时回到 0x0000",
+      "detectBy": "连续取出 64 个以上描述符：第 64 个之后 STKPTR 回到 0x0000 附近，应从地址 0x0000 继续读出第 65 个描述符",
+      "find": "s_next = (uint16_t)((s_next + 4u) & (RT_STK_WORDS - 1u));",
+      "replace": "s_next = (uint16_t)(s_next + 4u);"
+    },
+    {
+      "id": "D4",
+      "file": "rt_drv.c",
+      "title": "判断 BC 是否正在读该子地址时，子地址字段移位错误",
+      "design": "详细设计 1.1：STAT bit9～5 为正在传输的子地址；2.5 第 2 步",
+      "detectBy": "STAT = BUSY | (1 << 5)（正在传输子地址 1）时写子地址 1 应返回 RT_ERR_BUSY 且不写数据块；正在传输子地址 2 时写子地址 1 应成功",
+      "find": "((st >> RT_STAT_SA_SHIFT) & RT_STAT_SA_MASK) == sa",
+      "replace": "((st >> 4u) & RT_STAT_SA_MASK) == sa"
+    },
+    {
+      "id": "D5",
+      "file": "rt_msg.c",
+      "title": "命令字字数为 0 时没有按 32 字处理",
+      "design": "详细设计 1.2、3.3 第 2.3 步：字数 0 表示 32",
+      "detectBy": "描述符命令字的字数字段为 0：应读出 32 字，rt_msg_get 返回的 wc 为 32",
+      "find": "        if (wc == 0u) {\n            wc = RT_MAX_WC;\n        }\n",
+      "replace": ""
+    },
+    {
+      "id": "D6",
+      "file": "rt_msg.c",
+      "title": "有错的消息计数后没有丢弃，数据照样更新",
+      "design": "详细设计 3.3 第 2.1 步：ERR 为 1 时只计错误，不更新数据、不更新 s_last_rx、不计入正确消息",
+      "detectBy": "块状态字 ERR = 1 的接收消息：错误计数加 1，正确计数不变，rt_msg_get 返回 0（没有新数据）",
+      "find": "            cnt_inc(&s_err_cnt);\n            continue;\n",
+      "replace": "            cnt_inc(&s_err_cnt);\n"
+    },
+    {
+      "id": "D7",
+      "file": "rt_msg.c",
+      "title": "没有新数据时返回前没有开中断",
+      "design": "详细设计 3.4 第 3 步：每条返回路径上 irq_lock 和 irq_unlock 成对调用",
+      "detectBy": "桩记录 irq_lock/irq_unlock 次数：没有新数据时调用 rt_msg_get，两者次数应相等，且 irq_unlock 的参数为 irq_lock 的返回值",
+      "find": "    if (s_rx_new[sa] == 0u) {\n        irq_unlock(key);\n        return 0;\n    }",
+      "replace": "    if (s_rx_new[sa] == 0u) {\n        return 0;\n    }"
+    },
+    {
+      "id": "D8",
+      "file": "rt_msg.c",
+      "title": "总线静默判断没有考虑 tick 回绕",
+      "design": "详细设计 3.6 第 3 步：32 位无符号相减，tick 回绕时结果仍正确",
+      "detectBy": "最近一次收到消息时 tick 为 0xFFFFFF00，当前 tick 为 0xFFFFFF10（经过 16 tick）：应判为未静默；当前回绕为 0x000002E8（经过 1000 tick）应判为静默",
+      "find": "s_link_lost = ((uint32_t)(sys_ticks() - last) >= RT_LINK_TIMEOUT) ? 1u : 0u;",
+      "replace": "s_link_lost = (sys_ticks() >= last + RT_LINK_TIMEOUT) ? 1u : 0u;"
+    },
+    {
+      "id": "D9",
+      "file": "rt_msg.c",
+      "title": "发送数据写入重试多一次（最多调用 4 次）",
+      "design": "详细设计 3.5：返回 RT_ERR_BUSY 时再次调用，最多调用 3 次",
+      "detectBy": "rt_drv_write_tx 的桩前 3 次返回 RT_ERR_BUSY、第 4 次返回 RT_OK：rt_msg_put 应返回 RT_ERR_BUSY，桩被调用 3 次",
+      "find": "for (n = 0u; n < RT_TX_TRIES && r == RT_ERR_BUSY; n++) {",
+      "replace": "for (n = 0u; n <= RT_TX_TRIES && r == RT_ERR_BUSY; n++) {"
+    }
+  ]
+}

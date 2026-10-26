@@ -26,7 +26,7 @@ astrolab-agent/
 ├── sample/src/         示例代码：遥测帧打包/解析，故意埋了约 10 个缺陷
 ├── sample/docs/        示例软件研制任务书（虚构，.docx 由同名 .md 生成），埋了 20 个需求问题
 ├── sample/design/      设计示例（虚构）：tcu 热控单元软件（概要设计的输入）；oc_ctrl OC 指令输出（详细设计的输入）
-├── sample/utest/       单元测试示例模块（虚构）：cmd_check 指令检查（6 个缺陷）、uart_drv 串口驱动（7 个缺陷），各含详细设计
+├── sample/utest/       单元测试示例模块（虚构）：cmd_check 指令检查（6 个缺陷）、uart_drv 串口驱动（7 个缺陷）、rt1553 1553B RT 通信（两个单元，9 个缺陷），各含详细设计
 ├── evals/              代码走查评测集（8 个用例、29 个缺陷）与自动打分
 │   ├── requirements-analysis/  示例任务书的埋入问题对照表（人工对照用）
 │   ├── preliminary-design/     概要设计评测：答案表、参考概要设计
@@ -212,6 +212,10 @@ node evals\unit-test\score.mjs uart_drv --run sample\.utest\uart_drv\last-run.js
 
 人工参考测试的成绩：31 个用例，预期错误 0，缺陷 7/7，变异 26/26，语句、分支 100%。
 
+**示例 3：多单元工程 rt1553。**`utest\rt1553` 是一个 1553B 远程终端：芯片驱动 `rt_drv.c`（寄存器、共享 RAM、描述符堆栈）和消息处理 `rt_msg.c`（调用 rt_drv、tick、关中断、遥控分发）两个单元，共 11 个接口。每个单元一个测试程序，测一个单元时另一个单元用桩代替。寄存器头文件 `src\rt_hw.h` 与 `rt_drv.c` 在同一目录，`run_unit_tests` 会自动替换（编译影子副本，被测文件不改动）。提示词和评分方法见 [evals\unit-test\README.md](evals/unit-test/README.md)。
+
+**寄存器地址直接写在 `.c` 中**（没有可替换的头文件）时，测试驱动可以 `#include "ut_map.h"`，用 `UT_MAP(地址, 长度)` 把这段地址映射为主机内存后再测试。只能预置值、检查最终写入值，模拟不了读清除等硬件副作用。自检（`check.ps1`）会试一次映射 0x20000100，本机映射不了时显示警告。
+
 **MC/DC：**GCC 14 及以上，utest 服务用 `-fcondition-coverage` 直接测量；GCC 13 及以下不能测量，Skill 要求智能体为每个复合判定写 MC/DC 分析表（每个条件的独立影响对），用 `check_mcdc` 核对，报告中写“未测量，分析表核对……”，不写百分比。
 
 **注意：**
@@ -308,10 +312,10 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 需求分析 | requirements-analysis | docreader、docgen | 示例 1（RS-422 遥测）、示例 2（1553B RT） | 两个示例已评测，检查脚本 check-report.mjs |
 | 概要设计 | preliminary-design（正向） | docgen（Mermaid 流程图转 Word 图形） | tcu（热控单元软件） | 已评测：F 5/5、G 10/10、0 误报，检查脚本 check-hld.mjs；用其输出跑 htr_out 详细设计，两个 Skill 能衔接 |
 | 详细设计 | detailed-design（正向、逆向） | docgen（Mermaid 流程图转 Word 图形） | oc_ctrl（OC 指令输出） | 正向已评测；逆向需在修复 prepare.mjs 后重测一次 |
-| 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC） | cmd_check、uart_drv | 两个示例已评测，评分脚本 score.mjs |
+| 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC；同目录头文件替换；地址映射 ut_map.h） | cmd_check、uart_drv、rt1553（多单元） | cmd_check、uart_drv 已评测；rt1553 参考测试基线已建立，待智能体实测；评分脚本 score.mjs 支持多单元 |
 | 代码走查 | code-walkthrough | cppcheck | 8 个评测用例 | 已有基线 |
 
-待办：多接口工程的单元测试示例（1553B 共享存储区、跨模块）；被测 `.c` 与寄存器头文件同目录时的替换；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
+待办：rt1553 多单元示例在 DSH 中实测；地址映射在 Windows 上确认（运行 check.ps1）；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
 
 ## 版本说明
 

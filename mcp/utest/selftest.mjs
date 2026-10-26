@@ -57,6 +57,22 @@ try {
     else say(!cs.timedOut && !cs.summary, cs.timedOut
       ? '崩溃识别：测试程序崩溃后挂起到超时（Windows 错误报告对话框未关闭），请告诉维护人员'
       : `崩溃识别：测试程序崩溃后 ${((Date.now() - t0) / 1000).toFixed(1)} 秒内结束，最后的用例 ${cs.cases?.at(-1)?.id ?? '?'}`)
+
+    // 与被测 .c 同目录的寄存器头文件，用 includeDirs 中的同名头文件替换（影子目录）
+    const sd = await c.callTool({ name: 'run_unit_tests', arguments: {
+      sources: [join(ex, 'samedir', 'src', 'drv.c')], tests: [join(ex, 'samedir', 'test', 'test_drv.c')],
+      includeDirs: [join(ex, 'samedir', 'test', 'hw'), join(ex, 'samedir', 'src')], name: 'selftest-samedir' } })
+    const ss = sd.structuredContent || {}
+    say(!sd.isError && ss.summary?.failed === 0 && ss.headerOverrides?.length === 1,
+      sd.isError ? `同目录头文件替换：失败：${sd.content[0].text.slice(0, 300)}` : `同目录头文件替换：用例 ${ss.summary?.cases ?? '?'} 个，失败 ${ss.summary?.failed ?? '?'} 个，替换 ${ss.headerOverrides?.length ?? 0} 个头文件`)
+
+    // 目标机地址映射为主机内存（ut_map.h）。地址被主机占用时只提示，不算失败
+    const mp = await c.callTool({ name: 'run_unit_tests', arguments: {
+      sources: [join(ex, 'mapped.c')], tests: [join(ex, 'test_map.c')], includeDirs: [ex], name: 'selftest-map' } })
+    const ms = mp.structuredContent || {}
+    if (mp.isError) say(false, `地址映射：编译失败：${mp.content[0].text.slice(0, 300)}`)
+    else if (ms.summary?.failed === 0 && ms.summary?.cases === 1) say(true, '地址映射（ut_map.h）：0x20000100 映射为主机内存，被测代码直接访问该地址正常')
+    else console.log(`   [!]  地址映射（ut_map.h）：本机映射 0x20000100 失败或结果不对（${JSON.stringify(ms.summary)}），直接写地址的代码在本机不能用 UT_MAP 测试`)
   }
 } catch (e) {
   say(false, `自检出错：${e.message}`)

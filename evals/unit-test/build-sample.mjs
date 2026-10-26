@@ -5,13 +5,15 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { buildSample } from './lib.mjs'
+import { buildSample, loadCase, patchFile } from './lib.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
 const name = process.argv[2] || 'cmd_check'
-const cfg = JSON.parse(readFileSync(join(HERE, name, 'case.json'), 'utf8'))
-const ref = readFileSync(join(HERE, name, cfg.reference), 'utf8')
+const cfg = loadCase(join(HERE, name))
 const defects = JSON.parse(readFileSync(join(HERE, name, 'defects.json'), 'utf8')).defects
-writeFileSync(join(ROOT, cfg.sampleSource), buildSample(ref, defects))
-console.log(`已生成 ${cfg.sampleSource}（埋入 ${defects.length} 个缺陷）`)
+for (const f of cfg.files) {
+  const mine = defects.filter((d) => patchFile(cfg, d) === f.name)
+  writeFileSync(join(ROOT, f.sample), buildSample(f.text, mine))
+  console.log(`已生成 ${f.sample}（埋入 ${mine.filter((d) => d.inSample !== false).length} 个缺陷）`)
+}

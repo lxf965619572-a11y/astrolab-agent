@@ -24,11 +24,12 @@ server.registerTool('toolchain_info', {
 server.registerTool('run_unit_tests', {
   description:
     '编译被测源文件（插桩统计覆盖率）和测试文件（驱动、桩），链接后运行，返回用例通过情况、失败检查、各函数的语句/分支/MC/DC 覆盖率及未覆盖行。' +
-    '链接缺函数时列出需要的桩。手写驱动请使用 utest.h（已自动加入头文件路径）。每次运行会清空上次的覆盖率数据。',
+    '链接缺函数时列出需要的桩。手写驱动请使用 utest.h（已自动加入头文件路径）；地址直接写在被测代码中时，可用 ut_map.h 把目标机地址映射为主机内存。' +
+    'includeDirs 中排在被测文件目录之前的目录里有与被测 .c 同目录头文件同名的头文件时，自动替换该头文件（编译影子副本，被测文件不改动）。每次运行会清空上次的覆盖率数据。',
   inputSchema: {
     sources: z.array(z.string()).min(1).describe('被测源文件（.c），会插桩统计覆盖率。不要列出测试文件'),
     tests: z.array(z.string()).min(1).describe('测试驱动和桩文件（.c；gtest 为 .cpp）'),
-    includeDirs: z.array(z.string()).optional().describe('头文件目录'),
+    includeDirs: z.array(z.string()).optional().describe('头文件目录，按顺序查找。替换硬件头文件的目录（如 test/hw）放在最前面'),
     defines: z.array(z.string()).optional().describe('预定义宏，如 "UNIT_TEST" 或 "REG_BASE=ut_regs"'),
     cflags: z.array(z.string()).optional().describe('其他编译选项，如 "-std=c99"、"-Wall"'),
     framework: z.enum(['c', 'gtest']).optional().describe('c=手写驱动+utest.h（默认）；gtest=GoogleTest（D2000 Linux 代码）'),

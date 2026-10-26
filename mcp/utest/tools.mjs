@@ -2,7 +2,7 @@
 // 编译、链接、运行测试程序，解析测试结果，用 gcov 统计被测文件的覆盖率。
 
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { allowedRoots, resolvePath } from '../common/paths.mjs'
@@ -72,6 +72,38 @@ function linkProblems(text) {
 
 const trimLog = (s, n = 4000) => (s.length > n ? s.slice(0, n) + `\n……（共 ${s.length} 字符，已截断）` : s)
 
+// —— 被测 .c 同目录头文件的替换 ——
+// #include "x.h" 先在包含它的文件所在目录查找，所以与被测 .c 同目录的头文件，不能靠 includeDirs 中的同名头文件替换。
+// 检测到这种情况（includeDirs 中排在被测文件目录之前的目录里有同名头文件）时，把被测文件目录中的文件复制到
+// 构建目录下的影子目录（不含被替换的头文件），编译影子目录中的副本；原目录追加到 includeDirs 最后，
+// 使 "../xx/yy.h" 这类相对路径仍能找到。覆盖率按文件名统计，结果仍对应原文件。
+const HEADER = /\.(h|hh|hpp|inc)$/i
+const samePath = (a, b) => (process.platform === 'win32' ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b))
+function planShadows(srcAbs, incAbs, buildDir) {
+  const plans = []
+  for (const s of srcAbs) {
+    const sdir = dirname(s)
+    if (plans.some((p) => samePath(p.sdir, sdir))) continue
+    let files = []
+    try { files = readdirSync(sdir, { withFileTypes: true }).filter((e) => e.isFile()).map((e) => e.name) } catch { continue }
+    const overridden = []
+    for (const h of files.filter((f) => HEADER.test(f))) {
+      for (const d of incAbs) {
+        if (samePath(d, sdir)) break // 被测文件目录本身排在前面：用的就是它的头文件，不替换
+        if (existsSync(join(d, h))) { overridden.push({ header: join(sdir, h), by: join(d, h) }); break }
+      }
+    }
+    plans.push({ sdir, files, overridden, shadow: overridden.length ? join(buildDir, 'shadow', String(plans.length + 1)) : null })
+  }
+  for (const p of plans) {
+    if (!p.shadow) continue
+    mkdirSync(p.shadow, { recursive: true })
+    const skip = new Set(p.overridden.map((o) => basename(o.header).toLowerCase()))
+    for (const f of p.files) if (!skip.has(f.toLowerCase())) copyFileSync(join(p.sdir, f), join(p.shadow, f))
+  }
+  return plans.filter((p) => p.shadow)
+}
+
 export async function runUnitTests({ sources = [], tests = [], includeDirs = [], defines = [], cflags = [], framework = 'c', timeoutSec = 10, name }) {
   const tc = await toolchain()
   if (!tc.ok) return fail(tc.error)
@@ -91,6 +123,11 @@ export async function runUnitTests({ sources = [], tests = [], includeDirs = [],
   rmSync(dir, { recursive: true, force: true }) // 清掉上次的 .gcda，避免覆盖率累加
   const obj = join(dir, 'obj')
   mkdirSync(obj, { recursive: true })
+
+  const shadows = planShadows(srcAbs, incAbs, dir)
+  const shadowOf = (f) => { const p = shadows.find((x) => samePath(x.sdir, dirname(f))); return p ? { file: join(p.shadow, basename(f)), extraInc: [`-I${p.sdir}`] } : null }
+  // 输出中的影子目录路径换回原目录，便于对照源码
+  const unshadow = (t) => { let o = String(t ?? ''); for (const p of shadows) for (const v of [p.shadow, p.shadow.replace(/\\/g, '/')]) o = o.split(v).join(p.sdir); return o }
 
   const before = Object.fromEntries(srcAbs.map((f) => [f, sha1(f)]))
   const common = ['-O0', '-g', ...incAbs.map((d) => `-I${d}`), ...defines.map((d) => `-D${d}`)]
@@ -116,18 +153,39 @@ export async function runUnitTests({ sources = [], tests = [], includeDirs = [],
     } catch { return false }
   }
 
+  // 测试文件 #include 了影子目录中的被测 .c 时，编译测试文件的副本，把这一行改为包含影子目录中的副本
+  const testShadow = (t) => {
+    if (!shadows.length) return null
+    let txt
+    try { txt = readFileSync(t, 'utf8') } catch { return null }
+    let changed = false
+    for (const s of srcAbs) {
+      const sh = shadowOf(s)
+      if (!sh) continue
+      const re = new RegExp(`(#\\s*include\\s*)["<][^">]*${basename(s).replace('.', '\\.')}[">]`, 'g')
+      if (re.test(txt)) { txt = txt.replace(re, (_, inc) => `${inc}"${sh.file.replace(/\\/g, '/')}"`); changed = true }
+    }
+    if (!changed) return null
+    const d = join(dir, 'shadow', 'tests')
+    mkdirSync(d, { recursive: true })
+    const f = join(d, basename(t))
+    writeFileSync(f, txt)
+    return { file: f, extraInc: [`-I${dirname(t)}`] }
+  }
+
   const compile = async (file, isTest) => {
     const isCpp = /\.(cc|cpp|cxx)$/i.test(file)
     const compiler = isCpp ? tc.cxx : tc.cc
     const o = objName(file, isTest ? 't_' : '')
     const instr = !isTest || includesProduct(file)
-    const args = ['-c', file, '-o', o, ...common, ...(isTest ? [`-I${HARNESS}`] : []), ...(instr ? cov : []),
+    const sh = isTest ? testShadow(file) : shadowOf(file)
+    const args = ['-c', sh ? sh.file : file, '-o', o, ...common, ...(sh ? sh.extraInc : []), ...(isTest ? [`-I${HARNESS}`] : []), ...(instr ? cov : []),
       ...(isCpp && gtestRoot ? [`-I${join(gtestRoot, 'include')}`] : []), ...cflags]
     const r = await run(compiler, args, { cwd: dir })
     log.push(`$ ${basename(compiler)} ${args.join(' ')}\n${r.stderr}${r.stdout}`)
     if (instr) instrumented.push(o)
     objects.push(o)
-    return { file, code: r.code, out: (r.stderr + r.stdout).trim(), spawnError: r.spawnError }
+    return { file, code: r.code, out: unshadow((r.stderr + r.stdout).trim()), spawnError: r.spawnError }
   }
 
   // 被测试文件 #include 的被测 .c 不再单独编译（否则重复定义），其覆盖率从测试文件的插桩结果中统计
@@ -185,7 +243,10 @@ export async function runUnitTests({ sources = [], tests = [], includeDirs = [],
     }
     const srcBases = new Set(srcAbs.map((s) => basename(s).toLowerCase()))
     const want = (file) => srcBases.has(basename(file).toLowerCase())
-    if (docs.length) coverage = summarize(docs, want)
+    if (docs.length) {
+      coverage = summarize(docs, want)
+      for (const f of coverage.files) f.file = srcAbs.find((s) => basename(s).toLowerCase() === basename(f.file).toLowerCase()) || unshadow(f.file)
+    }
     else covNote ||= '没有生成覆盖率数据（测试程序可能没有正常退出：崩溃或超时时 .gcda 不会写出）'
   }
 
@@ -207,6 +268,7 @@ export async function runUnitTests({ sources = [], tests = [], includeDirs = [],
     sourceHashes: after,
     sourcesModifiedDuringRun: modified,
     includedByTest,
+    headerOverrides: shadows.flatMap((p) => p.overridden),
     notes: [runNote, covNote].filter(Boolean),
     compileWarnings: warnings,
   }
@@ -217,6 +279,7 @@ export async function runUnitTests({ sources = [], tests = [], includeDirs = [],
   // —— 文字摘要 ——
   const L = []
   L.push(`编译器：${tc.cc} ${tc.version}${tc.mcdc ? '（支持 MC/DC 测量）' : '（GCC 14 以下，不能测量 MC/DC，请用 check_mcdc 核对 MC/DC 分析表）'}`)
+  for (const p of shadows) for (const o of p.overridden) L.push(`替换了被测文件同目录的头文件：${o.header} → ${o.by}（编译的是构建目录 shadow 中去掉该头文件的副本，被测文件本身没有改动，覆盖率仍对应原文件）`)
   if (parsed.summary) L.push(`用例：共 ${parsed.summary.cases} 个，通过 ${parsed.summary.passed}，失败 ${parsed.summary.failed}`)
   if (parsed.fails.length) L.push(`失败检查：\n${parsed.fails.slice(0, 30).map((f) => `- ${f.id} ${f.detail}`).join('\n')}${parsed.fails.length > 30 ? `\n……共 ${parsed.fails.length} 条` : ''}`)
   if (runNote) L.push(`注意：${runNote}`)

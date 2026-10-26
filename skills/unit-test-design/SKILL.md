@@ -29,7 +29,7 @@ description: 依据详细设计为航天嵌入式 C 软件模块设计单元测�
    - 设计没有规定、或规定含糊的行为，列为待确认问题（Q-xxx）。
 3. **读代码，只为确定结构。**读代码是为了知道函数原型、需要哪些桩、有哪些判定和条件（MC/DC 用）、static 函数和寄存器访问方式。**预期结果不从代码推导。**代码与设计不一致时，按设计写预期，测试失败后列为疑似缺陷。
 4. **设计用例。**按 [references/test-design-methods.md](references/test-design-methods.md) 逐个函数设计：等价类、边界值、判定和条件（含 MC/DC）、错误处理和检查优先级、状态和计数（初值、回绕、饱和、复位）、字节和位处理。每个用例写明依据（设计文档的章节号）。依据只能写设计文件中真实存在的章节；设计未规定的写“设计未规定，见 Q-xxx”，这类用例只检查设计规定了的部分。
-5. **编写驱动和桩。**按 [references/stub-driver-conventions.md](references/stub-driver-conventions.md) 编写，放在被测模块目录下的 `test/`。用例标识按 [references/test-case-format.md](references/test-case-format.md) 的规则编写，与报告用例表一一对应。
+5. **编写驱动和桩。**按 [references/stub-driver-conventions.md](references/stub-driver-conventions.md) 编写，放在被测模块目录下的 `test/`；被测模块有多个单元（多个 `.c`）时，每个单元一个测试程序，放在 `test/<单元名>/`，其他单元用桩代替（约定第 1 节）。用例标识按 [references/test-case-format.md](references/test-case-format.md) 的规则编写，与报告用例表一一对应。
 6. **运行并处理结果。**调用 `mcp__utest__run_unit_tests`（`sources` 只列被测 `.c`，`tests` 列驱动和桩）。按结果处理：
    - **编译或链接失败**：缺函数就补桩，重复定义按工具提示处理。不改被测代码。
    - **用例失败**：先检查用例本身：输入是否按设计组织，预期是否按设计推导，算术是否算对。用例确实写错了（预期与设计不符），改正用例，并写入报告的“用例修正记录”，注明修正前、修正后和设计依据。用例没错，就是**疑似缺陷**：保留这个失败的用例，不改预期，写入疑似缺陷表。
@@ -38,7 +38,7 @@ description: 依据详细设计为航天嵌入式 C 软件模块设计单元测�
    - **MC/DC**：编译器支持（GCC 14 及以上）时，工具直接给出 MC/DC 覆盖率。不支持时，对每个含两个及以上条件的判定写 MC/DC 分析表，用 `mcp__utest__check_mcdc` 核对；没有满足的条件，按工具建议的向量补用例，补不出的说明原因。
 
    改动测试后重新运行，直到用例和覆盖率的状态稳定。**报告必须以最后一次运行的结果为准。**
-7. **写报告。**按 [references/test-case-format.md](references/test-case-format.md) 编写单元测试报告，保存为被测模块目录下的 `test/单元测试报告-<模块名>-<日期>.md`。运行结果、覆盖率直接取自最后一次运行，不自己计算或估计。
+7. **写报告。**按 [references/test-case-format.md](references/test-case-format.md) 编写单元测试报告，保存为被测模块目录下的 `test/单元测试报告-<模块名>-<日期>.md`（多个单元时每个单元一份，放在 `test/<单元名>/`）。运行结果、覆盖率直接取自最后一次运行，不自己计算或估计。
 8. **运行检查脚本（必须）。**
 
    ```

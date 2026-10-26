@@ -1,0 +1,233 @@
+{
+  "description": "对参考版 rt_drv.c、rt_msg.c 的单点变异，用于衡量测试的检错能力。每个变异体都与参考版行为不同（非等价）。",
+  "mutants": [
+    {
+      "id": "M01",
+      "file": "rt_drv.c",
+      "find": "if (rt_addr > RT_ADDR_MAX) {",
+      "replace": "if (rt_addr >= RT_ADDR_MAX) {"
+    },
+    {
+      "id": "M02",
+      "file": "rt_drv.c",
+      "find": "for (i = 0u; i < 5u; i++) {",
+      "replace": "for (i = 0u; i < 4u; i++) {"
+    },
+    {
+      "id": "M03",
+      "file": "rt_drv.c",
+      "find": "RT_REG_WR(RT_START, RT_START_RESET);",
+      "replace": "RT_REG_WR(RT_START, RT_START_RUN);"
+    },
+    {
+      "id": "M04",
+      "file": "rt_drv.c",
+      "find": "            return RT_ERR_TIMEOUT;\n",
+      "replace": "            break;\n"
+    },
+    {
+      "id": "M05",
+      "file": "rt_drv.c",
+      "find": "RT_REG_WR(RT_CFG1, RT_CFG1_RT | RT_CFG1_ENH);",
+      "replace": "RT_REG_WR(RT_CFG1, RT_CFG1_RT);"
+    },
+    {
+      "id": "M06",
+      "file": "rt_drv.c",
+      "find": "RT_REG_WR(RT_ADDR, (uint16_t)rt_addr | addr_parity(rt_addr));",
+      "replace": "RT_REG_WR(RT_ADDR, (uint16_t)rt_addr);"
+    },
+    {
+      "id": "M07",
+      "file": "rt_drv.c",
+      "find": "for (sa = 1u; sa <= RT_RX_SA_MAX; sa++) {",
+      "replace": "for (sa = 1u; sa < RT_RX_SA_MAX; sa++) {"
+    },
+    {
+      "id": "M08",
+      "file": "rt_drv.c",
+      "find": "RT_RAM_WR(RT_LUT_RX + sa, RT_BLK_RX + (uint16_t)(sa - 1u) * RT_BLK_WORDS);",
+      "replace": "RT_RAM_WR(RT_LUT_RX + sa, RT_BLK_RX + (uint16_t)sa * RT_BLK_WORDS);"
+    },
+    {
+      "id": "M09",
+      "file": "rt_drv.c",
+      "find": "for (i = 0u; i < RT_BLK_WORDS; i++) {",
+      "replace": "for (i = 0u; i < RT_BLK_WORDS - 1u; i++) {"
+    },
+    {
+      "id": "M10",
+      "file": "rt_drv.c",
+      "find": "        RT_RAM_WR(RT_LUT_TX + sa, blk);\n",
+      "replace": ""
+    },
+    {
+      "id": "M11",
+      "file": "rt_drv.c",
+      "find": "    RT_REG_WR(RT_IMASK, RT_IRQ_EOM);\n    RT_REG_WR(RT_START, RT_START_RUN);",
+      "replace": "    RT_REG_WR(RT_START, RT_START_RUN);\n    RT_REG_WR(RT_IMASK, RT_IRQ_EOM);"
+    },
+    {
+      "id": "M12",
+      "file": "rt_drv.c",
+      "find": "    RT_REG_WR(RT_IMASK, RT_IRQ_EOM);\n",
+      "replace": ""
+    },
+    {
+      "id": "M13",
+      "file": "rt_drv.c",
+      "find": "s_next = RT_STK_BASE;",
+      "replace": "s_next = 4u;"
+    },
+    {
+      "id": "M14",
+      "file": "rt_drv.c",
+      "find": "ptr = (uint16_t)(RT_REG_RD(RT_STKPTR) & (RT_STK_WORDS - 1u));",
+      "replace": "ptr = (uint16_t)RT_REG_RD(RT_STKPTR);"
+    },
+    {
+      "id": "M15",
+      "file": "rt_drv.c",
+      "find": "d->ptr  = RT_RAM_RD(s_next + 2u);",
+      "replace": "d->ptr  = RT_RAM_RD(s_next + 3u);"
+    },
+    {
+      "id": "M16",
+      "file": "rt_drv.c",
+      "find": "    if (d == NULL) {\n        return RT_ERR_PARAM;",
+      "replace": "    if (d == NULL) {\n        return 0;"
+    },
+    {
+      "id": "M17",
+      "file": "rt_drv.c",
+      "find": "for (i = 0u; i < wc; i++) {\n        buf[i] = RT_RAM_RD(addr + i);",
+      "replace": "for (i = 0u; i <= wc; i++) {\n        buf[i] = RT_RAM_RD(addr + i);"
+    },
+    {
+      "id": "M18",
+      "file": "rt_drv.c",
+      "find": "sa < 1u || sa > RT_TX_SA_MAX",
+      "replace": "sa < 1u || sa > RT_RX_SA_MAX"
+    },
+    {
+      "id": "M19",
+      "file": "rt_drv.c",
+      "find": "wc < 1u || wc > RT_MAX_WC",
+      "replace": "wc < 1u || wc >= RT_MAX_WC"
+    },
+    {
+      "id": "M20",
+      "file": "rt_drv.c",
+      "find": "|| wc < 1u ||",
+      "replace": "||"
+    },
+    {
+      "id": "M21",
+      "file": "rt_drv.c",
+      "find": "(st & RT_STAT_BUSY) != 0u && ((st",
+      "replace": "(st & RT_STAT_BUSY) != 0u || ((st"
+    },
+    {
+      "id": "M22",
+      "file": "rt_drv.c",
+      "find": "blk = (uint16_t)(RT_BLK_TX + (uint16_t)(sa - 1u) * RT_BLK_WORDS);\n    for (i = 0u; i < wc; i++) {",
+      "replace": "blk = (uint16_t)(RT_BLK_RX + (uint16_t)(sa - 1u) * RT_BLK_WORDS);\n    for (i = 0u; i < wc; i++) {"
+    },
+    {
+      "id": "M23",
+      "file": "rt_drv.c",
+      "find": "return RT_REG_RD(RT_ISTAT);",
+      "replace": "return RT_REG_RD(RT_STAT);"
+    },
+    {
+      "id": "M24",
+      "file": "rt_msg.c",
+      "find": "        s_rx_new[sa] = 0u;\n    }\n    s_msg_cnt",
+      "replace": "    }\n    s_msg_cnt"
+    },
+    {
+      "id": "M25",
+      "file": "rt_msg.c",
+      "find": "    s_last_rx = sys_ticks();\n}",
+      "replace": "    s_last_rx = 0u;\n}"
+    },
+    {
+      "id": "M26",
+      "file": "rt_msg.c",
+      "find": "if ((rt_drv_irq_status() & RT_IRQ_EOM) == 0u) {",
+      "replace": "if ((rt_drv_irq_status() & RT_IRQ_EOM) != 0u) {"
+    },
+    {
+      "id": "M27",
+      "file": "rt_msg.c",
+      "find": "if (*c < 0xFFFFu) {",
+      "replace": "if (*c <= 0xFFFFu) {"
+    },
+    {
+      "id": "M28",
+      "file": "rt_msg.c",
+      "find": "        s_last_rx = sys_ticks();\n        sa =",
+      "replace": "        sa ="
+    },
+    {
+      "id": "M29",
+      "file": "rt_msg.c",
+      "find": "sa = (uint8_t)((d.cmd >> RT_CMD_SA_SHIFT) & 0x1Fu);",
+      "replace": "sa = (uint8_t)((d.cmd >> 4u) & 0x1Fu);"
+    },
+    {
+      "id": "M30",
+      "file": "rt_msg.c",
+      "find": "if ((d.cmd & RT_CMD_TR) == 0u && sa >= 1u",
+      "replace": "if ((d.cmd & RT_CMD_TR) != 0u && sa >= 1u"
+    },
+    {
+      "id": "M31",
+      "file": "rt_msg.c",
+      "find": "sa >= 1u && sa <= RT_RX_SA_MAX) {\n            rt_drv_read",
+      "replace": "sa >= 1u && sa < RT_RX_SA_MAX) {\n            rt_drv_read"
+    },
+    {
+      "id": "M32",
+      "file": "rt_msg.c",
+      "find": "            s_rx_new[sa] = 1u;\n",
+      "replace": ""
+    },
+    {
+      "id": "M33",
+      "file": "rt_msg.c",
+      "find": "    s_rx_new[sa] = 0u;\n    irq_unlock(key);\n    return 1;",
+      "replace": "    irq_unlock(key);\n    return 1;"
+    },
+    {
+      "id": "M34",
+      "file": "rt_msg.c",
+      "find": "if (rt_msg_get(RT_SA_TC, buf, &wc) == 1) {",
+      "replace": "if (rt_msg_get(RT_SA_TC, buf, &wc) >= 0) {"
+    },
+    {
+      "id": "M35",
+      "file": "rt_msg.c",
+      "find": ">= RT_LINK_TIMEOUT) ? 1u : 0u;",
+      "replace": "> RT_LINK_TIMEOUT) ? 1u : 0u;"
+    },
+    {
+      "id": "M36",
+      "file": "rt_msg.c",
+      "find": "? 1u : 0u;",
+      "replace": "? 1u : s_link_lost;"
+    },
+    {
+      "id": "M37",
+      "file": "rt_msg.c",
+      "find": "st->err_cnt = s_err_cnt;",
+      "replace": "st->err_cnt = s_msg_cnt;"
+    },
+    {
+      "id": "M38",
+      "file": "rt_msg.c",
+      "find": "&& r == RT_ERR_BUSY; n++)",
+      "replace": "&& r != RT_OK; n++)"
+    }
+  ]
+}

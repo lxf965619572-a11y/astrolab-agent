@@ -1,0 +1,14 @@
+{
+  "description": "1553B RT 通信（虚构）：两个单元。rt_drv 是芯片驱动（寄存器、共享 RAM、描述符堆栈，寄存器头文件 rt_hw.h 与 .c 同目录）；rt_msg 是消息处理（调用 rt_drv、sys_ticks、irq_lock/irq_unlock、tc_dispatch）。工作区中是埋缺陷版，本目录下是正确的参考版。",
+  "files": [
+    { "name": "rt_drv.c", "reference": "reference/rt_drv.c", "sample": "sample/utest/rt1553/src/rt_drv.c" },
+    { "name": "rt_msg.c", "reference": "reference/rt_msg.c", "sample": "sample/utest/rt1553/src/rt_msg.c" }
+  ],
+  "sampleSrcDir": "sample/utest/rt1553/src",
+  "sampleInclude": "sample/utest/rt1553/include",
+  "sampleTestDir": "sample/utest/rt1553/test",
+  "programs": [
+    { "name": "rt_drv", "sources": ["rt_drv.c"], "testSubdir": "rt_drv" },
+    { "name": "rt_msg", "sources": ["rt_msg.c"], "testSubdir": "rt_msg" }
+  ]
+}
