@@ -1,6 +1,6 @@
 # 部门智能体入门工程（笔记本开发测试用）
 
-在一台 Windows 笔记本上把 DSH（DeepSeek Harness）跑起来，并接入部门工具（Cppcheck 静态分析、Word/Excel/PDF 文档读取、按 Word 模板生成文档、单元测试编译运行与覆盖率统计）和部门 Skill（代码走查、需求分析、详细设计、单元测试设计）。这是《部门级智能体落地实施方案》中“领域能力层”的最小样板，以后的 Skill 和 MCP 服务都按同样的方式添加。
+在一台 Windows 笔记本上把 DSH（DeepSeek Harness）跑起来，并接入部门工具（Cppcheck 静态分析、Word/Excel/PDF 文档读取、按 Word 模板生成文档、单元测试编译运行与覆盖率统计）和部门 Skill（代码走查、需求分析、概要设计、详细设计、单元测试设计）。这是《部门级智能体落地实施方案》中“领域能力层”的最小样板，以后的 Skill 和 MCP 服务都按同样的方式添加。
 
 > **注意：**现阶段接的是 DeepSeek 官方 API，代码会发送到云端。只能用 `sample` 里的示例代码或非敏感代码测试，**不要打开任何型号的真实代码**。以后切到内网模型只需改一行配置（见最后一节）。
 
@@ -20,14 +20,16 @@ astrolab-agent/
 ├── mcp/common/         上面几个服务共用的 ZIP/XML/路径模块（只用 Node 自带模块）
 ├── skills/code-walkthrough/     代码走查 Skill（含检查表）
 ├── skills/requirements-analysis/ 需求分析 Skill（检查表、质量规则、报告格式、GJB 438B SRS 章节要求）
+├── skills/preliminary-design/   概要设计 Skill（文档结构、体系结构检查表、时序分析方法、流程图写法、检查脚本）
 ├── skills/detailed-design/      详细设计 Skill（正向/逆向，文档结构、函数格式、设计检查表、流程图写法、检查脚本）
 ├── skills/unit-test-design/     单元测试设计 Skill（用例设计方法、驱动和桩约定、报告格式、gtest 说明、报告检查脚本）
 ├── sample/src/         示例代码：遥测帧打包/解析，故意埋了约 10 个缺陷
 ├── sample/docs/        示例软件研制任务书（虚构，.docx 由同名 .md 生成），埋了 20 个需求问题
-├── sample/design/      详细设计示例 oc_ctrl（虚构）：需求规格说明、概要设计说明、控制器接口说明的摘录
+├── sample/design/      设计示例（虚构）：tcu 热控单元软件（概要设计的输入）；oc_ctrl OC 指令输出（详细设计的输入）
 ├── sample/utest/       单元测试示例模块（虚构）：cmd_check 指令检查（6 个缺陷）、uart_drv 串口驱动（7 个缺陷），各含详细设计
 ├── evals/              代码走查评测集（8 个用例、29 个缺陷）与自动打分
 │   ├── requirements-analysis/  示例任务书的埋入问题对照表（人工对照用）
+│   ├── preliminary-design/     概要设计评测：答案表、参考概要设计
 │   ├── detailed-design/        详细设计评测：答案表、逆向模式用的代码、参考详细设计
 │   └── unit-test/              单元测试评分：正确的参考版、缺陷和变异体清单、参考测试、评分脚本
 ├── runtime/            setup.ps1 生成：DSH 安装目录和数据目录（不提交）
@@ -100,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start-web.ps1
 node skills\requirements-analysis\scripts\check-report.mjs sample\req\需求分析报告-20261024.md
 ```
 
-**改了 Skill 之后要开新会话。**Skill 在会话中第一次使用时加载，之后同一会话不会重新读取。修改 `skills\` 下的文件并运行 `setup.ps1` 后，要在界面里新建会话再测试，否则智能体用的还是旧版 Skill，还会照着上下文中的旧报告修补。
+**改了 Skill 之后：不用重新运行 `setup.ps1`，新建会话即可。**DSH 直接读取本工程的 `skills\` 目录（`runtime\dsh-home\cordis.patch.yml` 中的 `customSkillDirs`），每次加载 Skill 都重新读取文件，新增或改名的 Skill 也会自动出现。但同一会话中已经加载过的 Skill 内容留在上下文里，智能体会照着旧版本和上下文中的旧报告做，所以测试改动要新建会话。改了 `mcp\` 下的服务代码，要重启 `start-web.ps1`。
 
 需求分析报告满意后，可以接着输入：
 
@@ -126,6 +128,28 @@ node skills\requirements-analysis\scripts\check-report.mjs sample\req\需求分�
 3. 对照 `evals\requirements-analysis\示例2\示例2-埋入问题.md` 评分：18 个必检问题、4 个加分问题，以及 10 个**误报陷阱**。误报陷阱是材料里已经写清楚的内容（如看门狗参数、ICD 已提供、1553B 自带字校验），报告把它们当作“缺失”提出，说明智能体在套用示例 1 的结论。
 
 任务书和 ICD 的 Markdown 原稿也放在 `evals\requirements-analysis\示例2\` 下，不在工作区内。
+
+### 概要设计
+
+在 `sample` 工作区中新建会话。先准备工作区（把上一次的输出移走）：
+
+```powershell
+node evals\preliminary-design\prepare.mjs
+```
+
+然后输入：
+
+```text
+按 design\tcu\docs 下的软件需求规格说明、硬件接口说明和与平台通信协议，编写热控单元软件（TCUS）的概要设计说明，目标平台 BM3803，裸机，保存到 design\tcu\doc，并生成 Word，待确认问题导出 Excel。
+```
+
+预期过程：智能体加载 `preliminary-design` Skill，读三份文件，摘录全部需求和硬件约束，核对文件之间的一致性，定 CSCI 级设计决策（执行模型、tick、中断用法），划分模块并分配需求，画启动流程和主循环流程，对每条时间要求和硬件时间约束做最坏情况分析，写共享数据保护、模块接口、存储分配、资源余量、可靠性安全性设计和需求追溯，运行 `check-hld.mjs --srs <SRS>` 自查，再生成 Word。
+
+**检查脚本**对照 SRS 原文件核对每条需求是否摘录、是否分配到模块；时序分析的结论与数值是否一致；共享数据有没有保护；资源余量是否满足等。
+
+**怎么判断效果：**示例中埋了 5 处文件之间的矛盾或缺漏，以及几处只有做了时序分析才会发现的问题（例如测温通道切换后要等 1 ms，32 路连续忙等会使 5 ms 的遥测响应要求无法满足）。答案表和评分方法见 [evals\preliminary-design\README.md](evals/preliminary-design/README.md)。
+
+只做正向设计。工作区中已有代码时，Skill 会先问是重新设计还是为代码补写。
 
 ### 详细设计
 
@@ -241,7 +265,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-evals.ps1 -Parallel 2 -Labe
 
 ## 怎么扩展
 
-**加一个 Skill：**可参考 `skills\requirements-analysis\` 的组织方式：`SKILL.md` 只写步骤和约束，检查表、规则、模板放在 `references\` 下。在 `skills\` 下新建目录，写一个 `SKILL.md`（开头是 `name` 和 `description`，其余是 Markdown 指令），重新运行 `setup.ps1`（只会复制配置，不会重装）。也可以直接放到工作区的 `.dsh\skills\` 下，只对该项目生效。名称必须是小写加连字符，如 `unit-test-design`。
+**加一个 Skill：**可参考 `skills\requirements-analysis\` 的组织方式：`SKILL.md` 只写步骤和约束，检查表、规则、模板放在 `references\` 下。在 `skills\` 下新建目录，写一个 `SKILL.md`（开头是 `name` 和 `description`，其余是 Markdown 指令），新建会话即可使用，不用重新运行 `setup.ps1`。也可以放到项目的 `.dsh\skills\` 下，只对该项目生效（DSH 把包含 `.git` 的最近上级目录当作项目根，在本工程中是 `astrolab-agent` 根目录，而不是 `sample`）。名称必须是小写加连字符，如 `unit-test-design`。
 
 **加一个 MCP 服务：**参考 `mcp\cppcheck\server.mjs` 写一个新服务，然后在 `config\cordis.patch.yml.template` 的 `insert:` 下仿照 `mcp-cppcheck` 再加一条（`id` 和 `serverName` 都要唯一），重新运行 `setup.ps1`。
 
@@ -276,6 +300,18 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 浏览器打开后 401 | 地址要带启动时打印的 `?token=...`；重新从启动窗口复制完整地址 |
 | 模型说“工作区下没有 src”，然后到处找文件 | 会话开在了默认工作区。在界面左侧添加 `sample` 文件夹作为工作区，在其中新建会话 |
 | 想清空所有会话重新开始 | 停止服务后删除 `runtime\dsh-home\sessions` |
+
+## 当前进度（2026-10-25）
+
+| 环节 | Skill | 工具 | 示例和评测 | 状态 |
+|---|---|---|---|---|
+| 需求分析 | requirements-analysis | docreader、docgen | 示例 1（RS-422 遥测）、示例 2（1553B RT） | 两个示例已评测，检查脚本 check-report.mjs |
+| 概要设计 | preliminary-design（正向） | docgen（Mermaid 流程图转 Word 图形） | tcu（热控单元软件） | 已评测：F 5/5、G 10/10、0 误报，检查脚本 check-hld.mjs；用其输出跑 htr_out 详细设计，两个 Skill 能衔接 |
+| 详细设计 | detailed-design（正向、逆向） | docgen（Mermaid 流程图转 Word 图形） | oc_ctrl（OC 指令输出） | 正向已评测；逆向需在修复 prepare.mjs 后重测一次 |
+| 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC） | cmd_check、uart_drv | 两个示例已评测，评分脚本 score.mjs |
+| 代码走查 | code-walkthrough | cppcheck | 8 个评测用例 | 已有基线 |
+
+待办：多接口工程的单元测试示例（1553B 共享存储区、跨模块）；被测 `.c` 与寄存器头文件同目录时的替换；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
 
 ## 版本说明
 

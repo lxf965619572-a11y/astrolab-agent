@@ -448,7 +448,8 @@ export function renderFlowchart(src, opts) {
     if (n.shape === 'decision' && k >= 2 && g.edges.filter((e) => e.from === n.id && !e.label).length) warnings.push(`判断节点 ${n.id}（${n.text}）的出口没有标注“是/否”`)
     if (n.shape !== 'decision' && n.shape !== 'terminal' && k === 0) warnings.push(`节点 ${n.id}（${n.text}）没有出线`)
   }
-  if (!structural && !noOut.some((n) => n.shape === 'terminal')) warnings.push('没有“结束/返回”节点')
+  // 所有节点都有出线的是无限循环（如主循环），可以没有结束节点
+  if (!structural && noOut.length && !noOut.some((n) => n.shape === 'terminal')) warnings.push('没有“结束/返回”节点')
   const layout = layoutFlowchart(g)
   const v = flowchartToDrawing(layout, opts)
   if (v.tooSmall && structural) warnings.push(`结构图（如调用关系图）宽度约为页面的 ${Math.round(100 / v.scale)}%，缩小后文字可能溢出图框；建议改用“调用者 | 被调用函数”表格，或按调用者拆成几张图`)

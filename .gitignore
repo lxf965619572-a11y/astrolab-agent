@@ -10,8 +10,10 @@ sample/utest/*/test/
 evals/results/
 evals/unit-test/results/
 .utest/
-sample/design/*/doc*/
+sample/design/*/doc/
+sample/design/*/doc-*/
 evals/detailed-design/results/
+evals/preliminary-design/results/
 sample/design/*/src/
 sample/design/*/include/
 

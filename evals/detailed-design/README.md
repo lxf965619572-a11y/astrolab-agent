@@ -14,7 +14,7 @@
 ## 正向模式
 
 1. `node evals\detailed-design\prepare.mjs forward`（删除工作区中的代码，上一次的输出移到 `evals\detailed-design\results\`）
-2. 运行 `scripts\setup.ps1`，在 `sample` 工作区**新建会话**，输入：
+2. 在 `sample` 工作区**新建会话**，输入：
 
    ```text
    按 design\oc_ctrl\docs 下的需求规格说明、概要设计说明和 OC 输出控制器接口说明，编写 oc_ctrl 模块的详细设计说明，正向设计，目标平台 BM3803，保存到 design\oc_ctrl\doc，并生成 Word。
@@ -32,7 +32,7 @@
 ## 逆向模式
 
 1. `node evals\detailed-design\prepare.mjs reverse`（把代码复制到 `sample\design\oc_ctrl\src`、`include`）
-2. 运行 `scripts\setup.ps1`，**新建会话**，输入：
+2. **新建会话**，输入：
 
    ```text
    design\oc_ctrl 下已有代码（src、include），请按 docs 下的需求规格说明、概要设计说明和 OC 输出控制器接口说明，为 oc_ctrl 补写详细设计说明，逆向设计，目标平台 BM3803，保存到 design\oc_ctrl\doc。

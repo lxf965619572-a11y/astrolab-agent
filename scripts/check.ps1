@@ -60,8 +60,15 @@ if (Test-Path $DshBin) {
     foreach ($id in @('mcp-cppcheck', 'mcp-docreader', 'mcp-docgen', 'mcp-utest')) {
         if ($dump -match "id: $id") { Write-Ok "已加载 $id" } else { Write-Fail "组合配置中没有 $id，重新运行 setup.ps1 或检查 runtime\dsh-home\cordis.patch.yml"; $bad++ }
     }
-    foreach ($name in @('code-walkthrough', 'requirements-analysis', 'unit-test-design', 'detailed-design')) {
-        if (Test-Path (Join-Path $DshHome "skills\$name\SKILL.md")) { Write-Ok "Skill：$name" } else { Write-Fail "缺少 Skill $name，重新运行 setup.ps1"; $bad++ }
+    # Skill：DSH 直接读取本工程的 skills 目录（customSkillDirs），不再复制
+    $skillsDir = (Join-Path $Root 'skills') -replace '\\', '/'
+    if ($dump -match [regex]::Escape("customSkillDirs") -and $dump -match [regex]::Escape($skillsDir)) { Write-Ok "Skill 目录：$skillsDir" }
+    else { Write-Fail "组合配置中 skill-filesystem 没有指向 $skillsDir，重新运行 setup.ps1"; $bad++ }
+    foreach ($d in Get-ChildItem -Directory (Join-Path $Root 'skills')) {
+        if (-not (Test-Path (Join-Path $d.FullName 'SKILL.md'))) { Write-Fail "skills\$($d.Name) 中没有 SKILL.md"; $bad++; continue }
+        $stale = Join-Path $DshHome "skills\$($d.Name)"
+        if (Test-Path $stale) { Write-Warn2 "Skill：$($d.Name)（runtime\dsh-home\skills 下还有以前复制的旧副本，运行一次 setup.ps1 删除）" }
+        else { Write-Ok "Skill：$($d.Name)" }
     }
 }
 

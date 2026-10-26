@@ -51,12 +51,11 @@ New-Item -ItemType Directory -Force -Path $DshHome | Out-Null
 $rootFwd = $Root -replace '\\', '/'
 $tpl = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'config\cordis.patch.yml.template')
 [IO.File]::WriteAllText((Join-Path $DshHome 'cordis.patch.yml'), $tpl.Replace('__STARTER_DIR__', $rootFwd), (New-Object Text.UTF8Encoding $false))
-Write-Ok 'cordis.patch.yml（注册 cppcheck、docreader、docgen、utest 四个 MCP 服务）'
-# 部门 Skills：复制到 DSH 用户级 skills 目录
-$skillsDst = Join-Path $DshHome 'skills'
-New-Item -ItemType Directory -Force -Path $skillsDst | Out-Null
-Copy-Item -Recurse -Force (Join-Path $Root 'skills\*') $skillsDst
-Write-Ok "skills：$((Get-ChildItem -Directory $skillsDst).Name -join ', ')"
+Write-Ok 'cordis.patch.yml（注册 cppcheck、docreader、docgen、utest 四个 MCP 服务；Skill 目录指向本工程的 skills）'
+# 部门 Skills：DSH 通过 cordis.patch.yml 中的 customSkillDirs 直接读取本工程的 skills 目录，不再复制。
+# 以前版本复制到 runtime\dsh-home\skills 的旧副本会和工程中的同名 Skill 重复，这里删除（只删工程中有同名目录的）。
+Remove-StaleSkillCopies
+Write-Ok "skills（直接读取 skills\）：$((Get-ChildItem -Directory (Join-Path $Root 'skills')).Name -join ', ')"
 
 if (-not (Test-Path $LocalEnv)) {
     Copy-Item (Join-Path $Root 'config\local.env.example') $LocalEnv

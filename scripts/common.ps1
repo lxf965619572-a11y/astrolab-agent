@@ -45,3 +45,13 @@ function Find-Cppcheck {
     }
     return $null
 }
+
+# 删除以前版本复制到 runtime\dsh-home\skills 的旧副本（只删工程 skills\ 中有同名目录的，DSH 自带或用户另放的不动）
+function Remove-StaleSkillCopies {
+    $old = Join-Path $DshHome 'skills'
+    if (-not (Test-Path $old)) { return }
+    foreach ($d in Get-ChildItem -Directory (Join-Path $Root 'skills')) {
+        $p = Join-Path $old $d.Name
+        if (Test-Path $p) { Remove-Item -Recurse -Force $p; Write-Ok "已删除旧副本 runtime\dsh-home\skills\$($d.Name)" }
+    }
+}

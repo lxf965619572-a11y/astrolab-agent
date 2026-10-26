@@ -45,3 +45,11 @@
         command: !!js process.execPath
         args: ['__STARTER_DIR__/mcp/utest/server.mjs']
         toolCallTimeoutMs: 600000   # 编译、运行和覆盖率统计，大模块可能较慢
+
+# 部门 Skills：让 DSH 直接读取本工程的 skills 目录（不再复制到 DSH 数据目录）。
+# DSH 每次加载 Skill 都重新读取文件，所以改了 skills\ 下的文件不用重新运行 setup.ps1，新建会话即可。
+# 原条目（dsh-base 组合包中的 skill-filesystem）没有配置；按 id 打补丁会替换整个 config。
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+  config:
+    customSkillDirs: ['__STARTER_DIR__/skills']
