@@ -59,3 +59,29 @@
     providerName: dept-skills
     includeDefaultRoots: false
     customSkillDirs: ['__STARTER_DIR__/skills']
+
+# 部门模型路由（OpenAI 兼容接口，pi-ai 通用适配器）。
+# 内网 vLLM 只提供 OpenAI 兼容接口，所以外网开发时也走这条路，两边只差地址、模型名和思考参数的写法。
+# 地址等从 local.env 的 DEPT_LLM_* 读取（start-web.ps1 读入）；不填时连 DeepSeek 官方 API 的 OpenAI 兼容接口。
+# 在界面的模型选择里选“部门模型”。原来的 DeepSeek 官方路由仍保留，便于对比。
+# 按 id 打补丁会替换整个 config。
+- id: llm-pi-ai
+  name: '@deepseek-ai/dsh-llm-pi-ai'
+  config:
+    providers:
+      dept-llm:
+        displayName: 部门模型
+        api: openai-completions
+        baseURL: !!js "process.env.DEPT_LLM_BASE_URL || 'https://api.deepseek.com'"
+        apiKeyEnv: DEPT_LLM_API_KEY
+        compat:
+          # 官方 API：deepseek（thinking + reasoning_effort）；内网 vLLM：chat-template（chat_template_kwargs）
+          thinkingFormat: !!js "process.env.DEPT_LLM_THINKING_FORMAT || 'deepseek'"
+        models:
+          - id: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
+            name: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
+            contextWindow: !!js "Number(process.env.DEPT_LLM_CONTEXT_WINDOW || 1048576)"
+            maxTokens: !!js "Number(process.env.DEPT_LLM_MAX_TOKENS || 65536)"
+            reasoningEfforts:
+              'off':
+              high: high

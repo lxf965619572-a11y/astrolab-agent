@@ -15,6 +15,8 @@ Import-LocalEnv
 $env:DSH_HOME = $DshHome
 $env:DSH_TELEMETRY_DISABLED = '1'
 if (-not $env:DEEPSEEK_API_KEY) { Write-Warn2 'config\local.env 中没有 DEEPSEEK_API_KEY，界面能打开但模型无法回答。' }
+if (-not $env:DEPT_LLM_API_KEY -and $env:DEEPSEEK_API_KEY) { $env:DEPT_LLM_API_KEY = $env:DEEPSEEK_API_KEY }
+if ($env:DEPT_LLM_BASE_URL) { Write-Ok "部门模型地址：$($env:DEPT_LLM_BASE_URL)" }
 if ($env:DEEPSEEK_BASE_URL) { Write-Ok "模型地址：$($env:DEEPSEEK_BASE_URL)" } else { Write-Warn2 '模型地址：DeepSeek 官方 API（代码会发送到云端，只用示例代码测试）' }
 
 Write-Host "工作区：$Workspace"
