@@ -15,7 +15,7 @@ const ROOT = resolve(HERE, '..', '..')
 const DSH_BIN = process.env.SPIKE_DSH_BIN || join(ROOT, 'runtime', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
 const WORKSPACE = resolve(process.env.SPIKE_WORKSPACE || join(ROOT, 'sample'))
 const PORT = Number(process.env.SPIKE_PORT || 3090)
-const LOGDIR = join(ROOT, 'runtime', 'spike')
+const LOGDIR = process.env.SPIKE_LOGDIR || join(ROOT, 'runtime', 'spike')
 mkdirSync(LOGDIR, { recursive: true })
 const DENY = /denied|not permitted|sandbox|拒绝|不允许|无权|access is denied/i
 
