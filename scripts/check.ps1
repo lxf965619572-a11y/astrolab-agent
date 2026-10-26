@@ -62,7 +62,9 @@ if (Test-Path $DshBin) {
     }
     # Skill：DSH 直接读取本工程的 skills 目录（customSkillDirs），不再复制
     $skillsDir = (Join-Path $Root 'skills') -replace '\\', '/'
-    if ($dump -match [regex]::Escape("customSkillDirs") -and $dump -match [regex]::Escape($skillsDir)) { Write-Ok "Skill 目录：$skillsDir" }
+    $i = $dump.IndexOf('id: skill-filesystem'); $blk = ''
+    if ($i -ge 0) { $j = $dump.IndexOf('- id:', $i); $blk = if ($j -gt $i) { $dump.Substring($i, $j - $i) } else { $dump.Substring($i) } }
+    if ($blk.Contains($skillsDir) -and $blk -notmatch 'disabled:\s*true') { Write-Ok "Skill 目录：$skillsDir" }
     else { Write-Fail "组合配置中 skill-filesystem 没有指向 $skillsDir，重新运行 setup.ps1"; $bad++ }
     foreach ($d in Get-ChildItem -Directory (Join-Path $Root 'skills')) {
         if (-not (Test-Path (Join-Path $d.FullName 'SKILL.md'))) { Write-Fail "skills\$($d.Name) 中没有 SKILL.md"; $bad++; continue }

@@ -48,8 +48,14 @@
 
 # 部门 Skills：让 DSH 直接读取本工程的 skills 目录（不再复制到 DSH 数据目录）。
 # DSH 每次加载 Skill 都重新读取文件，所以改了 skills\ 下的文件不用重新运行 setup.ps1，新建会话即可。
-# 原条目（dsh-base 组合包中的 skill-filesystem）没有配置；按 id 打补丁会替换整个 config。
+# Web 组合包（dsh-web-app）禁用了宿主层的 skill-filesystem，改由各 agent preset 自己挂载；
+# 宿主层的提供方注册在全局层，所有 preset 的 Skill 目录都会合并它，所以这里重新启用宿主行，
+# 只扫描本工程的 skills（includeDefaultRoots: false，项目和用户目录仍由 preset 自己扫描）。
+# 按 id 打补丁会替换整个 config。
 - id: skill-filesystem
   name: '@deepseek-ai/dsh-skill-filesystem'
+  disabled: false
   config:
+    providerName: dept-skills
+    includeDefaultRoots: false
     customSkillDirs: ['__STARTER_DIR__/skills']
