@@ -17,4 +17,7 @@ sample/design/*/include/
 
 # 本地工具与临时文件
 cppcheck-*.msi
+/*.exe
+/*.msi
+/*.zip
 ~$*
