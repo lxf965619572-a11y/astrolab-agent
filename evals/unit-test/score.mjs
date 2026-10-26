@@ -10,7 +10,7 @@
 
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { applyPatches, buildSample, loadCase, loadLocalEnv, patchFile } from './lib.mjs'
 
@@ -21,8 +21,27 @@ const argv = process.argv.slice(2)
 const runRecs = []
 for (let k = argv.indexOf('--run'); k >= 0; k = argv.indexOf('--run')) { runRecs.push(JSON.parse(readFileSync(argv[k + 1], 'utf8'))); argv.splice(k, 2) }
 const uniq = (a) => [...new Set(a)]
-const runDefines = uniq(runRecs.flatMap((r) => r.defines || []))
-const runCflags = uniq(runRecs.flatMap((r) => r.cflags || []))
+// 每个测试程序沿用被测文件相同的那份运行记录的宏定义和编译选项（不同测试程序的选项不能混用，如只属于 rt_drv 的 -include）。
+// 选项中指向智能体测试目录、被测文件目录的绝对路径，换成评分时复制出的对应目录
+const slash = (s) => String(s).replace(/\\/g, '/')
+const srcKey = (list) => list.map((s) => posix.basename(slash(s)).toLowerCase()).sort().join('|')
+function runOptions(p, tdir, srcDir) {
+  const own = runRecs.filter((r) => srcKey(r.sources || []) === srcKey(p.sources))
+  const recs = own.length ? own : programs.length === 1 ? runRecs : []
+  const remap = (flag, r) => {
+    const roots = [[r.tests?.[0], tdir], [r.sources?.[0], srcDir]].filter(([f]) => f).map(([f, to]) => [posix.dirname(slash(f)).toLowerCase() + '/', to])
+    const low = slash(flag).toLowerCase()
+    for (const [from, to] of roots) {
+      const i = low.indexOf(from)
+      if (i >= 0) return flag.slice(0, i) + join(to, slash(flag).slice(i + from.length))
+    }
+    return flag
+  }
+  return {
+    defines: uniq(recs.flatMap((r) => r.defines || [])),
+    cflags: recs.flatMap((r) => (r.cflags || []).map((f) => remap(f, r))),
+  }
+}
 const name = argv[0] || 'cmd_check'
 const caseDir = join(HERE, name)
 if (!existsSync(join(caseDir, 'case.json'))) { console.error(`没有评测用例 ${name}（可选：${readdirSync(HERE, { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync(join(HERE, e.name, 'case.json'))).map((e) => e.name).join('、')}）`); process.exit(2) }
@@ -82,14 +101,15 @@ async function runVariant(sources, label) {
   const res = { buildFailed: false, error: '', crashed: false, timedOut: false, failed: new Set(), cases: [], coverage: [], failures: [] }
   for (const p of programs) {
     const tdir = p.testSubdir ? join(dir, 'test', p.testSubdir) : join(dir, 'test')
+    const opt = runOptions(p, tdir, join(dir, 'src'))
     const r = await runUnitTests({
       sources: p.sources.map((n) => join(dir, 'src', n)),
       tests: p.tests.map((f) => join(tdir, f)),
       // 测试目录中含 .h 的子目录（如替换硬件头文件的 hw/）和测试目录放在被测头文件目录之前，替换头文件才能生效；
       // 与被测 .c 同目录的头文件由 run_unit_tests 自动替换
       includeDirs: [...headerDirs(tdir), tdir, join(dir, 'include')],
-      defines: runDefines,
-      cflags: runCflags,
+      defines: opt.defines,
+      cflags: opt.cflags,
       timeoutSec: 10,
       name: `${label}-${p.name}`,
     })

@@ -8,7 +8,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { checkMcdcTool, coverageDetail, runUnitTests, toolchainInfo } from './tools.mjs'
+import { hotHandler, hotModule } from '../common/hot.mjs'
+
+// 工具实现修改后下一次调用自动生效，不用重启 DSH（见 ../common/hot.mjs）
+const tools = hotModule(import.meta.url, 'tools.mjs')
 
 const server = new McpServer({ name: 'dept-utest', version: '0.1.0' }, {
   instructions:
@@ -19,7 +22,7 @@ const server = new McpServer({ name: 'dept-utest', version: '0.1.0' }, {
 server.registerTool('toolchain_info', {
   description: '查看本机编译器、gcov 版本，以及是否支持 MC/DC 测量（GCC 14 及以上）。',
   inputSchema: {},
-}, toolchainInfo)
+}, hotHandler(tools, 'toolchainInfo'))
 
 server.registerTool('run_unit_tests', {
   description:
@@ -36,7 +39,7 @@ server.registerTool('run_unit_tests', {
     timeoutSec: z.number().int().min(1).max(300).optional().describe('测试程序运行超时，默认 10 秒'),
     name: z.string().optional().describe('本次测试名，用作构建目录名，默认取第一个被测文件名'),
   },
-}, runUnitTests)
+}, hotHandler(tools, 'runUnitTests'))
 
 server.registerTool('coverage_detail', {
   description: '显示上次 run_unit_tests 中未覆盖的语句、未全覆盖的分支和 MC/DC 条件所在的源码行，用于补充用例。',
@@ -46,7 +49,7 @@ server.registerTool('coverage_detail', {
     function: z.string().optional().describe('只看某个函数'),
     context: z.number().int().min(0).max(5).optional().describe('每处显示的上下文行数，默认 1'),
   },
-}, coverageDetail)
+}, hotHandler(tools, 'coverageDetail'))
 
 server.registerTool('check_mcdc', {
   description:
@@ -60,6 +63,6 @@ server.registerTool('check_mcdc', {
       expected: z.boolean().optional().describe('设计时预期的判定结果，填写后会核对'),
     })).min(1),
   },
-}, checkMcdcTool)
+}, hotHandler(tools, 'checkMcdcTool'))
 
 await server.connect(new StdioServerTransport())

@@ -8,7 +8,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { readDocument } from './tools.mjs'
+import { hotHandler, hotModule } from '../common/hot.mjs'
+
+// 工具实现修改后下一次调用自动生效，不用重启 DSH（见 ../common/hot.mjs）
+const tools = hotModule(import.meta.url, 'tools.mjs')
 
 const server = new McpServer({ name: 'dept-docreader', version: '0.1.0' }, {
   instructions:
@@ -28,6 +31,6 @@ server.registerTool('read_document', {
     sheet: z.string().optional().describe('仅 Excel：只读指定名称的工作表'),
     pages: z.object({ from: z.number().int().min(1).optional(), to: z.number().int().min(1).optional() }).optional().describe('仅 PDF：页码范围'),
   },
-}, readDocument)
+}, hotHandler(tools, 'readDocument'))
 
 await server.connect(new StdioServerTransport())

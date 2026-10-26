@@ -102,7 +102,7 @@ powershell -ExecutionPolicy Bypass -File scripts\start-web.ps1
 node skills\requirements-analysis\scripts\check-report.mjs sample\req\需求分析报告-20261024.md
 ```
 
-**改了 Skill 之后：不用重新运行 `setup.ps1`，新建会话即可。**DSH 直接读取本工程的 `skills\` 目录（`runtime\dsh-home\cordis.patch.yml` 中的 `customSkillDirs`），每次加载 Skill 都重新读取文件，新增或改名的 Skill 也会自动出现。但同一会话中已经加载过的 Skill 内容留在上下文里，智能体会照着旧版本和上下文中的旧报告做，所以测试改动要新建会话。改了 `mcp\` 下的服务代码，要重启 `start-web.ps1`。
+**改了 Skill 之后：不用重新运行 `setup.ps1`，新建会话即可。**DSH 直接读取本工程的 `skills\` 目录（`runtime\dsh-home\cordis.patch.yml` 中的 `customSkillDirs`），每次加载 Skill 都重新读取文件，新增或改名的 Skill 也会自动出现。但同一会话中已经加载过的 Skill 内容留在上下文里，智能体会照着旧版本和上下文中的旧报告做，所以测试改动要新建会话。改了 `mcp\` 下的工具实现（各服务的 `tools.mjs`、`lib\`、`mcp\common\`）也不用重启：下一次调用工具时自动加载新版本（`mcp\common\hot.mjs`）。只有改了 `server.mjs`（工具名称、说明、参数）或新增服务时，才要重启 `start-web.ps1`。
 
 需求分析报告满意后，可以接着输入：
 
@@ -312,10 +312,10 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 需求分析 | requirements-analysis | docreader、docgen | 示例 1（RS-422 遥测）、示例 2（1553B RT） | 两个示例已评测，检查脚本 check-report.mjs |
 | 概要设计 | preliminary-design（正向） | docgen（Mermaid 流程图转 Word 图形） | tcu（热控单元软件） | 已评测：F 5/5、G 10/10、0 误报，检查脚本 check-hld.mjs；用其输出跑 htr_out 详细设计，两个 Skill 能衔接 |
 | 详细设计 | detailed-design（正向、逆向） | docgen（Mermaid 流程图转 Word 图形） | oc_ctrl（OC 指令输出） | 正向已评测；逆向需在修复 prepare.mjs 后重测一次 |
-| 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC；同目录头文件替换；地址映射 ut_map.h） | cmd_check、uart_drv、rt1553（多单元） | cmd_check、uart_drv 已评测；rt1553 参考测试基线已建立，待智能体实测；评分脚本 score.mjs 支持多单元 |
+| 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC；同目录头文件替换；地址映射 ut_map.h） | cmd_check、uart_drv、rt1553（多单元） | cmd_check、uart_drv、rt1553 已评测（智能体均达到参考测试水平）；评分脚本 score.mjs 支持多单元 |
 | 代码走查 | code-walkthrough | cppcheck | 8 个评测用例 | 已有基线 |
 
-待办：rt1553 多单元示例在 DSH 中实测；地址映射在 Windows 上确认（运行 check.ps1）；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
+待办：地址映射、工具热更新在 Windows 上确认（运行 check.ps1）；用部门历史问题单改编更难的单元测试示例；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
 
 ## 版本说明
 

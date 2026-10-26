@@ -9,7 +9,10 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
-import { exportTables, listTemplates, renderDocument } from './tools.mjs'
+import { hotHandler, hotModule } from '../common/hot.mjs'
+
+// 工具实现修改后下一次调用自动生效，不用重启 DSH（见 ../common/hot.mjs）
+const tools = hotModule(import.meta.url, 'tools.mjs')
 
 const server = new McpServer({ name: 'dept-docgen', version: '0.1.0' }, {
   instructions:
@@ -21,7 +24,7 @@ const server = new McpServer({ name: 'dept-docgen', version: '0.1.0' }, {
 server.registerTool('list_templates', {
   description: '列出可用的 Word 模板，以及每个模板的封面/页眉字段（{{字段名}}）、是否有正文和目录占位、标题样式与自动编号情况。',
   inputSchema: {},
-}, listTemplates)
+}, hotHandler(tools, 'listTemplates'))
 
 server.registerTool('render_docx', {
   description:
@@ -38,7 +41,7 @@ server.registerTool('render_docx', {
     headingNumbers: z.enum(['auto', 'keep', 'strip']).optional().describe('标题中手写章节号的处理：auto=模板自动编号且顺序一致时去掉（默认）；keep=保留；strip=总是去掉'),
     overwrite: z.boolean().optional().describe('输出文件已存在时是否覆盖，默认 false'),
   },
-}, renderDocument)
+}, hotHandler(tools, 'renderDocument'))
 
 server.registerTool('export_xlsx', {
   description:
@@ -53,6 +56,6 @@ server.registerTool('export_xlsx', {
     reviewColumns: z.array(z.string()).optional().describe('在右侧追加的空白列，供评审填写，如 ["评审意见","处理结果"] 或 ["答复","答复人","状态"]'),
     overwrite: z.boolean().optional().describe('输出文件已存在时是否覆盖，默认 false'),
   },
-}, exportTables)
+}, hotHandler(tools, 'exportTables'))
 
 await server.connect(new StdioServerTransport())
