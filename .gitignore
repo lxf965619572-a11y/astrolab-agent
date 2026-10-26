@@ -7,6 +7,7 @@ sample/.dsh/
 sample/.acl-recovery/
 sample/req-*/
 sample/utest/*/test/
+sample/utest/*/test-*/
 evals/results/
 evals/unit-test/results/
 .utest/

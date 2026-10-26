@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>工作台原型</title>
+<style>
+  :root { --bg: #f6f6f4; --panel: #fff; --ink: #1d1d1b; --quiet: #6b6b66; --line: #e2e2dc; --accent: #2457c5; --warn: #b3261e; --ok: #1f7a3a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.6 "Microsoft YaHei", "PingFang SC", system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header { display: flex; gap: 16px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 15px; margin: 0; }
+  .meta { color: var(--quiet); font-size: 12px; }
+  .state { margin-left: auto; font-size: 12px; padding: 2px 8px; border-radius: 10px; border: 1px solid var(--line); }
+  .state.running { color: var(--accent); border-color: var(--accent); }
+  .state.stopped { color: var(--warn); border-color: var(--warn); }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; padding-bottom: 170px; }
+  .ev { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; margin: 8px 0; white-space: pre-wrap; word-break: break-word; }
+  .ev.user { border-left: 3px solid var(--accent); }
+  .ev.tool { font-family: Consolas, monospace; font-size: 12px; color: var(--quiet); }
+  .ev.denied { border-color: var(--warn); color: var(--warn); }
+  .ev.note { background: transparent; border-style: dashed; color: var(--quiet); font-size: 12px; }
+  .ev.error { border-color: var(--warn); color: var(--warn); }
+  details { color: var(--quiet); font-size: 12px; }
+  footer { position: fixed; left: 0; right: 0; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 12px 16px; }
+  footer .row { max-width: 900px; margin: 0 auto; display: flex; gap: 8px; }
+  textarea { flex: 1; min-height: 64px; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 6px; resize: vertical; }
+  button { font: inherit; padding: 6px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); cursor: pointer; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: default; }
+  .btns { display: flex; flex-direction: column; gap: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>工作台原型（阶段 0）</h1>
+  <span class="meta" id="ws"></span>
+  <span class="state" id="state">未启动</span>
+</header>
+<main id="log"></main>
+<footer>
+  <div class="row">
+    <textarea id="input" placeholder="输入要求，Ctrl+Enter 发送"></textarea>
+    <div class="btns">
+      <button class="primary" id="send">发送</button>
+      <button id="stop">停止</button>
+      <button id="resume">继续</button>
+      <button id="new">新会话</button>
+    </div>
+  </div>
+</footer>
+<script>
+const $ = (id) => document.getElementById(id)
+const log = $('log')
+let state = 'stopped'
+const labels = { stopped: '已停止', starting: '启动中', idle: '空闲', running: '运行中' }
+function setState(s) {
+  state = s
+  $('state').textContent = labels[s] || s
+  $('state').className = 'state ' + s
+  $('send').disabled = s === 'starting'
+  $('stop').disabled = !(s === 'running' || s === 'idle' || s === 'starting')
+  $('resume').disabled = s !== 'stopped'
+}
+function add(cls, text, extra) {
+  const div = document.createElement('div')
+  div.className = 'ev ' + cls
+  div.textContent = text
+  if (extra) div.appendChild(extra)
+  log.appendChild(div)
+  window.scrollTo(0, document.body.scrollHeight)
+}
+function render(m) {
+  if (m.kind === 'state') { setState(m.state); if (m.note) add('note', m.note); return }
+  if (m.kind === 'hello') { $('ws').textContent = '工作区：' + m.workspace; setState(m.state); log.innerHTML = ''; (m.history || []).forEach(render); return }
+  if (m.kind === 'user') return add('user', m.text)
+  if (m.kind === 'assistant') {
+    let extra = null
+    if (m.thinking) { extra = document.createElement('details'); const s = document.createElement('summary'); s.textContent = '思考过程'; extra.appendChild(s); extra.appendChild(document.createTextNode(m.thinking)) }
+    if (m.text || extra) add('assistant', m.text || '', extra)
+    return
+  }
+  if (m.kind === 'tool-call') return add('tool', '▶ ' + m.name + '  ' + m.args)
+  if (m.kind === 'tool-result') return add(m.denied ? 'tool denied' : 'tool', (m.denied ? '✖ 越界操作被拒绝：' : '◀ ') + m.text.slice(0, 300))
+  if (m.kind === 'turn-end') return add('note', '本轮结束：' + m.reason)
+  if (m.kind === 'note') return add('note', m.text)
+  if (m.kind === 'error') return add('error', '出错：' + m.text)
+}
+const es = new EventSource('/api/events')
+es.onmessage = (e) => render(JSON.parse(e.data))
+const post = (url, data) => fetch(url, { method: 'POST', body: data ? JSON.stringify(data) : undefined })
+$('send').onclick = () => { const t = $('input').value.trim(); if (!t) return; $('input').value = ''; post('/api/prompt', { text: t }) }
+$('input').onkeydown = (e) => { if (e.key === 'Enter' && e.ctrlKey) $('send').onclick() }
+$('stop').onclick = () => post('/api/stop')
+$('resume').onclick = () => post('/api/resume')
+$('new').onclick = () => post('/api/new')
+setState('stopped')
+</script>
+</body>
+</html>
