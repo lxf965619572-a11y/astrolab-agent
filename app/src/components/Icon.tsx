@@ -35,6 +35,12 @@ const P: Record<string, string> = {
   undo: 'M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3',
   external: 'M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5',
   wifiOff: 'M2 8.8a15 15 0 0 1 20 0M5.5 12.4a10 10 0 0 1 13 0M9 16a5 5 0 0 1 6 0M12 20h.01M3 3l18 18',
+  palette: 'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 22 9.7C21.6 5.9 17.3 3 12 3zM7.5 12.5h.01M9.5 8h.01M14.5 8h.01M17 11.5h.01',
+  book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5',
+  puzzle: 'M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4v-6h3a2 2 0 1 0 0-4H4V4z',
+  upload: 'M12 16V4M7 9l5-5 5 5M5 20h14',
+  refresh: 'M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4',
+  edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
   stop: '',
   play: '',
 }
@@ -50,21 +56,22 @@ export function Icon({ name, size = 16, stroke = 1.8, className, style }: { name
 }
 
 /** 应用图标“芯片轨道”：小尺寸简化版（标题栏、任务栏） */
+// 图标颜色跟着皮肤走（tokens.css 的 --icon-*、--accent、--accent-text）
 export function AppIcon({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 256 256" role="img" aria-label="AstroLab">
       <defs>
-        <linearGradient id="aiBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#DDD4FC" /></linearGradient>
-        <linearGradient id="aiChip" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#A08FF8" /><stop offset="1" stopColor="#6A55D6" /></linearGradient>
+        <linearGradient id="aiBg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style={{ stopColor: 'var(--icon-bg-top)' }} /><stop offset="1" style={{ stopColor: 'var(--icon-bg)' }} /></linearGradient>
+        <linearGradient id="aiChip" x1="0" y1="0" x2="1" y2="1"><stop offset="0" style={{ stopColor: 'var(--icon-chip-a)' }} /><stop offset="1" style={{ stopColor: 'var(--icon-chip-b)' }} /></linearGradient>
       </defs>
       <rect width="256" height="256" rx="58" fill="url(#aiBg)" />
-      <rect x="4" y="4" width="248" height="248" rx="54" fill="none" stroke="#8B7CF6" strokeOpacity=".45" strokeWidth="10" />
-      <path d="M58 108h26M58 148h26M172 108h26M172 148h26M108 58v26M148 58v26M108 172v26M148 172v26" stroke="#A797F7" strokeWidth="18" strokeLinecap="round" />
+      <rect x="4" y="4" width="248" height="248" rx="54" fill="none" style={{ stroke: 'var(--accent)' }} strokeOpacity=".45" strokeWidth="10" />
+      <path d="M58 108h26M58 148h26M172 108h26M172 148h26M108 58v26M148 58v26M108 172v26M148 172v26" style={{ stroke: 'var(--icon-pin)' }} strokeWidth="18" strokeLinecap="round" />
       <rect x="80" y="80" width="96" height="96" rx="20" fill="url(#aiChip)" />
       <g transform="translate(128 128) rotate(-22)">
         <path d="M-104 0A104 38 0 0 0 104 0" fill="none" stroke="#FFFFFF" strokeWidth="30" strokeLinecap="round" />
-        <path d="M-104 0A104 38 0 0 0 104 0" fill="none" stroke="#5B4BC4" strokeWidth="18" strokeLinecap="round" />
-        <circle cx="85.2" cy="21.8" r="22" fill="#5B4BC4" stroke="#FFFFFF" strokeWidth="9" />
+        <path d="M-104 0A104 38 0 0 0 104 0" fill="none" style={{ stroke: 'var(--accent-text)' }} strokeWidth="18" strokeLinecap="round" />
+        <circle cx="85.2" cy="21.8" r="22" style={{ fill: 'var(--accent-text)' }} stroke="#FFFFFF" strokeWidth="9" />
       </g>
     </svg>
   )

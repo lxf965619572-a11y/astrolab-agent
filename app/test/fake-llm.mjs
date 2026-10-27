@@ -3,6 +3,8 @@
 //   含 MARK-ASK     → 先调用 ask_user_question，拿到结果后回 ASK-DONE
 //   含 MARK-STEER   → 文字 STEER-SEEN（说明插话在本轮中途被看到）
 //   含 MARK-RESUME  → 文字 RESUMED
+//   含 MARK-KB      → 先查知识库（mcp__knowledge__search_knowledge），再调插件的工具（mcp__crc_tools_crc__count_lines），回 KB-DONE 和两个结果
+//   每次请求的工具名和消息全文记在 requests 里（检查技能目录、插件工具有没有加载）
 //   其他            → 每步慢 delay 毫秒，调用 todo_write，共 steps 步，然后回 DONE
 // 用法：import { startFakeLlm } from './fake-llm.mjs'；或 node test/fake-llm.mjs（端口 PORT，默认 18999）
 
@@ -14,6 +16,7 @@ const injected = (t) => t.startsWith('Current runtime context') || t.includes('<
 
 export function startFakeLlm({ port = 0, delay = 1200, steps = 6, log = () => {} } = {}) {
   let n = 0
+  const requests = []
   const server = createServer((req, res) => {
     let body = ''
     req.on('data', (c) => { body += c })
@@ -27,7 +30,12 @@ export function startFakeLlm({ port = 0, delay = 1200, steps = 6, log = () => {}
       const tools = msgs.slice(li + 1).filter((m) => m.role === 'tool').length
       const id = `r${++n}`
       let reply
-      if (last.includes('MARK-ASK')) reply = tools ? { text: 'ASK-DONE' } : { tool: { name: 'ask_user_question', args: { questions: [{ id: 'q1', question: '选哪个？', options: [{ label: '甲' }, { label: '乙' }] }] } } }
+      requests.push({ tools: (j.tools || []).map((t) => (t.function && t.function.name) || t.name), text: msgs.map(textOf).join('\n') })
+      const results = msgs.slice(li + 1).filter((m) => m.role === 'tool').map(textOf)
+      if (last.includes('MARK-KB')) reply = tools === 0 ? { tool: { name: 'mcp__knowledge__search_knowledge', args: { query: '复位 超时' } } }
+        : tools === 1 ? { tool: { name: 'mcp__crc_tools_crc__count_lines', args: { path: 'a.txt' } } }
+          : { text: `KB-DONE\n${results.join('\n---\n')}` }
+      else if (last.includes('MARK-ASK')) reply = tools ? { text: 'ASK-DONE' } : { tool: { name: 'ask_user_question', args: { questions: [{ id: 'q1', question: '选哪个？', options: [{ label: '甲' }, { label: '乙' }] }] } } }
       else if (last.includes('MARK-STEER')) reply = { text: 'STEER-SEEN' }
       else if (last.includes('MARK-RESUME')) reply = { text: 'RESUMED' }
       else if (tools < steps) reply = { tool: { name: 'todo_write', args: { todos: [{ content: `步骤 ${tools + 1}`, status: 'in_progress' }] } } }
@@ -46,7 +54,7 @@ export function startFakeLlm({ port = 0, delay = 1200, steps = 6, log = () => {}
       res.end()
     })
   })
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ port: server.address().port, close: () => new Promise((r) => server.close(() => r())) })))
+  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ port: server.address().port, requests, close: () => new Promise((r) => server.close(() => r())) })))
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

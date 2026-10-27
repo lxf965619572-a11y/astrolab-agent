@@ -1,0 +1,122 @@
+// 库的测试：用本机的裸仓库当“内网 Git 服务器”。同步、目录、安装、提交审核、通过、退回、知识检索。
+
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { Library } from '../main/library.mjs'
+import { buildIndex, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
+
+const run = (cwd, ...args) => execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, DEPT_UI_GIT: '1' } })
+const put = (root, rel, text) => { mkdirSync(dirname(join(root, rel)), { recursive: true }); writeFileSync(join(root, rel), text) }
+const SKILL = (name, desc) => `---\nname: ${name}\ndescription: ${desc}\n---\n\n# ${name}\n\n步骤……\n`
+
+function setup() {
+  const t = mkdtempSync(join(tmpdir(), 'astro-lib-'))
+  // 让测试不受本机 git 全局配置影响：没有 user.name 时用系统用户名
+  process.env.GIT_CONFIG_GLOBAL = join(t, 'gitconfig')
+  writeFileSync(process.env.GIT_CONFIG_GLOBAL, '')
+  const server = join(t, 'server', 'dept.git')
+  mkdirSync(server, { recursive: true })
+  run(server, 'init', '-q', '--bare', '-b', 'main')
+  const seed = join(t, 'seed')
+  mkdirSync(seed)
+  run(seed, 'init', '-q', '-b', 'main')
+  put(seed, 'skills/spw-review/SKILL.md', SKILL('spw-review', 'SpaceWire 报文走查'))
+  put(seed, 'plugins/crc-tools/plugin.json', JSON.stringify({ name: 'crc-tools', title: 'CRC 工具', version: '1.0.0', description: '计算和核对 CRC', skills: ['skills'], mcp: [{ name: 'crc', command: 'node', args: ['mcp/crc/server.mjs'] }] }))
+  put(seed, 'plugins/crc-tools/skills/crc-check/SKILL.md', SKILL('crc-check', '核对报文 CRC'))
+  put(seed, 'plugins/crc-tools/mcp/crc/server.mjs', '// 工具服务\n')
+  put(seed, 'knowledge/经验/2026-10-01-看门狗.md', '---\ntitle: 看门狗只在主循环末尾喂\nkind: 经验\ntags: [看门狗]\n---\n等待循环里无条件喂狗会掩盖死循环。\n')
+  run(seed, 'add', '-A')
+  run(seed, '-c', 'user.name=seed', '-c', 'user.email=s@x', 'commit', '-q', '-m', '初始内容')
+  run(seed, 'push', '-q', server, 'main')
+  const root = join(t, 'root')
+  put(root, 'skills/coding/SKILL.md', SKILL('coding', '编码'))
+  put(root, 'config/libraries.json', JSON.stringify({ sources: [{ id: 'dept', name: '部门通用库', url: server, branch: 'main' }] }))
+  const lib = new Library({ dataDir: join(t, 'data'), root })
+  return { t, server, root, lib }
+}
+
+test('同步共享库、目录、安装技能和插件', async () => {
+  const { lib } = setup()
+  await lib.ensureMine()
+  const st = await lib.sync('dept')
+  assert.equal(st.error, '')
+  assert.ok(st.cloned)
+  const cat = await lib.catalog()
+  const keys = cat.map((c) => c.key)
+  assert.ok(keys.includes('builtin:skill:coding'))
+  assert.ok(keys.includes('dept:skill:spw-review'))
+  assert.ok(keys.includes('dept:plugin:crc-tools'))
+  await lib.install('dept:skill:spw-review')
+  await lib.install('dept:plugin:crc-tools')
+  const dirs = lib.skillDirs()
+  assert.ok(dirs.some((d) => d.endsWith(join('installed', 'skills'))))
+  assert.ok(dirs.some((d) => d.endsWith(join('crc-tools', 'skills'))))
+  const mcp = lib.mcpServers('/usr/bin/node')
+  assert.equal(mcp.length, 1)
+  assert.equal(mcp[0].command, '/usr/bin/node')
+  assert.ok(mcp[0].args[0].endsWith(join('crc-tools', 'mcp', 'crc', 'server.mjs')))
+  assert.match(mcp[0].name, /^[A-Za-z0-9_-]{1,32}$/)
+  const after = await lib.catalog()
+  assert.ok(after.find((c) => c.key === 'dept:plugin:crc-tools').installed)
+  await assert.rejects(lib.install('builtin:skill:coding'), /没有这个库/)
+  lib.uninstall('plugin', 'crc-tools')
+  assert.equal(lib.mcpServers('/n').length, 0)
+})
+
+test('提交审核：分支推到服务器，审核人通过后进主分支；退回的看得到状态', async () => {
+  const { lib, server } = setup()
+  const mine = await lib.ensureMine()
+  await lib.sync('dept')
+  const rel = writeEntry(mine, { title: '1553B RT 复位用大于或等于判就绪', kind: '经验', tags: ['1553B'], status: '草稿' }, '设计规定 elapsed >= 10 tick 超时。')
+  await lib.commitMine([rel], '知识库：复位')
+  const { branch } = await lib.submit('dept', rel, '知识：复位')
+  assert.match(branch, /^submit\/[a-z0-9_-]+\/.+-\d{14}$/)
+  assert.ok(run(server, 'branch', '--list', branch).trim())
+  let subs = await lib.submissions()
+  assert.equal(subs[0].status, '待审核')
+  const pend = await lib.pending('dept')
+  assert.equal(pend.length, 1)
+  assert.deepEqual(pend[0].files.map((f) => f.path), [rel])
+  const v = await lib.pendingFile('dept', pend[0].ref, rel)
+  assert.equal(v.before, null)
+  assert.match(v.after, /复位/)
+  assert.doesNotMatch(v.after, /草稿/, '提交时去掉草稿状态')
+  const ok = await lib.approve('dept', pend[0].ref)
+  assert.deepEqual([ok.merged, ok.title], [true, '知识：复位'])
+  assert.ok(existsSync(join(lib.source('dept').dir, rel)), '同步后主分支上有了')
+  subs = await lib.submissions()
+  assert.equal(subs[0].status, '已通过')
+  // 退回
+  put(mine, 'skills/my-skill/SKILL.md', SKILL('my-skill', '我的技能'))
+  await lib.commitMine(['skills/my-skill'], '技能：my-skill')
+  await lib.submit('dept', 'skills/my-skill', '技能：my-skill')
+  const p2 = await lib.pending('dept')
+  const rj = await lib.reject('dept', p2[0].ref)
+  assert.equal(rj.rejected, true)
+  subs = await lib.submissions()
+  assert.equal(subs[0].status, '已退回')
+  assert.equal((await lib.pending('dept')).length, 0)
+  // 知识检索覆盖我的库和共享库
+  const hits = search(buildIndex(lib.available()), '复位 就绪')
+  assert.ok(hits.length >= 1)
+  assert.ok(hits.some((h) => h.lib === 'dept'))
+  assert.ok(search(buildIndex(lib.available()), '看门狗').length >= 1)
+})
+
+test('连不上服务器：同步报错但不抛出，我的库照常可用', async () => {
+  const { lib } = setup()
+  lib.addSource({ name: 'xh-a', url: '/no/such/repo.git', model: '型号A' })
+  const st = await lib.sync('xh-a')
+  assert.ok(st.error)
+  assert.equal(st.cloned, false)
+  assert.ok(lib.available().some((l) => l.id === 'mine'))
+  assert.ok(!lib.available().some((l) => l.id === 'xh-a'))
+  assert.throws(() => lib.removeSource('dept'), /不能移除/)
+  lib.removeSource('xh-a')
+  assert.ok(!lib.sources().some((s) => s.id === 'xh-a'))
+  void readFileSync
+})

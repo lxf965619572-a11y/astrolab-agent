@@ -304,22 +304,32 @@ export class EngineBridge extends EventEmitter {
  * 写引擎启动补丁（通过 --patch 传给 DSH），返回文件路径。
  *   - 关掉 web_search、web_fetch：内网没有外网，智能体会白白尝试
  *   - 加 DSH 自带的 ask_user_question（阻塞模式：不回答就一直等）和引擎桥插件（提问、插话、停止）
+ *   - skillDirs：技能目录（内置 + 从库里安装的 + 插件带的），覆盖数据目录补丁里 skill-filesystem 的目录列表
+ *   - mcpServers：插件带的工具服务 [{ id, name, command, args, env, cwd, toolCallTimeoutMs }]
  * 提问工具用我们自己的条目 id；DSH 以后若在 sdk 中默认挂上提问工具，会出现两个同名工具，升级 DSH 时检查。
  */
-export function writeEnginePatch(dir, { ask = true, disableWeb = true } = {}) {
+export function writeEnginePatch(dir, { ask = true, disableWeb = true, skillDirs = null, mcpServers = [] } = {}) {
   mkdirSync(dir, { recursive: true })
+  const q = (v) => JSON.stringify(String(v)) // YAML 的双引号字符串与 JSON 转义兼容
   const lines = ['# 由 AstroLab 生成，每次启动引擎时重写']
   if (disableWeb) lines.push('- id: tool-web', '  disabled: true')
-  if (ask) {
-    const url = pathToFileURL(join(HERE, 'bridge.mjs')).href.replace(/'/g, "''")
-    lines.push(
-      '- insert:',
-      '    - id: astrolab-tool-ask-user',
-      "      name: '@deepseek-ai/dsh-tool-ask-user'",
-      '    - id: astrolab-bridge',
-      `      name: '${url}'`,
-    )
+  if (skillDirs && skillDirs.length) {
+    lines.push('- id: skill-filesystem', '  disabled: false', '  config:', '    providerName: dept-skills', '    includeDefaultRoots: false',
+      `    customSkillDirs: [${skillDirs.map((d) => q(d.replace(/\\/g, '/'))).join(', ')}]`)
   }
+  const inserts = []
+  if (ask) {
+    const url = pathToFileURL(join(HERE, 'bridge.mjs')).href
+    inserts.push('    - id: astrolab-tool-ask-user', "      name: '@deepseek-ai/dsh-tool-ask-user'", '    - id: astrolab-bridge', `      name: ${q(url)}`)
+  }
+  for (const m of mcpServers) {
+    inserts.push(`    - id: ${q(m.id)}`, "      name: '@deepseek-ai/dsh-mcp-client'", '      config:', `        serverName: ${q(m.name)}`, '        transport: stdio',
+      `        command: ${q(m.command)}`, `        args: [${m.args.map(q).join(', ')}]`)
+    if (m.cwd) inserts.push(`        cwd: ${q(m.cwd)}`)
+    if (m.env && Object.keys(m.env).length) inserts.push(`        env: {${Object.entries(m.env).map(([k, v]) => `${q(k)}: ${q(v)}`).join(', ')}}`)
+    if (m.toolCallTimeoutMs) inserts.push(`        toolCallTimeoutMs: ${Number(m.toolCallTimeoutMs)}`)
+  }
+  if (inserts.length) lines.push('- insert:', ...inserts)
   const file = join(dir, 'astrolab-engine.patch.yml')
   writeFileSync(file, lines.join('\n') + '\n')
   return file

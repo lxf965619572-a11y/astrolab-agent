@@ -1,18 +1,24 @@
 // 界面状态：主进程推来的任务状态和活动记录，加上界面自己的视图、提示条、设置。
 
 import { create } from 'zustand'
-import type { AppState, AstroApi, AstroEvent, Item, Question, Stage, TaskState, Project } from './api'
+import type { AppState, AstroApi, AstroEvent, Item, KbMeta, LibSource, Question, Stage, TaskState, Project } from './api'
 import { play, setSoundSettings } from './sound'
 
-export type View = 'launch' | 'task' | 'review' | 'history'
+export type View = 'launch' | 'task' | 'review' | 'history' | 'knowledge' | 'library'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
-interface Settings { sound: boolean; volume: number; notify: boolean }
+export type Theme = 'lavender' | 'cream' | 'mars'
+interface Settings { sound: boolean; volume: number; notify: boolean; theme: Theme; reviewer: boolean }
 /** 发起页写了一半的任务：切到别的页面再回来还在（任务进行中可以先写好下一个） */
 export interface Draft { prompt: string; files: string[]; report: boolean; dismissed: string[] }
 
 function loadSettings(): Settings {
-  try { return { sound: true, volume: 0.3, notify: true, ...JSON.parse(localStorage.getItem('astrolab.settings') || '{}') } } catch { return { sound: true, volume: 0.3, notify: true } }
+  const d: Settings = { sound: true, volume: 0.3, notify: true, theme: 'lavender', reviewer: false }
+  try {
+    const v = { ...d, ...JSON.parse(localStorage.getItem('astrolab.settings') || '{}') }
+    if (!['lavender', 'cream', 'mars'].includes(v.theme)) v.theme = v.theme === 'clay' ? 'mars' : 'lavender' // 旧的“陶土”换成“黑橙”
+    return v
+  } catch { return d }
 }
 
 interface Store {
@@ -27,6 +33,10 @@ interface Store {
   launchStage: string
   draft: Draft
   chatDraft: string
+  /** 知识条目编辑框：null 不显示；id 有值时是编辑我的库里的条目 */
+  kbEditor: null | { id?: string; meta: KbMeta; body: string }
+  libraries: LibSource[]
+  kbVersion: number
   toasts: Toast[]
   settings: Settings
   lastError: string | null
@@ -35,6 +45,8 @@ interface Store {
   setLaunchStage(id: string): void
   setDraft(d: Partial<Draft>): void
   setChatDraft(t: string): void
+  openKbEditor(e: { id?: string; meta: Partial<KbMeta>; body: string }): void
+  closeKbEditor(saved?: boolean): void
   toast(t: Omit<Toast, 'id'>, ms?: number): void
   dropToast(id: number): void
   setSettings(s: Partial<Settings>): void
@@ -43,6 +55,17 @@ interface Store {
 }
 
 let toastSeq = 0
+
+/** 换皮肤：根元素的 data-theme 切换颜色变量；Windows 上标题栏右侧的系统按钮区跟着换底色 */
+export function applyTheme(theme: Theme) {
+  const el = document.documentElement
+  if (theme === 'lavender') delete el.dataset.theme
+  else el.dataset.theme = theme
+  const css = getComputedStyle(el)
+  const color = css.getPropertyValue('--titlebar-bg').trim()
+  const symbol = css.getPropertyValue('--ink-2').trim()
+  try { window.astro?.sys.titlebar?.({ color, symbolColor: symbol }) } catch { /* 浏览器里没有标题栏 */ }
+}
 
 export const useStore = create<Store>((set, get) => ({
   api: null,
@@ -56,6 +79,9 @@ export const useStore = create<Store>((set, get) => ({
   launchStage: 'utest',
   draft: { prompt: '', files: [], report: true, dismissed: [] },
   chatDraft: '',
+  kbEditor: null,
+  libraries: [],
+  kbVersion: 0,
   toasts: [],
   settings: loadSettings(),
   lastError: null,
@@ -63,6 +89,7 @@ export const useStore = create<Store>((set, get) => ({
   async init(api) {
     set({ api })
     setSoundSettings({ enabled: get().settings.sound, volume: get().settings.volume })
+    applyTheme(get().settings.theme)
     api.onEvent((e) => onEvent(e))
     const s = await api.getState()
     get().applyAppState(s)
@@ -80,6 +107,8 @@ export const useStore = create<Store>((set, get) => ({
   setLaunchStage(id) { set({ launchStage: id }) },
   setDraft(d) { set({ draft: { ...get().draft, ...d } }) },
   setChatDraft(t) { set({ chatDraft: t }) },
+  openKbEditor(e) { set({ kbEditor: { id: e.id, body: e.body, meta: { title: '', kind: '经验', tags: [], ...e.meta } } }) },
+  closeKbEditor(saved) { set({ kbEditor: null, kbVersion: get().kbVersion + (saved ? 1 : 0) }) },
 
   toast(t, ms = 4000) {
     const id = ++toastSeq
@@ -92,6 +121,7 @@ export const useStore = create<Store>((set, get) => ({
     const settings = { ...get().settings, ...s }
     try { localStorage.setItem('astrolab.settings', JSON.stringify(settings)) } catch { /* 存不了就只在本次有效 */ }
     setSoundSettings({ enabled: settings.sound, volume: settings.volume })
+    if (s.theme) applyTheme(settings.theme)
     set({ settings })
   },
 
@@ -148,6 +178,7 @@ function onEvent(e: AstroEvent) {
       break
     }
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break
+    case 'library': useStore.setState({ libraries: e.payload, kbVersion: st.kbVersion + 1 }); break
   }
 }
 

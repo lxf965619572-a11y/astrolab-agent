@@ -41,6 +41,20 @@ server.registerTool('run_unit_tests', {
   },
 }, hotHandler(tools, 'runUnitTests'))
 
+server.registerTool('compile_check', {
+  description:
+    '编码环节用：只编译不运行，用严格告警（-Wall -Wextra -Wconversion 等）检查 .c 文件，返回每条错误和告警的文件、行号、告警类别。' +
+    'target 为 sparc 或 d2000 时，配置了目标机交叉编译器（TARGET_CC_SPARC / TARGET_CC_D2000）就用它，否则用主机 gcc 并说明局限。',
+  inputSchema: {
+    sources: z.array(z.string()).min(1).describe('要检查的源文件（.c）'),
+    includeDirs: z.array(z.string()).optional().describe('头文件目录'),
+    defines: z.array(z.string()).optional().describe('预定义宏'),
+    cflags: z.array(z.string()).optional().describe('其他编译选项'),
+    std: z.enum(['c89', 'c99', 'c11']).optional().describe('C 标准，默认 c99；部门规定 C89 的项目填 c89'),
+    target: z.enum(['sparc', 'd2000', 'host']).optional().describe('目标平台，默认 host'),
+  },
+}, hotHandler(tools, 'compileCheck'))
+
 server.registerTool('coverage_detail', {
   description: '显示上次 run_unit_tests 中未覆盖的语句、未全覆盖的分支和 MC/DC 条件所在的源码行，用于补充用例。',
   inputSchema: {

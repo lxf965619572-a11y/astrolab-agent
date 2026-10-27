@@ -1,0 +1,7 @@
+{
+  "说明": "部门预置的共享库（内网 Git 仓库）。复制为 config/libraries.json，打包进安装包后，每个人打开工作台就会自动同步。型号库填 model：型号相关的知识条目只能提交到对应的型号库；谁能看到由 Git 服务器上的仓库权限决定。",
+  "sources": [
+    { "id": "dept", "name": "部门通用库", "url": "http://git.intra.example/astrolab/library.git", "branch": "main" },
+    { "id": "xh-a", "name": "型号A 库", "url": "http://git.intra.example/xh-a/astrolab-library.git", "branch": "main", "model": "型号A" }
+  ]
+}

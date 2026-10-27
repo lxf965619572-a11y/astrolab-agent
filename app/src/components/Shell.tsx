@@ -1,9 +1,9 @@
 // 外壳：标题栏（玻璃，可拖动窗口）、研发环节侧栏、状态栏、提示条。
 
 import { useEffect, useState } from 'react'
-import { Button, Menu, MenuItem, MenuTrigger, Popover, Separator } from 'react-aria-components'
+import { Button, Dialog, DialogTrigger, Menu, MenuItem, MenuTrigger, Popover, Separator } from 'react-aria-components'
 import { AnimatePresence, motion } from 'motion/react'
-import { useStore, type View } from '../store'
+import { useStore, type Theme, type View } from '../store'
 import { AppIcon, Icon, STAGE_ICON } from './Icon'
 import { play } from '../sound'
 
@@ -46,6 +46,7 @@ export function TitleBar() {
       </MenuTrigger>
       <div className="tb-drag" />
       <ModelStatus />
+      <ThemePicker />
       <SoundToggle />
       <div className="tb-controls-space" />
     </header>
@@ -58,6 +59,35 @@ function ModelStatus() {
   const ok = app.engineReady && (app.mock || app.model.hasKey)
   const text = app.mock ? '模拟引擎（不调用模型）' : !app.engineReady ? '引擎未安装' : !app.model.hasKey ? '模型未配置' : `部门模型 · ${app.model.model}`
   return <span className={`tb-model ${ok ? 'ok' : 'bad'}`} title={app.model.baseURL}><span className="dot" />{text}</span>
+}
+
+const THEMES: { id: Theme; name: string; desc: string; sw: [string, string, string] }[] = [
+  { id: 'lavender', name: '浅紫', desc: '冷静的浅紫，默认', sw: ['#F3F1F9', '#C4B5FD', '#8B7CF6'] },
+  { id: 'cream', name: '奶油', desc: '暖奶油面板，钴蓝点缀', sw: ['#E8E2D8', '#F5F1EA', '#2F45D8'] },
+  { id: 'mars', name: '黑橙', desc: '纯黑底，火星橙线框', sw: ['#060504', '#2A140A', '#FF6A1F'] },
+]
+
+/** 换皮肤：只改颜色，界面结构不变；立刻生效，下次打开记住 */
+function ThemePicker() {
+  const theme = useStore((s) => s.settings.theme)
+  const set = useStore((s) => s.setSettings)
+  return (
+    <DialogTrigger>
+      <Button className="tb-icon" aria-label="换皮肤"><Icon name="palette" size={17} /></Button>
+      <Popover className="pop theme-pop" placement="bottom end">
+        <Dialog className="theme-dialog" aria-label="皮肤">
+          <div className="theme-title">皮肤</div>
+          {THEMES.map((t) => (
+            <Button key={t.id} className={`theme-opt ${theme === t.id ? 'on' : ''}`} aria-pressed={theme === t.id} onPress={() => { set({ theme: t.id }); play('tick') }}>
+              <span className="theme-sw" aria-hidden="true">{t.sw.map((c) => <i key={c} style={{ background: c }} />)}</span>
+              <span className="theme-text"><span className="strong">{t.name}</span><span className="muted small">{t.desc}</span></span>
+              {theme === t.id && <Icon name="check" size={15} stroke={2.4} className="accent" />}
+            </Button>
+          ))}
+        </Dialog>
+      </Popover>
+    </DialogTrigger>
+  )
 }
 
 function SoundToggle() {
@@ -84,7 +114,7 @@ export function Sidebar() {
   return (
     <nav className="sidebar" aria-label="研发环节">
       <div className="nav-label">研发环节</div>
-      {(app?.stages || []).map((s) => {
+      {(app?.stages || []).filter((s) => !s.hidden).map((s) => {
         const isTask = current === s.id && !!ts?.task
         const on = view === 'launch' ? launchStage === s.id : isTask
         const live = isTask && busy
@@ -103,7 +133,17 @@ export function Sidebar() {
           </Button>
         )
       })}
+      {ts?.task && (app?.stages || []).find((s) => s.id === ts.task!.stage)?.hidden && (
+        <Button className={`nav ${['task', 'review'].includes(view) ? 'on' : ''}`} onPress={() => setView('task')}>
+          <Icon name={ts.task.stage === 'plugin' ? 'puzzle' : 'sparkle'} size={18} stroke={1.7} />
+          <span className="nav-name">{ts.task.stageName}</span>
+          {busy && <span className={`led ${ts.status === 'asking' ? 'ask' : ''}`} />}
+          <span className={`nav-status st-${ts.task.commit ? 'done' : ts.status}`}>{ts.task.commit ? '已提交' : statusText[ts.status || 'idle']}</span>
+        </Button>
+      )}
       <div className="nav-sep" />
+      <Button className={`nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={18} stroke={1.7} /><span className="nav-name">知识库</span></Button>
+      <Button className={`nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={18} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
       <Button className={`nav ${view === 'history' ? 'on' : ''}`} onPress={() => setView('history')}><Icon name="history" size={18} stroke={1.7} /><span className="nav-name">任务历史</span></Button>
       <div className="nav-grow" />
       <div className="nav-foot">

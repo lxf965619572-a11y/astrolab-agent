@@ -3,8 +3,8 @@
 
 export type Status = 'idle' | 'starting' | 'running' | 'asking' | 'done' | 'stopped' | 'error'
 
-export interface Project { id: string; path: string; name: string; sample?: boolean; git?: boolean; branch?: string; lastOpenedAt?: number }
-export interface Stage { id: string; name: string; skill: string; hasSkill: boolean }
+export interface Project { id: string; path: string; name: string; sample?: boolean; library?: boolean; git?: boolean; branch?: string; lastOpenedAt?: number }
+export interface Stage { id: string; name: string; skill: string; hasSkill: boolean; hidden?: boolean }
 export interface Todo { content: string; status: 'pending' | 'in_progress' | 'completed' }
 
 export interface Call {
@@ -50,7 +50,7 @@ export interface TaskState {
 export interface AppState {
   platform: string; mock: boolean; installed: boolean
   model: { provider: string; model: string; baseURL: string; hasKey: boolean }
-  engineReady: boolean; projects: Project[]; stages: Stage[]; notes: string[]
+  engineReady: boolean; projects: Project[]; stages: Stage[]; notes: string[]; libraryDir?: string
   task: TaskState; items: Item[]
 }
 
@@ -65,8 +65,22 @@ export type AstroEvent =
   | { type: 'queued'; payload: { id: string; text: string } }
   | { type: 'notify'; payload: { level: number; kind: 'done' | 'ask' | 'error'; title: string; body: string } }
   | { type: 'warn'; payload: string }
+  | { type: 'library'; payload: LibSource[] }
 
 export interface Mention { name: string; paths: string[] }
+
+// ---------- 库：知识库、技能与插件 ----------
+export type KbKind = '经验' | '设计' | '代码' | '问题'
+export interface KbMeta { title: string; kind: KbKind; model?: string; tags: string[]; author?: string; date?: string; source?: string; status?: string }
+export interface KbHit { id: string; title: string; kind: KbKind; model: string; tags: string[]; lib: string; libName: string; writable: boolean; path: string; date: string; author: string; status: string; source: string; score: number; snippet: string }
+export interface KbEntry { id: string; lib: string; libName: string; writable: boolean; path: string; meta: KbMeta; body: string }
+export interface LibSource { id: string; name: string; url: string; branch: string; model: string; preset: boolean; local: boolean; writable: boolean; cloned: boolean; syncing: boolean; lastSync: number | null; error: string }
+export interface CatalogItem {
+  key: string; kind: 'skill' | 'plugin'; name: string; title: string; description: string; version?: string; source: string; sourceName: string; path: string
+  builtin?: boolean; mine?: boolean; installed: boolean; installedFrom?: string; update?: boolean; mcp?: string[]; skills?: string[]
+}
+export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string }
+export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[] }
 
 export interface StartInput { stage: string; prompt: string; files: string[]; options: { report: boolean } }
 
@@ -88,7 +102,19 @@ export interface AstroApi {
     changes(): Promise<Change[]>; file(path: string): Promise<FileVersions>
     commit(message: string, paths?: string[]): Promise<string>; undo(): Promise<void>; restore(): Promise<number>
   }
-  sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void> }
+  kb: {
+    search(q: string, f?: { kind?: string; model?: string; lib?: string }): Promise<KbHit[]>; read(id: string): Promise<KbEntry>
+    save(e: { id?: string; meta: KbMeta; body: string }): Promise<string>; remove(id: string): Promise<void>; publish(id: string, target: string): Promise<{ branch: string }>
+  }
+  lib: {
+    state(): Promise<{ sources: LibSource[]; mine: string }>; sync(id?: string): Promise<LibSource[]>
+    addSource(s: { name: string; url: string; branch?: string; model?: string }): Promise<LibSource[]>; removeSource(id: string): Promise<LibSource[]>
+    catalog(): Promise<CatalogItem[]>; install(key: string): Promise<{ kind: string; name: string; restarted: boolean }>; uninstall(kind: string, name: string): Promise<{ restarted: boolean }>
+    read(key: string): Promise<{ item: CatalogItem; text: string; readme: string }>; submit(key: string, target: string): Promise<{ branch: string }>
+    submissions(): Promise<Submission[]>; pending(id: string): Promise<Pending[]>; pendingFile(id: string, ref: string, path: string): Promise<{ path: string; before: string | null; after: string | null }>
+    approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string): Promise<{ branch: string; title: string; rejected: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
+  }
+  sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void> }
 }
 
 declare global { interface Window { astro?: AstroApi } }

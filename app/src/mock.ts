@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, AstroApi, AstroEvent, Change, Item, Question, StartInput, Task, TaskState } from './api'
+import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, StartInput, Task, TaskState } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 
@@ -204,6 +204,26 @@ export function createMockApi(): AstroApi {
     }
   }
 
+  // 知识库和技能库（浏览器里看界面用）
+  const mkEntry = (lib: string, libName: string, meta: KbMeta, body: string): KbEntry => ({ id: `${lib}:knowledge/${meta.kind}/${meta.title}.md`, lib, libName, writable: lib === 'mine', path: `knowledge/${meta.kind}/${meta.title}.md`, meta, body })
+  let kbEntries: KbEntry[] = [
+    mkEntry('mine', '我的库', { title: '复位等待用“大于或等于”判就绪', kind: '经验', tags: ['1553B', '复位', '超时'], date: '2026-10-27', author: '智能体', status: '草稿', source: '单元测试任务 · rt_drv.c' }, 'rt_drv 的复位等待，设计 4.2.3 规定 **elapsed ≥ 10 tick** 视为超时。代码用了 `>`，第 10 tick 就绪时仍报超时。\n\n```c\nif (elapsed >= RT_RESET_TMO_TICKS) {\n    return RT_ERR_TIMEOUT;\n}\n```'),
+    mkEntry('dept', '部门通用库', { title: '串口接收中断只放进环形缓冲区', kind: '设计', tags: ['UART', '中断'], date: '2026-09-12', author: '李工' }, '中断服务程序只把字节放进环形缓冲区并计数，帧解析放在主循环。缓冲区读写指针分开，主循环读之前不用关中断。'),
+    mkEntry('dept', '部门通用库', { title: '看门狗只在主循环末尾喂', kind: '经验', tags: ['看门狗'], date: '2026-08-30', author: '张工' }, '在等待循环里无条件喂狗，会掩盖死循环。'),
+    mkEntry('xh-a', '型号A 库', { title: '型号A 1553B 子地址分配', kind: '设计', model: '型号A', tags: ['1553B'], date: '2026-07-02', author: '王工' }, '子地址 1～3 收遥控，4～6 发遥测。'),
+  ]
+  let libSources: LibSource[] = [
+    { id: 'mine', name: '我的库', url: '', branch: '', model: '', preset: false, local: true, writable: true, cloned: true, syncing: false, lastSync: null, error: '' },
+    { id: 'dept', name: '部门通用库', url: 'http://git.intra/astrolab/library.git', branch: 'main', model: '', preset: true, local: false, writable: false, cloned: true, syncing: false, lastSync: Date.now() - 600_000, error: '' },
+    { id: 'xh-a', name: '型号A 库', url: 'http://git.intra/xh-a/library.git', branch: 'main', model: '型号A', preset: true, local: false, writable: false, cloned: true, syncing: false, lastSync: Date.now() - 600_000, error: '' },
+  ]
+  const catalog: CatalogItem[] = [
+    ...STAGES.filter((st) => st.hasSkill).map((st): CatalogItem => ({ key: `builtin:skill:${st.skill}`, kind: 'skill', name: st.skill, title: `${st.name}`, description: `${st.name}的部门技能`, source: 'builtin', sourceName: '内置', path: `skills/${st.skill}`, builtin: true, installed: true })),
+    { key: 'dept:skill:spw-review', kind: 'skill', name: 'spw-review', title: '', description: '按部门 SpaceWire 通信设计规范走查报文头、长度、CRC 和超时处理。', source: 'dept', sourceName: '部门通用库', path: 'skills/spw-review', installed: false },
+    { key: 'dept:plugin:crc-tools', kind: 'plugin', name: 'crc-tools', title: 'CRC 计算与核对', version: '1.2.0', description: '按通信协议计算 CRC-16/CCITT、CRC-32，核对报文里的 CRC 字段。', source: 'dept', sourceName: '部门通用库', path: 'plugins/crc-tools', installed: true, update: true, mcp: ['crc'] },
+    { key: 'mine:skill:fpga-reg-check', kind: 'skill', name: 'fpga-reg-check', title: '', description: '核对 FPGA 寄存器配置表与驱动代码里的地址、位定义是否一致。', source: 'mine', sourceName: '我的库', path: 'skills/fpga-reg-check', mine: true, installed: false },
+  ]
+
   const api: AstroApi = {
     platform: 'win32',
     async getState() { return appState() },
@@ -318,6 +338,40 @@ export function createMockApi(): AstroApi {
       },
       async undo() { if (task) task.commit = null; pushState() },
       async restore() { const n = files.size; files = new Map(); if (task) task.restoredAt = Date.now(); pushState(); return n },
+    },
+    kb: {
+      async search(q, f) {
+        const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
+        return kbEntries.filter((e) => (!f?.kind || e.meta.kind === f.kind) && (!f?.lib || e.lib === f.lib) && terms.every((t) => `${e.meta.title} ${e.meta.tags.join(' ')} ${e.body}`.toLowerCase().includes(t)))
+          .map((e): KbHit => ({ id: e.id, title: e.meta.title, kind: e.meta.kind, model: e.meta.model || '', tags: e.meta.tags, lib: e.lib, libName: e.libName, writable: e.writable, path: e.path, date: e.meta.date || '', author: e.meta.author || '', status: e.meta.status || '', source: e.meta.source || '', score: 1, snippet: (e.body.split('\n').find((l) => l.trim() && !l.startsWith('```')) || '').replace(/\*\*|`/g, '') }))
+      },
+      async read(id) { const e = kbEntries.find((x) => x.id === id); if (!e) throw new Error('没有这个条目'); return e },
+      async save({ id, meta, body }) {
+        const old = id ? kbEntries.find((x) => x.id === id) : null
+        if (old) { old.meta = meta; old.body = body; return old.id }
+        const e: KbEntry = { id: `mine:knowledge/${meta.kind}/${Date.now()}.md`, lib: 'mine', libName: '我的库', writable: true, path: '', meta: { ...meta, date: '2026-10-27', author: 'lixf' }, body }
+        kbEntries.unshift(e)
+        return e.id
+      },
+      async remove(id) { kbEntries = kbEntries.filter((x) => x.id !== id) },
+      async publish() { await wait(300); return { branch: 'submit/lixf/x-20261027' } },
+    },
+    lib: {
+      async state() { return { sources: libSources, mine: 'D:\\…\\library\\mine' } },
+      async sync() { await wait(400); return libSources },
+      async addSource(x) { libSources.push({ id: x.name, name: x.name, url: x.url, branch: x.branch || 'main', model: x.model || '', preset: false, local: false, writable: false, cloned: true, syncing: false, lastSync: Date.now(), error: '' }); return libSources },
+      async removeSource(id) { libSources = libSources.filter((x) => x.id !== id); return libSources },
+      async catalog() { return catalog },
+      async install(key) { const i = catalog.find((c) => c.key === key)!; i.installed = true; return { kind: i.kind, name: i.name, restarted: true } },
+      async uninstall(kind, name) { const i = catalog.find((c) => c.kind === kind && c.name === name); if (i) i.installed = false; return { restarted: true } },
+      async read(key) { const i = catalog.find((c) => c.key === key)!; return { item: i, text: `---\nname: ${i.name}\n---\n\n# ${i.title || i.name}\n\n${i.description}\n\n## 步骤\n\n1. 确认输入……`, readme: '' } },
+      async submit() { await wait(300); return { branch: 'submit/lixf/x' } },
+      async submissions() { return [{ branch: 'submit/lixf/fu-wei', library: 'dept', path: 'knowledge/经验/复位.md', title: '知识：1553B RT 复位用大于或等于判就绪', at: Date.now() - 3600_000, status: '待审核' }] },
+      async pending() { return [{ ref: 'origin/submit/wang/crc', branch: 'submit/wang/crc', author: '王工', at: Date.now() - 7200_000, title: '插件：crc-tools', files: [{ status: 'A', path: 'plugins/crc-tools/plugin.json' }, { status: 'A', path: 'plugins/crc-tools/mcp/crc/server.mjs' }] }] },
+      async pendingFile(_id, _ref, path) { return { path, before: null, after: '{\n  "name": "crc-tools"\n}\n' } },
+      async approve(_id, ref) { await wait(900); return { branch: ref, title: '插件：crc-tools', merged: true } },
+      async reject(_id, ref) { await wait(600); return { branch: ref, title: '插件：crc-tools', rejected: true } },
+      async create(kind, prompt) { return api.task.start({ stage: kind, prompt, files: [], options: { report: false } }) },
     },
     sys: { async openPath() {}, async showItem() {} },
   }

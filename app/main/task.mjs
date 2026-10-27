@@ -24,6 +24,9 @@ export const STAGES = [
   { id: 'coding', name: '编码', skill: 'coding' },
   { id: 'utest', name: '单元测试', skill: 'unit-test-design' },
   { id: 'review', name: '代码走查', skill: 'code-walkthrough' },
+  // 不在侧栏的环节：在“技能与插件”里发起，工作区是“我的库”
+  { id: 'skill', name: '技能创作', skill: 'skill-authoring', hidden: true },
+  { id: 'plugin', name: '插件创作', skill: 'plugin-authoring', hidden: true },
 ]
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
@@ -43,6 +46,7 @@ export class TaskController extends EventEmitter {
    * @param {string} [o.logDir]   引擎收发记录 <logDir>/<任务>.jsonl
    * @param {string} [o.skillsDir] 判断技能是否存在
    * @param {boolean} [o.warm]    打开项目时就在后台启动引擎（默认是）
+   * @param {boolean} [o.knowledge] 有知识库工具：第一条消息里提醒智能体先查、做完记草稿
    */
   constructor(o) {
     super()
@@ -224,6 +228,7 @@ export class TaskController extends EventEmitter {
       this.task.endedAt = Date.now()
       this.setStatus('done')
       this.save()
+      if (this.restartPending) this.requestRestart()
       this.emit('notify', { level: 2, kind: 'done', title: `${this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120) })
     }
   }
@@ -248,7 +253,8 @@ export class TaskController extends EventEmitter {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
-    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。`, `【环节】${t.stageName}`]
+    const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处；做完后，有值得留下的经验或踩过的坑，用 mcp__knowledge__propose_knowledge 记一条草稿。' : ''
+    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。${kb}`, `【环节】${t.stageName}`]
     if (t.skill && hasSkill) parts.push(`请先用 skill 工具加载技能 ${t.skill}，按技能的步骤完成。`)
     parts.push(`【要求】${t.prompt}`)
     if (t.files && t.files.length) parts.push(`【相关文件】\n${t.files.map((f) => `- ${f}`).join('\n')}`)
@@ -366,6 +372,14 @@ export class TaskController extends EventEmitter {
     this.setStatus('stopped')
     this.save()
     return { ms: Date.now() - t0, unsent }
+  }
+
+  /** 安装或卸载了技能、插件：引擎要重启才能加载。任务进行中就等它结束后再重启 */
+  requestRestart() {
+    if (this.busy) { this.restartPending = true; return false }
+    this.restartPending = false
+    void this.closeEngine().then(() => this.warm())
+    return true
   }
 
   /** 结束引擎进程树（停止的最后手段），然后在后台重启，下次继续不用等 */

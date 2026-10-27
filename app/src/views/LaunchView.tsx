@@ -52,7 +52,7 @@ export function LaunchView() {
   const ambiguous = mentions.filter((m) => m.paths.length > 1 && !m.paths.some((p) => files.includes(p)))
   const [recent, setRecent] = useState<Task[]>([])
   const ta = useRef<HTMLTextAreaElement>(null)
-  const stages = app?.stages || []
+  const stages = (app?.stages || []).filter((s) => !s.hidden)
   const stage = stages.find((s) => s.id === stageId) || stages[4]
   const h = HINTS[stage?.id || 'utest']
   const project = ts?.project

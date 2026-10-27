@@ -6,6 +6,8 @@ import { LaunchView } from './views/LaunchView'
 import { TaskView } from './views/TaskView'
 import { ReviewView } from './views/ReviewView'
 import { HistoryView } from './views/HistoryView'
+import { KbEditor, KnowledgeView } from './views/KnowledgeView'
+import { LibraryView } from './views/LibraryView'
 import { AppIcon } from './components/Icon'
 
 export function App() {
@@ -28,9 +30,12 @@ export function App() {
           {v === 'task' && <TaskView />}
           {v === 'review' && <ReviewView />}
           {v === 'history' && <HistoryView />}
+          {v === 'knowledge' && <KnowledgeView />}
+          {v === 'library' && <LibraryView />}
         </div>
       </div>
       <StatusBar />
+      <KbEditor />
       <Toasts />
     </div>
   )

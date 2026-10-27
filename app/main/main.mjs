@@ -8,6 +8,8 @@ import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore } from './projects.mjs'
 import { STAGES, TaskController } from './task.mjs'
+import { Library } from './library.mjs'
+import { buildIndex, readEntry, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
 
 const P = resolvePaths()
 mkdirSync(P.data, { recursive: true })
@@ -32,6 +34,7 @@ let win = null
 let bridge = null
 let store = null
 let ctl = null
+let lib = null
 let notes = []
 
 function send(type, payload) {
@@ -42,13 +45,15 @@ function send(type, payload) {
 function makeEngine(project) {
   const env = engineEnv(P)
   env.ASTROLAB_BRIDGE = bridge.path
+  // 知识库工具服务用：我的库 + 全部共享库（还没克隆的也列上，同步后不用重启引擎就能查到）
+  env.ASTROLAB_LIBRARIES = JSON.stringify(lib.sources().map((x) => ({ id: x.id, name: x.name, dir: x.dir, model: x.model || '', writable: !!x.writable })))
   const m = modelConfig(env)
   mkdirSync(P.logs, { recursive: true })
   return new Engine({
     dshBin: P.dshBin, nodePath: P.nodePath, cwd: project.path, env,
     logFile: join(P.logs, `engine-${new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)}.jsonl`),
     provider: m.provider, model: m.model, reasoningEffort: m.reasoningEffort,
-    patches: P.mock ? [] : [writeEnginePatch(P.engineDir)],
+    patches: P.mock ? [] : [writeEnginePatch(P.engineDir, { skillDirs: lib.skillDirs(), mcpServers: lib.mcpServers(P.nodePath) })],
   })
 }
 
@@ -62,7 +67,8 @@ function appState() {
     model: { provider: m.provider, model: m.model, baseURL: m.baseURL, hasKey: m.hasKey },
     engineReady: P.mock || existsSync(P.dshBin),
     projects: store.list(),
-    stages: STAGES.map((s) => ({ ...s, hasSkill: existsSync(join(P.skillsDir, s.skill)) })),
+    stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),
+    libraryDir: lib.sources()[0].dir,
     notes,
     task: ctl.snapshotState(),
     items: ctl.items(),
@@ -97,6 +103,40 @@ function handle(channel, fn) {
   })
 }
 
+// ---------- 库：知识库、技能与插件 ----------
+const mineLib = () => lib.sources()[0]
+const kbLibs = () => lib.available()
+function mineEntryPath(id) {
+  const i = String(id).indexOf(':')
+  if (String(id).slice(0, i) !== mineLib().id) throw new Error('只有我的库里的条目能改；共享库的条目先复制到我的库')
+  return String(id).slice(i + 1)
+}
+async function kbSave({ id, meta, body }) {
+  const mine = await lib.ensureMine()
+  const path = id ? mineEntryPath(id) : undefined
+  const rel = writeEntry(mine, meta, body, path)
+  await lib.commitMine([rel], `知识库：${meta.title || rel}`)
+  return `${mineLib().id}:${rel}`
+}
+async function kbDelete(id) {
+  const rel = mineEntryPath(id)
+  const { rmSync } = await import('node:fs')
+  rmSync(join(mineLib().dir, rel), { force: true })
+  await lib.commitMine([rel], `知识库：删除 ${rel}`)
+}
+/** 在“我的库”里发起技能或插件创作：我的库当作一个项目打开，智能体只能写这里 */
+async function createInLibrary(kind, prompt) {
+  if (ctl.busy) throw new Error('当前有任务在进行，结束后再创作')
+  const dir = await lib.ensureMine()
+  const p = store.findByPath(dir) || store.add(dir, { name: '我的库', library: true })
+  await openProject(p.id)
+  return ctl.start({ stage: kind === 'plugin' ? 'plugin' : 'skill', prompt, files: [], options: { report: false } })
+}
+function afterInstall() {
+  const now = ctl.requestRestart()
+  return { restarted: now }
+}
+
 function registerIpc() {
   handle('app:state', () => appState())
   handle('project:open', (id) => openProject(id))
@@ -121,8 +161,47 @@ function registerIpc() {
   handle('review:commit', (message, paths) => ctl.commit(message, paths))
   handle('review:undoCommit', () => ctl.undoCommit())
   handle('review:restore', () => ctl.restoreSnapshot())
+  handle('kb:search', (q, f) => search(buildIndex(kbLibs()), q || '', { ...(f || {}), limit: 200 }))
+  handle('kb:read', (id) => readEntry(kbLibs(), id))
+  handle('kb:save', (e) => kbSave(e))
+  handle('kb:delete', (id) => kbDelete(id))
+  handle('kb:publish', async (id, target) => { const e = readEntry(kbLibs(), id); return lib.submit(target, mineEntryPath(id), `知识：${e.meta.title || e.path}`) })
+  handle('lib:state', () => ({ sources: lib.states(), mine: mineLib().dir }))
+  handle('lib:sync', async (id) => { if (id) await lib.sync(id); else await lib.syncAll(); return lib.states() })
+  handle('lib:addSource', async (s) => { const id = lib.addSource(s); await lib.sync(id); ctl.requestRestart(); return lib.states() })
+  handle('lib:removeSource', (id) => { lib.removeSource(id); ctl.requestRestart(); return lib.states() })
+  handle('lib:catalog', () => lib.catalog())
+  handle('lib:install', async (key) => ({ ...(await lib.install(key)), ...afterInstall() }))
+  handle('lib:uninstall', (kind, name) => { lib.uninstall(kind, name); return afterInstall() })
+  handle('lib:readSkill', async (key) => {
+    const items = await lib.catalog()
+    const it = items.find((x) => x.key === key)
+    if (!it) throw new Error('没有这一项')
+    const base = it.builtin ? P.root : lib.available().find((l) => l.id === it.source).dir
+    const { readFileSync } = await import('node:fs')
+    const f = it.kind === 'skill' ? join(base, it.path, 'SKILL.md') : join(base, it.path, 'plugin.json')
+    let extra = ''
+    if (it.kind === 'plugin') { try { extra = readFileSync(join(base, it.path, 'README.md'), 'utf8') } catch { /* 没有说明 */ } }
+    return { item: it, text: readFileSync(f, 'utf8'), readme: extra }
+  })
+  handle('lib:submit', async (key, target) => {
+    const it = (await lib.catalog()).find((x) => x.key === key)
+    if (!it || !it.mine) throw new Error('只有我的库里的技能和插件能提交')
+    return lib.submit(target, it.path, `${it.kind === 'skill' ? '技能' : '插件'}：${it.name}`)
+  })
+  handle('lib:submissions', () => lib.submissions())
+  handle('lib:pending', (id) => lib.pending(id))
+  handle('lib:pendingFile', (id, ref, path) => lib.pendingFile(id, ref, path))
+  handle('lib:approve', (id, ref) => lib.approve(id, ref))
+  handle('lib:reject', (id, ref) => lib.reject(id, ref))
+  handle('lib:create', (kind, prompt) => createInLibrary(kind, prompt))
   handle('sys:openPath', async (rel) => { const err = await shell.openPath(projectPath(rel)); if (err) throw new Error(err) })
   handle('sys:showItem', (rel) => shell.showItemInFolder(projectPath(rel)))
+  // 皮肤：Windows 标题栏右侧的系统按钮区（最小化、关闭）跟着换底色
+  handle('sys:titlebar', (c) => {
+    const ok = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
+    if (process.platform === 'win32' && win && !win.isDestroyed() && ok(c && c.color) && ok(c && c.symbolColor)) win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: 48 })
+  })
 }
 
 function wireController() {
@@ -192,7 +271,9 @@ async function boot() {
   bridge = new EngineBridge()
   await bridge.listen()
   store = new ProjectStore(join(P.data, 'projects.json'))
-  ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, makeEngine })
+  lib = new Library({ dataDir: P.data, root: P.root })
+  try { await lib.ensureMine() } catch (e) { notes.push(`我的库没有建好：${e.message}`) }
+  ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, makeEngine, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
   wireController()
   registerIpc()
   if (!store.list().length) {
@@ -206,6 +287,8 @@ async function boot() {
     try { await openProject(last.id) } catch (e) { notes.push(e.message) }
   }
   await createWindow()
+  // 共享库在后台同步（连不上内网 Git 服务器也不影响使用，状态在“知识库”和“技能与插件”里显示）
+  void lib.syncAll().then(() => send('library', lib.states())).catch((e) => mlog('library sync', e))
 }
 
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus() } })

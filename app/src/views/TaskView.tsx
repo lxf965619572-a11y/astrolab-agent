@@ -264,7 +264,10 @@ function Chat({ inputRef }: { inputRef: React.RefObject<HTMLTextAreaElement | nu
       <div className="chat-msgs" ref={box}>
         {msgs.map((m) => m.kind === 'user'
           ? <motion.div key={m.id} className="bubble user" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>{m.text}</motion.div>
-          : <motion.div key={m.id} className="bubble agent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><Markdown text={m.text} /></motion.div>)}
+          : <motion.div key={m.id} className="bubble agent" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+              <Markdown text={m.text} />
+              <Button className="bubble-act" aria-label="存到知识库" onPress={() => useStore.getState().openKbEditor({ meta: { kind: '经验', title: '', source: `${ts.task?.stageName || ''}任务：${ts.task?.title || ''}` }, body: m.text })}><Icon name="book" size={13} />存到知识库</Button>
+            </motion.div>)}
         {ts.queued.map((q) => (
           <div key={q.id} className="queued">
             <div className="bubble user pending">{q.text}</div>

@@ -35,6 +35,15 @@
         args: ['__STARTER_DIR__/mcp/docgen/server.mjs']
         toolCallTimeoutMs: 120000
 
+    # 知识库服务：检索部门经验、好的设计和代码，记草稿到个人库（不依赖 npm 包；库的位置由工作台经 ASTROLAB_LIBRARIES 给出）
+    - id: mcp-knowledge
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: knowledge
+        transport: stdio
+        command: !!js process.execPath
+        args: ['__STARTER_DIR__/mcp/knowledge/server.mjs']
+
     # 单元测试服务：主机上编译运行手写驱动/桩或 gtest，gcov 统计语句、分支、MC/DC 覆盖率
     # 编译器 UTEST_CC 等由 start-web.ps1 从 local.env 读入后继承；构建目录在工作区的 .utest 下
     - id: mcp-utest

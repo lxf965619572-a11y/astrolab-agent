@@ -371,3 +371,52 @@ export async function toolchainInfo() {
   const harness = { dir: HARNESS, utest: join(HARNESS, 'utest.h'), map: join(HARNESS, 'ut_map.h') }
   return ok({ ...tc, harness }, `C 编译器：${tc.cc}（${tc.version}）\nC++ 编译器：${tc.cxx}\ngcov：${tc.gcovOk ? tc.gcov : tc.gcovError}\nMC/DC 测量：${tc.mcdc ? '支持（-fcondition-coverage）' : '不支持（需要 GCC 14 及以上），用 check_mcdc 核对分析表'}\n构建目录：${join(allowedRoots()[0], '.utest')}\n测试框架头文件（编译测试文件时已自动加入头文件路径，需要看宏定义时直接读这两个文件，不用搜索）：\n  ${harness.utest}\n  ${harness.map}`)
 }
+
+// —— 编码环节：只编译不运行，用严格告警检查新写或改过的代码 ——
+// 目标机的交叉编译器在 local.env 里配：TARGET_CC_SPARC（如 sparc-gaisler-elf-gcc）、TARGET_CC_D2000（如 aarch64-linux-gnu-gcc）。
+// 没配时用主机 gcc 检查语法和告警，并在结果里说明：字节序、对齐、类型长度等目标机差异要靠 Cppcheck 和人工检查。
+const STRICT = ['-Wall', '-Wextra', '-Wconversion', '-Wsign-conversion', '-Wshadow', '-Wcast-align', '-Wcast-qual', '-Wpointer-arith',
+  '-Wstrict-prototypes', '-Wmissing-prototypes', '-Wmissing-declarations', '-Wundef', '-Wfloat-equal', '-Wswitch-default', '-Wvla',
+  '-Wredundant-decls', '-Wnested-externs', '-Wold-style-definition', '-Wwrite-strings']
+
+function parseDiagnostics(text) {
+  const out = []
+  for (const line of String(text).split(/\r?\n/)) {
+    const m = /^(.*?):(\d+):(\d+):\s+(error|warning|note):\s+(.*?)(?:\s+\[(-W[^\]]+)\])?$/.exec(line.trim())
+    if (m && m[4] !== 'note') out.push({ file: m[1], line: +m[2], col: +m[3], severity: m[4] === 'error' ? '错误' : '告警', message: m[5], flag: m[6] || '' })
+  }
+  return out
+}
+
+export async function compileCheck({ sources = [], includeDirs = [], defines = [], cflags = [], std = 'c99', target = 'host' }) {
+  if (!sources.length) return fail('sources 不能为空：请给出要检查的 .c 文件')
+  const srcAbs = sources.map(resolvePath)
+  const missing = srcAbs.filter((f) => !existsSync(f))
+  if (missing.length) return fail(`文件不存在：${missing.join('、')}（相对路径按 ${process.cwd()} 解析）`)
+  const cross = target === 'sparc' ? process.env.TARGET_CC_SPARC : target === 'd2000' ? process.env.TARGET_CC_D2000 : ''
+  let cc
+  let note = ''
+  if (cross) cc = cross
+  else {
+    const tc = await toolchain()
+    if (!tc.ok) return fail(tc.error)
+    cc = tc.cc
+    if (target !== 'host') note = `没有配置 ${target === 'sparc' ? 'TARGET_CC_SPARC' : 'TARGET_CC_D2000'}，用主机 gcc 检查语法和告警。字节序、非对齐访问、long 和指针长度等目标机差异，需要 Cppcheck（target=${target}）和人工检查`
+  }
+  const stdFlag = `-std=${std === 'c89' ? 'c89' : std === 'c11' ? 'c11' : 'c99'}`
+  const extra = std === 'c89' ? ['-Wdeclaration-after-statement', '-pedantic'] : []
+  const files = []
+  for (const f of srcAbs) {
+    const args = ['-fsyntax-only', stdFlag, ...STRICT, ...extra, ...includeDirs.map((d) => `-I${resolvePath(d)}`), ...defines.map((d) => `-D${d}`), ...cflags, f]
+    const r = await run(cc, args, { cwd: dirname(f), timeoutMs: 60_000 })
+    if (r.spawnError) return fail(`编译器无法运行（${cc}）：${trimLog(r.stderr, 400)}`)
+    const diags = parseDiagnostics(r.stderr + r.stdout)
+    files.push({ file: f, ok: r.code === 0, errors: diags.filter((d) => d.severity === '错误').length, warnings: diags.filter((d) => d.severity === '告警').length, diagnostics: diags.slice(0, 200) })
+  }
+  const errors = files.reduce((a, f) => a + f.errors, 0)
+  const warnings = files.reduce((a, f) => a + f.warnings, 0)
+  const result = { compiler: cc, target, std: stdFlag, flags: [...STRICT, ...extra], errors, warnings, files, note }
+  const lines = [`编译器：${cc}（${stdFlag}，严格告警）${note ? `\n说明：${note}` : ''}`, `结果：${errors} 个错误，${warnings} 个告警`]
+  for (const f of files) for (const d of f.diagnostics) lines.push(`${d.file}:${d.line}:${d.col} ${d.severity} ${d.message}${d.flag ? ` [${d.flag}]` : ''}`)
+  return ok(result, lines.join('\n'))
+}

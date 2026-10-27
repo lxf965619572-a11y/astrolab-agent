@@ -6,13 +6,16 @@
 //   A 运行中插话（steer）在本轮的下一步之前送到        B 停止（cancel）只中止当前轮，引擎进程不退出；继续接着做
 //   C 等回答时停止，问题失效；停止后在输入框回答能接上  D 空闲时 session/prompt 照常
 //   E 任务控制器全流程：预热引擎、发起、插话、停止、继续、完成，只启动一次引擎
+//   F 知识库工具服务、从库里安装的技能和插件（插件的工具服务）都能被智能体用上
 
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { TaskController } from '../main/task.mjs'
+import { Library } from '../main/library.mjs'
+import { writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
 import { startFakeLlm } from './fake-llm.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -150,6 +153,58 @@ try {
     await until(() => ctl.status === 'done')
     check('E 继续后完成，只启动过一次引擎', ctl.snapshotState().summary.lastAssistantText === 'RESUMED' && made === 1, { 引擎启动次数: made })
     await ctl.dispose()
+  }
+
+  // F：知识库、安装的技能和插件
+  {
+    const data = mkdtempSync(join(tmpdir(), 'astrolab-libdata-'))
+    const lib = new Library({ dataDir: data, root: ROOT })
+    const mine = await lib.ensureMine()
+    writeEntry(mine, { title: '1553B RT 复位等待用大于或等于判就绪', kind: '经验', tags: ['1553B', '复位', '超时'] }, '设计规定 elapsed >= 10 tick 视为超时。')
+    const pdir = join(mine, 'plugins', 'crc-tools')
+    mkdirSync(join(pdir, 'mcp', 'crc'), { recursive: true })
+    mkdirSync(join(pdir, 'skills', 'crc-check'), { recursive: true })
+    const assets = join(ROOT, 'skills', 'plugin-authoring', 'assets')
+    copyFileSync(join(assets, 'mcp-lite.mjs'), join(pdir, 'mcp', 'crc', 'mcp-lite.mjs'))
+    copyFileSync(join(assets, 'server-template.mjs'), join(pdir, 'mcp', 'crc', 'server.mjs'))
+    writeFileSync(join(pdir, 'plugin.json'), JSON.stringify({ name: 'crc-tools', title: 'CRC 工具', version: '1.0.0', description: '测试插件', skills: ['skills'], mcp: [{ name: 'crc', command: 'node', args: ['mcp/crc/server.mjs'] }] }))
+    writeFileSync(join(pdir, 'skills', 'crc-check', 'SKILL.md'), '---\nname: crc-check-marker\ndescription: 插件里的技能（验证用）\n---\n\n# 插件技能\n')
+    mkdirSync(join(mine, 'skills', 'my-marker-skill'), { recursive: true })
+    writeFileSync(join(mine, 'skills', 'my-marker-skill', 'SKILL.md'), '---\nname: my-marker-skill\ndescription: 我的库里装上的技能（验证用）\n---\n\n# 验证\n')
+    await lib.install('mine:plugin:crc-tools')
+    await lib.install('mine:skill:my-marker-skill')
+    const home2 = mkdtempSync(join(tmpdir(), 'astrolab-dshhome2-'))
+    writeFileSync(join(home2, 'cordis.patch.yml'), readFileSync(join(home, 'cordis.patch.yml'), 'utf8') + `- insert:
+    - id: mcp-knowledge
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: knowledge
+        transport: stdio
+        command: ${JSON.stringify(process.execPath)}
+        args: [${JSON.stringify(join(ROOT, 'mcp', 'knowledge', 'server.mjs'))}]
+`)
+    const ws2 = mkdtempSync(join(tmpdir(), 'astrolab-ws2-'))
+    writeFileSync(join(ws2, 'a.txt'), '一\n二\n三')
+    const patch2 = writeEnginePatch(join(home2, 'engine'), { skillDirs: lib.skillDirs(), mcpServers: lib.mcpServers(process.execPath) })
+    const eng2 = new Engine({
+      dshBin: DSH, nodePath: process.execPath, cwd: ws2, provider: 'dept-llm', model: 'deepseek-flash', reasoningEffort: 'off', patches: [patch2], logFile: join(home2, 'f.jsonl'),
+      env: { ...env, DSH_HOME: home2, ASTROLAB_LIBRARIES: JSON.stringify(lib.sources().map((x) => ({ id: x.id, name: x.name, dir: x.dir, writable: !!x.writable }))) },
+    })
+    const ev2 = []
+    let idle2 = 0
+    eng2.on('session.event', (p) => ev2.push(p.event))
+    eng2.on('session.status', (p) => { if (p.status === 'idle') idle2++ })
+    await eng2.start()
+    const n0 = llm.requests.length
+    await eng2.prompt('F', 'MARK-KB 查一下')
+    await until(() => idle2 >= 1)
+    const reqs = llm.requests.slice(n0)
+    const final = ev2.filter((e) => e.type === 'assistant/message').flatMap((e) => e.data.message.content.filter((b) => b.type === 'text').map((b) => b.text)).join('\n')
+    const toolNames = reqs[0] ? reqs[0].tools : []
+    check('F 知识库工具服务可用，查到我的库的条目', toolNames.includes('mcp__knowledge__search_knowledge') && /复位等待用大于或等于/.test(final), { 结果: final.slice(0, 200) })
+    check('F 插件的工具服务可用', toolNames.includes('mcp__crc_tools_crc__count_lines') && /a\.txt：3 行/.test(final))
+    check('F 安装的技能和插件带的技能都加载了', reqs.some((r) => r.text.includes('my-marker-skill')) && reqs.some((r) => r.text.includes('crc-check-marker')) && reqs.some((r) => r.text.includes('unit-test-design')))
+    await eng2.shutdown(5000)
   }
 } catch (e) {
   check('运行出错', false, e.stack || String(e))

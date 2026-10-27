@@ -1,4 +1,5 @@
-/* 设计语言（设计稿“设计语言”板，2026-10-26 浅紫版）：颜色、阴影、圆角、动效时长。所有组件只用这些变量。 */
+/* 设计语言（设计稿“设计语言”板）：颜色、阴影、圆角、动效时长。所有组件只用这些变量。
+   皮肤：:root 是默认的“浅紫”；[data-theme] 只改颜色类变量（底、字、强调色、阴影色调），形状和动效不变。 */
 :root {
   /* 底与内容 */
   --bg: #F3F1F9;
@@ -7,6 +8,43 @@
   --surface-2: #F4F2F9;
   --line: rgba(28, 27, 34, .07);
   --line-strong: rgba(28, 27, 34, .12);
+  --line-soft: #EEECF3;
+  --hover: #F7F5FC;
+  --tint: #F6F3FD;
+  --tint-2: #F1EEF8;
+  --field: rgba(243, 241, 248, .9);
+  --track: #D6D2E0;
+  --seg-bg: #EDEAF5;
+  --dash: #B9B4C9;
+  --bar: #E6E2EF;
+  --bubble-user: #EEE9FD;
+  --warm-soft: #FFFAF2;
+  --toast-link: #D8C7FF;
+  --titlebar-bg: #F6F4FB;
+  /* 色调（逗号分隔的 RGB，配 rgba() 用）：阴影、强调色、背景光斑 */
+  --shadow-rgb: 76, 60, 120;
+  --accent-rgb: 139, 124, 246;
+  --blob-a-rgb: 196, 181, 253;
+  --blob-b-rgb: 165, 180, 252;
+  /* 亮面与浮层（深色皮肤里换成暗的） */
+  --raised: #FFFFFF;
+  --knob: #FFFFFF;
+  --hl-rgb: 255, 255, 255;
+  --hl: rgba(255, 255, 255, .95);
+  --hl-max: #FFFFFF;
+  --glass-weak: rgba(255, 255, 255, .38);
+  --glass-mid: rgba(255, 255, 255, .55);
+  --glass-hover: rgba(255, 255, 255, .65);
+  --shimmer: rgba(255, 255, 255, .65);
+  --dark-rgb: 28, 27, 34;
+  --toast-bg: rgba(28, 27, 34, .86);
+  --toast-err: rgba(120, 22, 22, .9);
+  --scrim: rgba(28, 27, 34, .18);
+  /* 代码高亮与差异 */
+  --code-comment: #6B6878; --code-type: #2B5FB8; --code-string: #146C3A; --code-number: #8A4B06; --code-meta: #7A4106; --code-fn: #1C1B22;
+  --diff-add: #F1FAF4; --diff-add-text: rgba(26, 143, 78, .16); --diff-del: #FFF4F4; --diff-del-text: rgba(198, 40, 40, .14); --diff-collapsed: #F4F2F9;
+  /* 图标 */
+  --icon-bg-top: #FFFFFF; --icon-bg: #DDD4FC; --icon-chip-a: #A08FF8; --icon-chip-b: #6A55D6; --icon-pin: #A797F7;
 
   /* 文字 */
   --ink: #1C1B22;
@@ -19,7 +57,7 @@
   --accent-text: #5B4BC4;
   --accent-deep: #4C3A9E;
   --accent-soft: #F3EFFE;
-  --accent-ring: rgba(139, 124, 246, .45);
+  --accent-ring: rgba(var(--accent-rgb), .45);
   --lavender: #C4B5FD;
   --periwinkle: #A5B4FC;
 
@@ -36,18 +74,19 @@
   --glass-blur: blur(24px) saturate(1.6);
   --key-base: #F3F1F8;
   --key-on: #EEEAF8;
-  --key-raised: -3px -3px 8px rgba(255, 255, 255, .95), 3px 3px 8px rgba(76, 60, 120, .16);
-  --key-hover: -4px -4px 10px rgba(255, 255, 255, 1), 4px 4px 12px rgba(76, 60, 120, .2);
-  --key-pressed: inset 2px 2px 5px rgba(76, 60, 120, .22), inset -2px -2px 5px rgba(255, 255, 255, .9);
-  --inset: inset 2px 2px 6px rgba(76, 60, 120, .14), inset -2px -2px 6px rgba(255, 255, 255, .95);
-  --card-shadow: 0 1px 2px rgba(28, 27, 34, .06), 0 12px 32px rgba(76, 60, 120, .08);
-  --float-shadow: 0 24px 60px rgba(76, 60, 120, .2);
+  --key-raised: -3px -3px 8px rgba(255, 255, 255, .95), 3px 3px 8px rgba(var(--shadow-rgb), .16);
+  --key-hover: -4px -4px 10px rgba(255, 255, 255, 1), 4px 4px 12px rgba(var(--shadow-rgb), .2);
+  --key-pressed: inset 2px 2px 5px rgba(var(--shadow-rgb), .22), inset -2px -2px 5px rgba(255, 255, 255, .9);
+  --inset: inset 2px 2px 6px rgba(var(--shadow-rgb), .14), inset -2px -2px 6px rgba(255, 255, 255, .95);
+  --card-shadow: 0 1px 2px rgba(28, 27, 34, .06), 0 12px 32px rgba(var(--shadow-rgb), .08);
+  --float-shadow: 0 24px 60px rgba(var(--shadow-rgb), .2);
 
   /* 主按钮：浅紫底深紫字 */
-  --primary-bg: linear-gradient(180deg, #F7F4FF 0%, #E4DCFD 100%);
-  --primary-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(139, 124, 246, .3), 0 4px 12px rgba(139, 124, 246, .22);
-  --primary-hover: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(139, 124, 246, .4), 0 6px 16px rgba(139, 124, 246, .3);
-  --primary-pressed: inset 0 2px 5px rgba(76, 58, 158, .22), 0 0 0 1px rgba(139, 124, 246, .3);
+  --primary-bg: linear-gradient(180deg, var(--primary-top) 0%, var(--primary-bottom) 100%);
+  --primary-top: #F7F4FF; --primary-bottom: #E4DCFD;
+  --primary-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(var(--accent-rgb), .3), 0 4px 12px rgba(var(--accent-rgb), .22);
+  --primary-hover: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(var(--accent-rgb), .4), 0 6px 16px rgba(var(--accent-rgb), .3);
+  --primary-pressed: inset 0 2px 5px rgba(var(--shadow-rgb), .22), 0 0 0 1px rgba(var(--accent-rgb), .3);
 
   /* 形状 */
   --r-sm: 8px; --r: 10px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
@@ -63,3 +102,120 @@
   --titlebar-h: 48px;
   --statusbar-h: 28px;
 }
+
+/* 皮肤：奶油（参考 Ambra 仪表盘）和黑橙（参考火星探测界面），2026-10-27 用户确认 */
+
+/* ---------- 奶油（参考 Ambra）：暖奶油底，柔和凸起的卡片，钴蓝点缀，整块界面像一块嵌在底板上的面板 ---------- */
+:root[data-theme="cream"] {
+  --bg: #E8E2D8; --content: #F1ECE4; --surface: #F5F1EA; --surface-2: #EEE8DF; --raised: #F8F5EF; --knob: #FFFFFF;
+  --line: rgba(70, 56, 40, .08); --line-strong: rgba(70, 56, 40, .13); --line-soft: #E7E0D5;
+  --hover: #EFE9E0; --tint: #EAEBF6; --tint-2: #ECE6DC; --field: rgba(232, 225, 214, .7);
+  --track: #D9D2C6; --seg-bg: #E6DFD4; --dash: #BDB3A4; --bar: #E1D9CC; --bubble-user: #E3E6F7; --warm-soft: #FBF3E6; --toast-link: #AEB8FF;
+  --titlebar-bg: #E8E2D8;
+  --ink: #1C1A18; --ink-2: #3C3833; --ink-3: #6D675F; --ink-4: #8A847A;
+  --accent: #2F45D8; --accent-text: #2B3EC4; --accent-deep: #1D2C9C; --accent-soft: #E4E7F8; --accent-ring: rgba(47, 69, 216, .4);
+  --lavender: #AEB8F2; --periwinkle: #C9CEEF;
+  --shadow-rgb: 110, 92, 70; --accent-rgb: 47, 69, 216; --blob-a-rgb: 255, 255, 255; --blob-b-rgb: 255, 250, 240;
+  --hl: rgba(255, 255, 255, .85); --hl-max: rgba(255, 255, 255, .95);
+  --glass: rgba(241, 236, 228, .7); --glass-strong: rgba(245, 241, 234, .92); --glass-border: rgba(255, 255, 255, .65);
+  --glass-weak: rgba(255, 255, 255, 0); --glass-mid: rgba(255, 255, 255, .45);
+  --key-base: #F1ECE4; --key-on: #F7F4EE;
+  --key-raised: -4px -4px 10px rgba(255, 255, 255, .8), 4px 4px 12px rgba(110, 92, 70, .16);
+  --key-hover: -5px -5px 12px rgba(255, 255, 255, .9), 5px 5px 14px rgba(110, 92, 70, .2);
+  --key-pressed: inset 2px 2px 5px rgba(110, 92, 70, .2), inset -2px -2px 5px rgba(255, 255, 255, .8);
+  --inset: inset 2px 2px 6px rgba(110, 92, 70, .14), inset -2px -2px 6px rgba(255, 255, 255, .8);
+  --card-shadow: -6px -6px 16px rgba(255, 255, 255, .75), 8px 8px 22px rgba(110, 92, 70, .13);
+  --float-shadow: 0 24px 60px rgba(70, 56, 40, .22);
+  --primary-top: #F8F5EF; --primary-bottom: #ECE6DC;
+  --primary-shadow: -3px -3px 8px rgba(255, 255, 255, .85), 3px 3px 10px rgba(110, 92, 70, .18), inset 0 0 0 1px rgba(47, 69, 216, .25);
+  --primary-hover: -4px -4px 10px rgba(255, 255, 255, .9), 4px 4px 12px rgba(110, 92, 70, .22), inset 0 0 0 1px rgba(47, 69, 216, .4);
+  --idle: #948D82; --idle-soft: #E8E2D8;
+  --code-type: #2B3EC4;
+  --icon-bg: #E3E6F8; --icon-chip-a: #4A5FE6; --icon-chip-b: #1D2C9C; --icon-pin: #8C98EE;
+}
+/* 面板：主区域嵌在底板上，四周留出底板的边，圆角 */
+:root[data-theme="cream"] .app-body { padding: 0 12px 12px 0; }
+:root[data-theme="cream"] .app-main { border-radius: 22px; overflow: hidden; box-shadow: -6px -6px 16px rgba(255, 255, 255, .7), 8px 8px 24px rgba(110, 92, 70, .16); border: 1px solid rgba(255, 255, 255, .7); }
+:root[data-theme="cream"] .sidebar { background: transparent; border-right: 0; }
+/* 选中的环节：和默认皮肤一样“按下去”的凹陷——比侧栏略深的底，左上内阴影、右下内高光 */
+:root[data-theme="cream"] .nav.on { background: #E1DACE; color: var(--ink); font-weight: 600;
+  box-shadow: inset 3px 3px 7px rgba(110, 92, 70, .3), inset -3px -3px 7px rgba(255, 255, 255, .9); }
+:root[data-theme="cream"] .nav.on svg { color: var(--accent); }
+:root[data-theme="cream"] .nav[data-hovered]:not(.on) { background: rgba(255, 255, 255, .4); }
+:root[data-theme="cream"] .card, :root[data-theme="cream"] .task-card, :root[data-theme="cream"] .activity { border-color: rgba(255, 255, 255, .7); }
+:root[data-theme="cream"] .chat { background: var(--surface); border-left-color: var(--line-soft); }
+:root[data-theme="cream"] .app-blob, :root[data-theme="cream"] .launch-blob { display: none; }
+:root[data-theme="cream"] .statusbar, :root[data-theme="cream"] .titlebar { background: transparent; border-color: transparent; }
+:root[data-theme="cream"] .page-head h1, :root[data-theme="cream"] .launch-hero h1 { letter-spacing: -.2px; }
+
+/* ---------- 黑橙（参考火星探测界面）：纯黑底，火星橙点缀，细线框和角标，像仪表界面 ---------- */
+:root[data-theme="mars"] {
+  --bg: #060504; --content: #0A0908; --surface: #100E0C; --surface-2: #15120F; --raised: #1A1612; --knob: #FFE9DC;
+  --line: rgba(255, 128, 56, .13); --line-strong: rgba(255, 128, 56, .24); --line-soft: rgba(255, 128, 56, .1);
+  --hover: rgba(255, 106, 31, .06); --tint: rgba(255, 106, 31, .08); --tint-2: rgba(255, 255, 255, .03); --field: rgba(255, 255, 255, .03);
+  --track: #2B2420; --seg-bg: #0E0C0A; --dash: rgba(255, 128, 56, .35); --bar: #241C17; --bubble-user: #2A160C; --warm-soft: rgba(255, 176, 32, .08); --toast-link: #FFB088;
+  --titlebar-bg: #060504;
+  --ink: #F6F0EA; --ink-2: #DCD3CA; --ink-3: #A0968C; --ink-4: #7C736A;
+  --accent: #FF6A1F; --accent-text: #FF8A4C; --accent-deep: #FFB088; --accent-soft: rgba(255, 106, 31, .12); --accent-ring: rgba(255, 106, 31, .55);
+  --lavender: #8C3A12; --periwinkle: #4A2A18;
+  --ok: #35E07D; --ok-text: #6FF0A4; --ok-soft: rgba(53, 224, 125, .1); --warn: #FFB020; --warn-text: #FFC960; --warn-soft: rgba(255, 176, 32, .1); --err: #FF4D4D; --err-text: #FF8A8A; --err-soft: rgba(255, 77, 77, .1);
+  --idle: #7C736A; --idle-soft: rgba(255, 255, 255, .05);
+  --shadow-rgb: 0, 0, 0; --dark-rgb: 0, 0, 0; --accent-rgb: 255, 106, 31; --blob-a-rgb: 190, 64, 12; --blob-b-rgb: 120, 36, 8;
+  --hl: rgba(255, 255, 255, 0); --hl-max: rgba(255, 255, 255, 0);
+  --glass: rgba(10, 9, 8, .75); --glass-strong: rgba(16, 14, 12, .92); --glass-border: rgba(255, 128, 56, .18);
+  --glass-weak: rgba(255, 255, 255, 0); --glass-mid: rgba(255, 106, 31, .05); --glass-hover: rgba(255, 106, 31, .08); --shimmer: rgba(255, 176, 120, .35);
+  --key-base: #0F0D0B; --key-on: rgba(255, 106, 31, .1);
+  --key-raised: inset 0 0 0 1px rgba(255, 128, 56, .26);
+  --key-hover: inset 0 0 0 1px rgba(255, 128, 56, .5), 0 0 14px rgba(255, 106, 31, .14);
+  --key-pressed: inset 0 0 0 1px rgba(255, 106, 31, .8), inset 0 0 16px rgba(255, 106, 31, .2);
+  --inset: inset 0 0 0 1px rgba(255, 128, 56, .16);
+  --card-shadow: 0 0 0 1px rgba(255, 128, 56, .06);
+  --float-shadow: 0 0 0 1px rgba(255, 128, 56, .3), 0 24px 60px rgba(0, 0, 0, .7);
+  --primary-top: rgba(255, 106, 31, .16); --primary-bottom: rgba(255, 106, 31, .08);
+  --primary-shadow: inset 0 0 0 1px rgba(255, 106, 31, .75), 0 0 18px rgba(255, 106, 31, .18);
+  --primary-hover: inset 0 0 0 1px rgba(255, 140, 80, 1), 0 0 24px rgba(255, 106, 31, .32);
+  --primary-pressed: inset 0 0 0 1px rgba(255, 106, 31, 1), inset 0 0 18px rgba(255, 106, 31, .3);
+  --toast-bg: rgba(20, 16, 13, .96); --toast-err: rgba(90, 16, 16, .96); --scrim: rgba(0, 0, 0, .65);
+  --code-comment: #7C736A; --code-type: #7FC8FF; --code-string: #6FF0A4; --code-number: #FFC960; --code-meta: #FF8A4C; --code-fn: #F6F0EA;
+  --diff-add: rgba(53, 224, 125, .08); --diff-add-text: rgba(53, 224, 125, .22); --diff-del: rgba(255, 77, 77, .08); --diff-del-text: rgba(255, 77, 77, .22); --diff-collapsed: #15120F;
+  --icon-bg-top: #2A140A; --icon-bg: #120A06; --icon-chip-a: #FF8A4C; --icon-chip-b: #D9480F; --icon-pin: #FF8A4C;
+  color-scheme: dark;
+}
+/* 细点阵底纹 + 右下角的火星光 */
+:root[data-theme="mars"] .app-main {
+  background:
+    radial-gradient(ellipse 60% 55% at 100% 105%, rgba(255, 96, 20, .16), rgba(255, 96, 20, 0) 70%),
+    radial-gradient(rgba(255, 140, 70, .07) 1px, transparent 1.2px) 0 0 / 22px 22px,
+    var(--content);
+}
+:root[data-theme="mars"] .app-blob { display: none; }
+:root[data-theme="mars"] .launch-blob.a { opacity: .35; }
+:root[data-theme="mars"] .sidebar { background: #080706; border-right: 1px solid rgba(255, 128, 56, .14); }
+/* 选中的环节：凹陷——比侧栏更黑的槽，左上压暗，右下一道橙色亮边，像嵌进面板的按键 */
+:root[data-theme="mars"] .nav.on { background: linear-gradient(180deg, #000 0%, #000 50%, rgba(255, 106, 31, .13) 100%), #020101; color: #FFD2B8; font-weight: 600; border-radius: 4px;
+  box-shadow: inset 3px 3px 8px rgba(0, 0, 0, 1), inset -1px -1.5px 0 rgba(255, 128, 56, .7), inset 1px 1px 0 rgba(0, 0, 0, .9), 0 1px 0 rgba(255, 128, 56, .12); }
+:root[data-theme="mars"] .nav[data-hovered]:not(.on) { background: rgba(255, 106, 31, .07); }
+:root[data-theme="mars"] .nav.on svg { color: var(--accent); }
+:root[data-theme="mars"] .titlebar, :root[data-theme="mars"] .statusbar { background: #060504; border-color: rgba(255, 128, 56, .14); }
+/* 卡片：细线框 + 四角角标 */
+:root[data-theme="mars"] .card, :root[data-theme="mars"] .task-card, :root[data-theme="mars"] .activity, :root[data-theme="mars"] .composer-card {
+  border-radius: 6px; border: 1px solid rgba(255, 128, 56, .16);
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0 0 / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) 0 0 / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 100% 0 / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) 100% 0 / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 0 100% / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) 0 100% / 1.5px 14px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 100% 100% / 14px 1.5px no-repeat, linear-gradient(var(--accent), var(--accent)) 100% 100% / 1.5px 14px no-repeat,
+    rgba(16, 14, 12, .88);
+}
+:root[data-theme="mars"] .task-card.live { border-color: rgba(255, 106, 31, .45); box-shadow: 0 0 24px rgba(255, 106, 31, .1); }
+:root[data-theme="mars"] .chat { background: rgba(8, 7, 6, .9); border-left-color: rgba(255, 128, 56, .14); }
+:root[data-theme="mars"] .cap, :root[data-theme="mars"] .k-key, :root[data-theme="mars"] .k-primary, :root[data-theme="mars"] .seg-btn { border-radius: 4px; }
+:root[data-theme="mars"] .cap[data-selected] { box-shadow: inset 0 0 0 1px var(--accent), 0 0 18px rgba(255, 106, 31, .2); }
+:root[data-theme="mars"] .seg-bar { border-radius: 0; height: 4px; }
+:root[data-theme="mars"] .seg.completed .seg-bar, :root[data-theme="mars"] .seg.in_progress .seg-bar { box-shadow: 0 0 8px rgba(255, 106, 31, .5); }
+:root[data-theme="mars"] .page-head h1, :root[data-theme="mars"] .launch-hero h1 { letter-spacing: 3px; font-weight: 600; }
+:root[data-theme="mars"] .nav-label, :root[data-theme="mars"] .act-time, :root[data-theme="mars"] .chat-head .muted { letter-spacing: 2px; }
+:root[data-theme="mars"] .led { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+:root[data-theme="mars"] .bubble.user { border: 1px solid rgba(255, 106, 31, .35); }
+:root[data-theme="mars"] .bubble.agent { background: rgba(255, 255, 255, .03); border: 1px solid rgba(255, 255, 255, .06); }
+:root[data-theme="mars"] .pill.ok { box-shadow: inset 0 0 0 1px rgba(53, 224, 125, .35); }

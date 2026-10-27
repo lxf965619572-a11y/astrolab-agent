@@ -116,10 +116,15 @@ export function ReviewView() {
 
           <section className="diff-panel card" aria-label="文件内容">
             <div className="diff-head">
-              <span className="mono strong">{cur?.path}</span>
+              <span className="mono strong diff-path" title={cur?.path}>{cur?.path}</span>
               {cur && <span className={`tag fs-${cur.status}`}>{cur.status === 'A' ? '新文件' : cur.status === 'D' ? '已删除' : '修改'}</span>}
               <span className="grow" />
-              {cur && cur.status !== 'D' && <Key size="sm" onPress={() => void run((api) => api.sys.openPath(cur.path), '打开失败')}><Icon name="external" size={13} />{/\.(docx?|xlsx?)$/i.test(cur.path) ? '用 Office 打开' : '用默认程序打开'}</Key>}
+              {cur && cur.status !== 'D' && file && !file.binary && file.after && /\.(c|h|cpp|hpp|s|asm|md|txt|ld|mk)$/i.test(cur.path) && (
+                <Key size="sm" onPress={() => useStore.getState().openKbEditor({
+                  meta: { kind: /\.md$/i.test(cur.path) ? '设计' : '代码', title: '', source: `${task?.stageName || ''}任务 · ${cur.path}`, tags: [baseName(cur.path)] },
+                  body: /\.md$/i.test(cur.path) ? file.after!.slice(0, 20000) : `为什么好：\n\n\`\`\`${/\.(c|h)$/i.test(cur.path) ? 'c' : ''}\n${file.after!.slice(0, 20000)}\n\`\`\``,
+                })}><Icon name="book" size={13} />存到知识库</Key>)}
+              {cur && cur.status !== 'D' && <Key size="sm" onPress={() => void run((api) => api.sys.openPath(cur.path), '打开失败')}><Icon name="external" size={13} />{/\.(docx?|xlsx?)$/i.test(cur.path) ? '用 Office 打开' : '打开'}</Key>}
             </div>
             <motion.div key={cur?.path} className="diff-body" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.22 }}>
               {file && !file.binary && <Diff path={file.path} before={file.before ?? ''} after={file.after ?? ''} />}
