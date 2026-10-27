@@ -29,6 +29,15 @@
   button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
   button:disabled { opacity: .45; cursor: default; }
   .btns { display: flex; flex-direction: column; gap: 6px; }
+  .ev.question { border-color: #b45309; background: #fffaf2; white-space: normal; }
+  .ev.question.closed { border-color: var(--line); background: var(--panel); opacity: .8; }
+  .qhead { font-size: 12px; color: #7a4106; margin-bottom: 6px; }
+  .q { margin: 10px 0; }
+  .qt { font-weight: 600; margin-bottom: 6px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opts button.sel { background: #efe9fd; border-color: #8b7cf6; color: #4c3a9e; }
+  .ev.question input { width: 100%; margin-top: 6px; font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+  .qnote { margin-top: 6px; font-size: 12px; color: var(--quiet); }
 </style>
 </head>
 <body>
@@ -70,9 +79,76 @@ function add(cls, text, extra) {
   log.appendChild(div)
   window.scrollTo(0, document.body.scrollHeight)
 }
+const cards = new Map()
+function renderQuestion(m) {
+  const div = document.createElement('div')
+  div.className = 'ev question'
+  const head = document.createElement('div')
+  head.className = 'qhead'
+  head.textContent = '需要你决定 · 任务在等你回答'
+  div.appendChild(head)
+  const st = {}
+  for (const q of m.questions || []) {
+    const s = st[q.id] = { selected: [], custom: '', multi: !!q.multiSelect }
+    const box = document.createElement('div')
+    box.className = 'q'
+    const t = document.createElement('div')
+    t.className = 'qt'
+    t.textContent = (q.header ? '[' + q.header + '] ' : '') + q.question
+    box.appendChild(t)
+    const options = q.options || []
+    if (options.length) {
+      const opts = document.createElement('div')
+      opts.className = 'opts'
+      for (const o of options) {
+        const b = document.createElement('button')
+        b.textContent = o.label
+        if (o.description) b.title = o.description
+        b.onclick = () => {
+          if (s.multi) { const i = s.selected.indexOf(o.label); if (i >= 0) s.selected.splice(i, 1); else s.selected.push(o.label) }
+          else s.selected = [o.label]
+          for (const x of opts.children) x.classList.toggle('sel', s.selected.includes(x.textContent))
+        }
+        opts.appendChild(b)
+      }
+      box.appendChild(opts)
+    }
+    const inp = document.createElement('input')
+    inp.placeholder = options.length ? '其他（自己填写，可留空）' : '请填写'
+    inp.oninput = () => { s.custom = inp.value.trim() }
+    box.appendChild(inp)
+    div.appendChild(box)
+  }
+  const ok = document.createElement('button')
+  ok.className = 'primary'
+  ok.textContent = '确定'
+  ok.onclick = () => {
+    const qs = m.questions || []
+    // 单选题填了“其他”时以填写为准（selected 为空），与 DSH 的约定一致
+    const answers = qs.map((q) => { const s = st[q.id]; const a = { id: q.id, selected: s.multi || !s.custom ? s.selected : [] }; if (s.custom) a.custom = s.custom; return a })
+    const summary = qs.map((q) => { const s = st[q.id]; return s.custom || s.selected.join('、') || '（跳过）' }).join('；')
+    post('/api/answer', { id: m.id, answers, summary })
+  }
+  div.appendChild(ok)
+  const note = document.createElement('div')
+  note.className = 'qnote'
+  div.appendChild(note)
+  log.appendChild(div)
+  cards.set(m.id, div)
+  window.scrollTo(0, document.body.scrollHeight)
+}
+function closeQuestion(m) {
+  const d = cards.get(m.id)
+  if (!d) return add('note', m.reason)
+  d.querySelectorAll('button, input').forEach((x) => { x.disabled = true })
+  d.classList.add('closed')
+  d.querySelector('.qnote').textContent = m.reason
+}
 function render(m) {
   if (m.kind === 'state') { setState(m.state); if (m.note) add('note', m.note); return }
-  if (m.kind === 'hello') { $('ws').textContent = '工作区：' + m.workspace; setState(m.state); log.innerHTML = ''; (m.history || []).forEach(render); return }
+  if (m.kind === 'question') return renderQuestion(m)
+  if (m.kind === 'question-closed') return closeQuestion(m)
+  if (m.kind === 'hello') { $('ws').textContent = '工作区：' + m.workspace; setState(m.state); log.innerHTML = ''; cards.clear(); (m.history || []).forEach(render); return }
   if (m.kind === 'user') return add('user', m.text)
   if (m.kind === 'assistant') {
     let extra = null

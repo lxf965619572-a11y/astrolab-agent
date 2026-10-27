@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // 阶段 0 最小界面：本机网页（只监听 127.0.0.1），通过引擎适配层原型驱动 DSH sdk 模式。
-// 验证：事件实时显示、停止（结束引擎进程）、恢复会话后继续、越界操作被拒绝时的提示。
+// 验证：事件实时显示、停止（结束引擎进程）、恢复会话后继续、越界操作被拒绝时的提示、智能体提问（经提问桥）。
 // 用法：由 spike\sdk\run.ps1 -Mode ui 启动，浏览器打开 http://127.0.0.1:3090
 
 import { createServer } from 'node:http'
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mkdirSync } from 'node:fs'
-import { Engine, describeEvent } from './engine.mjs'
+import { AskBridge, Engine, describeEvent } from './engine.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
@@ -33,12 +33,20 @@ function push(msg) {
 }
 function setState(s, note) { state = s; push({ kind: 'state', state, sessionId, note }) }
 
+// 智能体提问桥：整个界面进程一个，引擎重启后插件会重新连上
+const bridge = new AskBridge()
+await bridge.listen()
+bridge.on('question', (q) => push({ kind: 'question', id: q.id, questions: q.questions }))
+bridge.on('abort', (m) => push({ kind: 'question-closed', id: m.id, reason: '智能体取消了这个问题' }))
+bridge.on('lost', (m) => push({ kind: 'question-closed', id: m.id, reason: '引擎已停止，这个问题失效了。继续后可以直接在输入框里回答' }))
+
 async function ensureEngine(resume) {
   if (engine && engine.alive) return
   setState('starting')
   engine = new Engine({
     dshBin: DSH_BIN, cwd: WORKSPACE, env: process.env, logFile: join(LOGDIR, `ui-${sessionId}.jsonl`),
     provider: process.env.SPIKE_PROVIDER || 'dept-llm', model: process.env.DEPT_LLM_MODEL || 'deepseek-flash', reasoningEffort: process.env.SPIKE_REASONING || 'high',
+    askBridge: bridge, patchDir: LOGDIR,
   })
   engine.on('session.event', (p) => {
     const d = describeEvent(p.event)
@@ -83,6 +91,12 @@ const server = createServer(async (req, res) => {
       await engine.prompt(sessionId, text)
       return res.end('{}')
     }
+    if (req.method === 'POST' && req.url === '/api/answer') {
+      const { id, answers, summary } = await body(req)
+      const ok = bridge.answer(id, answers)
+      push({ kind: 'question-closed', id, reason: ok ? `已回答：${summary || ''}` : '这个问题已失效' })
+      return res.end(JSON.stringify({ ok }))
+    }
     if (req.method === 'POST' && req.url === '/api/stop') {
       setState('stopped', '已停止')
       const ms = engine ? await engine.kill() : 0
@@ -107,4 +121,4 @@ const server = createServer(async (req, res) => {
   }
 })
 server.listen(PORT, '127.0.0.1', () => console.log(`打开 http://127.0.0.1:${PORT} （工作区：${WORKSPACE}；按 Ctrl+C 退出）`))
-process.on('SIGINT', async () => { if (engine) await engine.kill(); process.exit(0) })
+process.on('SIGINT', async () => { if (engine) await engine.kill(); await bridge.close(); process.exit(0) })

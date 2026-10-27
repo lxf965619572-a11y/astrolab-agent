@@ -367,5 +367,7 @@ export async function checkMcdcTool({ decision, vectors }) {
 export async function toolchainInfo() {
   const tc = await toolchain()
   if (!tc.ok) return fail(tc.error)
-  return ok(tc, `C 编译器：${tc.cc}（${tc.version}）\nC++ 编译器：${tc.cxx}\ngcov：${tc.gcovOk ? tc.gcov : tc.gcovError}\nMC/DC 测量：${tc.mcdc ? '支持（-fcondition-coverage）' : '不支持（需要 GCC 14 及以上），用 check_mcdc 核对分析表'}\n构建目录：${join(allowedRoots()[0], '.utest')}`)
+  // 测试框架头文件的位置直接告诉智能体：不说的话它会在整个磁盘上搜（实测一次花了一分多钟，还找到了打包目录里的旧副本）
+  const harness = { dir: HARNESS, utest: join(HARNESS, 'utest.h'), map: join(HARNESS, 'ut_map.h') }
+  return ok({ ...tc, harness }, `C 编译器：${tc.cc}（${tc.version}）\nC++ 编译器：${tc.cxx}\ngcov：${tc.gcovOk ? tc.gcov : tc.gcovError}\nMC/DC 测量：${tc.mcdc ? '支持（-fcondition-coverage）' : '不支持（需要 GCC 14 及以上），用 check_mcdc 核对分析表'}\n构建目录：${join(allowedRoots()[0], '.utest')}\n测试框架头文件（编译测试文件时已自动加入头文件路径，需要看宏定义时直接读这两个文件，不用搜索）：\n  ${harness.utest}\n  ${harness.map}`)
 }

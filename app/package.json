@@ -1,0 +1,42 @@
+{
+  "name": "astrolab",
+  "productName": "AstroLab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "部门研发智能体工作台",
+  "type": "module",
+  "main": "main/main.mjs",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/engine.test.mjs test/git.test.mjs test/task.test.mjs",
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "@codemirror/lang-cpp": "6.0.3",
+    "@codemirror/lang-markdown": "6.5.2",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/merge": "6.12.3",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/noto-sans-sc": "5.3.1",
+    "@lezer/highlight": "1.2.5",
+    "@tanstack/react-virtual": "3.14.23",
+    "@types/markdown-it": "14.2.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "dompurify": "3.4.17",
+    "electron": "44.9.3",
+    "markdown-it": "15.0.3",
+    "motion": "14.6.0",
+    "react": "19.3.1",
+    "react-aria-components": "1.22.1",
+    "react-dom": "19.3.1",
+    "typescript": "5.9.3",
+    "vite": "8.3.5",
+    "zustand": "5.0.16"
+  }
+}

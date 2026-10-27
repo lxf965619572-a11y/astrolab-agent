@@ -1,0 +1,65 @@
+/* 设计语言（设计稿“设计语言”板，2026-10-26 浅紫版）：颜色、阴影、圆角、动效时长。所有组件只用这些变量。 */
+:root {
+  /* 底与内容 */
+  --bg: #F3F1F9;
+  --content: #FAF9FD;
+  --surface: #FFFFFF;
+  --surface-2: #F4F2F9;
+  --line: rgba(28, 27, 34, .07);
+  --line-strong: rgba(28, 27, 34, .12);
+
+  /* 文字 */
+  --ink: #1C1B22;
+  --ink-2: #3B3946;
+  --ink-3: #5F5D6B;
+  --ink-4: #74717F;
+
+  /* 紫：浅、少，只给“活着的”和“要你注意的” */
+  --accent: #8B7CF6;
+  --accent-text: #5B4BC4;
+  --accent-deep: #4C3A9E;
+  --accent-soft: #F3EFFE;
+  --accent-ring: rgba(139, 124, 246, .45);
+  --lavender: #C4B5FD;
+  --periwinkle: #A5B4FC;
+
+  /* 状态 */
+  --ok: #1A8F4E; --ok-text: #146C3A; --ok-soft: #E9F6EF;
+  --warn: #B45309; --warn-text: #7A4106; --warn-soft: #FEF3E2;
+  --err: #C62828; --err-text: #A61B1B; --err-soft: #FDECEC;
+  --idle: #8E8A9C; --idle-soft: #EFEEF3;
+
+  /* 材质：浮层是玻璃，能按的是触感键 */
+  --glass: rgba(255, 255, 255, .5);
+  --glass-strong: rgba(255, 255, 255, .78);
+  --glass-border: rgba(255, 255, 255, .75);
+  --glass-blur: blur(24px) saturate(1.6);
+  --key-base: #F3F1F8;
+  --key-on: #EEEAF8;
+  --key-raised: -3px -3px 8px rgba(255, 255, 255, .95), 3px 3px 8px rgba(76, 60, 120, .16);
+  --key-hover: -4px -4px 10px rgba(255, 255, 255, 1), 4px 4px 12px rgba(76, 60, 120, .2);
+  --key-pressed: inset 2px 2px 5px rgba(76, 60, 120, .22), inset -2px -2px 5px rgba(255, 255, 255, .9);
+  --inset: inset 2px 2px 6px rgba(76, 60, 120, .14), inset -2px -2px 6px rgba(255, 255, 255, .95);
+  --card-shadow: 0 1px 2px rgba(28, 27, 34, .06), 0 12px 32px rgba(76, 60, 120, .08);
+  --float-shadow: 0 24px 60px rgba(76, 60, 120, .2);
+
+  /* 主按钮：浅紫底深紫字 */
+  --primary-bg: linear-gradient(180deg, #F7F4FF 0%, #E4DCFD 100%);
+  --primary-shadow: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(139, 124, 246, .3), 0 4px 12px rgba(139, 124, 246, .22);
+  --primary-hover: inset 0 1px 0 #FFFFFF, 0 0 0 1px rgba(139, 124, 246, .4), 0 6px 16px rgba(139, 124, 246, .3);
+  --primary-pressed: inset 0 2px 5px rgba(76, 58, 158, .22), 0 0 0 1px rgba(139, 124, 246, .3);
+
+  /* 形状 */
+  --r-sm: 8px; --r: 10px; --r-md: 12px; --r-lg: 16px; --r-xl: 20px;
+
+  /* 动效：只表达因果 */
+  --t-press: 120ms; --t-toggle: 180ms; --t-enter: 260ms;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+  --ease-spring: cubic-bezier(.3, 1.4, .5, 1);
+
+  --font: 'Noto Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', Consolas, 'Noto Sans SC', monospace;
+
+  --titlebar-h: 48px;
+  --statusbar-h: 28px;
+}

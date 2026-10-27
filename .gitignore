@@ -24,3 +24,7 @@ cppcheck-*.msi
 /*.msi
 /*.zip
 ~$*
+
+# 工作台（阶段 2）
+app/node_modules/
+app/dist/

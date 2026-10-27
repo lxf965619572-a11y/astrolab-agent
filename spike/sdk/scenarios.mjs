@@ -6,6 +6,7 @@
 //   S3 停止后继续：任务进行中结束引擎进程，恢复会话后追问，智能体应记得之前的进度
 //   S4 技能和工具服务：sdk 模式下能用部门技能和 utest 工具服务
 //   S5 Git 防护：智能体在工作区里 git commit（含 --no-verify）应被拦住；界面发起的提交应成功
+//   S6 智能体提问：不接提问桥时的表现；接上后问答（延迟 60 秒再答）；等待回答时停止再继续
 //
 // 用法：node spike/sdk/scenarios.mjs [--only S1,S3]
 // 结果：runtime/spike/report-<时间>.md，原始收发记录 runtime/spike/<时间>-<场景>.jsonl
@@ -14,7 +15,7 @@ import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Engine, describeEvent } from './engine.mjs'
+import { AskBridge, Engine, describeEvent, writeAskBridgePatch } from './engine.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
@@ -34,8 +35,8 @@ const MODEL = {
 const report = []
 const P = (...l) => { report.push(...l); console.log(l.join('\n')) }
 
-function newEngine(name, cwd) {
-  return new Engine({ dshBin: DSH_BIN, cwd, env: process.env, logFile: join(OUT, `${STAMP}-${name}.jsonl`), ...MODEL })
+function newEngine(name, cwd, askBridge) {
+  return new Engine({ dshBin: DSH_BIN, cwd, env: process.env, logFile: join(OUT, `${STAMP}-${name}.jsonl`), ...MODEL, askBridge, patchDir: OUT })
 }
 
 // 收集事件：按会话分开保存。sdk 协议说未知 id 会创建会话，但通知里的 sessionId 是否就是我们给的 id 要实测，
@@ -251,8 +252,127 @@ async function s5() {
   ])
 }
 
+// ---------- S6 ----------
+const ASK_PROMPT = '这是一次交互测试。请先调用 ask_user_question 工具，在同一次调用里问我两个问题：\n'
+  + '1. id 为 lang，问题“测试报告用什么语言写？”，选项“中文（推荐）”和“英文”；\n'
+  + '2. id 为 title，问题“报告标题叫什么？”，不给选项，由我自己填写。\n'
+  + '拿到回答后，只回复一句话：“好的，用<语言>写，标题为<标题>。” 不要读写任何文件，也不要做别的事。'
+const ASK_DELAY = Number(process.env.SPIKE_ASK_DELAY_MS || 60000)
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const until = (f, ms) => new Promise((res) => {
+  const t0 = Date.now()
+  const tick = setInterval(() => { if (f() || Date.now() - t0 > ms) { clearInterval(tick); res(!!f()) } }, 200)
+})
+// 模拟用户：单选题选“英文”（故意不选推荐项，看答案是否真的传回去），自填题填标题
+function autoAnswer(questions) {
+  return (questions || []).map((q) => {
+    const labels = (q.options || []).map((o) => o.label)
+    if (labels.length) return { id: q.id, selected: [labels.find((l) => /英文/.test(l)) || labels[labels.length - 1]] }
+    return { id: q.id, selected: [], custom: 'RT 通信测试' }
+  })
+}
+// 找出 ask_user_question 调用的结果
+function askResults(xs) {
+  const ids = new Set(xs.filter((x) => x.d.kind === 'tool-call' && /ask_user_question/.test(x.d.name)).map((x) => x.d.callId))
+  return xs.filter((x) => x.d.kind === 'tool-result' && ids.has(x.d.callId)).map((x) => x.d.text.slice(0, 300).replace(/\n/g, ' '))
+}
+// 组合后的配置里有没有提问工具和提问桥（不启动引擎）：分别看不加补丁和加补丁
+function askToolConfig(withPatch) {
+  const args = [DSH_BIN, '--profile', 'sdk']
+  if (withPatch) args.push('--patch', writeAskBridgePatch(OUT))
+  args.push('--dump-config')
+  const r = spawnSync(process.execPath, args, { env: process.env, encoding: 'utf8', windowsHide: true, maxBuffer: 64 * 1024 * 1024 })
+  const out = (r.stdout || '') + (r.stderr || '')
+  const found = ['tool-ask-user', 'astrolab-ask-bridge'].filter((k) => out.includes(k))
+  return `${withPatch ? '加补丁' : '不加补丁'}：${found.length ? `有 ${found.join('、')}` : '都没有'}（退出码 ${r.status}）`
+}
+const hasAnswer = (t) => /英文/.test(t) && /RT ?通信测试/.test(t)
+
+async function s6() {
+  const cwd = join(ROOT, 'sample')
+  const cfg = `${askToolConfig(false)}；${askToolConfig(true)}`
+
+  // a) 不接提问桥：sdk 模式原本的表现
+  let eng = newEngine('S6a', cwd)
+  await eng.start()
+  let c = collect(eng, `spike-s6a-${STAMP}`)
+  const ra = await promptAndWait(eng, c, c.sid, ASK_PROMPT, 300000)
+  const sa = sum(ra.xs)
+  await eng.shutdown()
+
+  // b) 接上提问桥，延迟 ASK_DELAY 再回答
+  const bridge = new AskBridge()
+  await bridge.listen()
+  let hello = null
+  bridge.on('hello', (m) => { hello = m })
+  const qb = []
+  const onQb = (q) => {
+    qb.push(q)
+    setTimeout(() => { q.answeredAt = Date.now(); q.accepted = bridge.answer(q.id, autoAnswer(q.questions)) }, ASK_DELAY)
+  }
+  bridge.on('question', onQb)
+  eng = newEngine('S6b', cwd, bridge)
+  await eng.start()
+  c = collect(eng, `spike-s6b-${STAMP}`)
+  const tb = Date.now()
+  const rb = await promptAndWait(eng, c, c.sid, ASK_PROMPT, 300000 + ASK_DELAY)
+  const sb = sum(rb.xs)
+  await eng.shutdown()
+  bridge.off('question', onQb)
+  const okB = !rb.timedOut && qb.length > 0 && qb[0].accepted === true && hasAnswer(sb.lastText)
+
+  // c) 等待回答时停止，重启并恢复会话，再把答案当作普通消息发过去
+  const qc = []
+  let lost = 0, reasked = 0
+  const onLost = () => { lost++ }
+  bridge.on('lost', onLost)
+  let phase = 1
+  const onQc = (q) => {
+    qc.push(q)
+    if (phase === 2) { reasked++; bridge.answer(q.id, autoAnswer(q.questions)) }
+  }
+  bridge.on('question', onQc)
+  eng = newEngine('S6c1', cwd, bridge)
+  await eng.start()
+  const sid = `spike-s6c-${STAMP}`
+  c = collect(eng, sid)
+  await eng.prompt(sid, ASK_PROMPT)
+  const asked = await until(() => qc.length > 0, 180000)
+  await sleep(1000)
+  const killMs = await eng.kill()
+  await sleep(500)
+  phase = 2
+  eng = newEngine('S6c2', cwd, bridge)
+  await eng.start()
+  let resumeOk = true, resumeErr = ''
+  try { await eng.resume(sid) } catch (e) { resumeOk = false; resumeErr = e.message }
+  c = collect(eng, sid)
+  await sleep(3000)
+  const afterResume = c.events.length
+  let rc = null, sc = null
+  if (resumeOk) {
+    rc = await promptAndWait(eng, c, sid, '刚才你问的两个问题，我的回答是：报告用英文写，标题为“RT 通信测试”。请按原来的要求回复那一句话。', 300000)
+    sc = sum(rc.xs)
+  }
+  await eng.shutdown()
+  await bridge.close()
+  const okC = asked && resumeOk && !!sc && !rc.timedOut && hasAnswer(sc.lastText)
+
+  const q0 = qb[0]
+  verdict('S6', '智能体提问', okB && okC, [
+    `- 组合配置中的提问工具：${cfg.slice(0, 500)}`,
+    `- a sdk 默认组合（不加补丁）：工具调用 ${sa.tools.join('、') || '无'}；提问工具的结果：${askResults(ra.xs).join(' ｜ ') || '（没有找到）'}；回答：${sa.lastText.slice(0, 200).replace(/\n/g, ' ')}`,
+    `- b 接上提问桥：插件连上=${hello ? `是（DSH 进程 ${hello.pid}）` : '**否**'}；收到问题 ${qb.length} 次；${q0 ? `发出提示后 ${q0.receivedAt - tb} ms 到达，${ASK_DELAY} ms 后回答（送达=${q0.accepted}）` : '**没有收到问题**'}`,
+    q0 ? `- b 问题内容：${JSON.stringify(q0.questions).slice(0, 500)}；wait=${JSON.stringify(q0.wait)}；session=${q0.session ?? '（无）'}；agent 字段：${(q0.agentKeys || []).slice(0, 15).join(',')}` : '',
+    `- b 提问工具的结果：${askResults(rb.xs).join(' ｜ ') || '（没有找到）'}；结束原因 ${sb.turnEnd}；超时=${rb.timedOut}；总用时 ${rb.ms} ms`,
+    `- b 回答：${sb.lastText.slice(0, 200).replace(/\n/g, ' ')}（含所选答案：${hasAnswer(sb.lastText) ? '是' : '**否**'}）`,
+    `- c 等待中停止：收到问题=${asked}；结束进程 ${killMs} ms；管道断开通知 ${lost} 次；恢复会话${resumeOk ? '成功' : `失败：${resumeErr}`}；恢复后 3 秒内新事件 ${afterResume} 个`,
+    sc ? `- c 以普通消息补答后：工具调用 ${sc.tools.join('、') || '无'}；又提问 ${reasked} 次（已自动回答）；结束原因 ${sc.turnEnd}；回答：${sc.lastText.slice(0, 200).replace(/\n/g, ' ')}（含答案：${hasAnswer(sc.lastText) ? '是' : '**否**'}）` : '- c 未补答',
+  ].filter(Boolean))
+}
+
 P(`# 阶段 0 技术验证报告（sdk 模式）`, '', `- 时间：${new Date().toISOString()}`, `- 模型：${JSON.stringify(MODEL)}`, `- Node：${process.version}，平台：${process.platform}`, `- DSH：${DSH_BIN}`, '')
-const all = { S1: s1, S2: s2, S3: s3, S4: s4, S5: s5 }
+const all = { S1: s1, S2: s2, S3: s3, S4: s4, S5: s5, S6: s6 }
 for (const [id, fn] of Object.entries(all)) {
   if (ONLY && !ONLY.includes(id)) continue
   console.log(`\n>>> ${id} 开始 ${new Date().toLocaleTimeString()}`)

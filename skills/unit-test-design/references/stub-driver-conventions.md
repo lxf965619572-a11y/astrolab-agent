@@ -35,7 +35,7 @@
 
 ## 2 手写驱动：utest.h
 
-`utest.h` 由 utest 服务提供，自动加入头文件路径。C89 可用，不依赖动态内存。
+`utest.h` 由 utest 服务提供，自动加入头文件路径。C89 可用，不依赖动态内存。下面的宏表够写驱动；需要看定义时，读 `toolchain_info` 给出的路径，不要在磁盘上搜索。
 
 ```c
 #define UTEST_MAIN          /* 只在含 main 的文件中定义一次 */

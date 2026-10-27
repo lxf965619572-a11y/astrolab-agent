@@ -5,12 +5,117 @@
 //   通知  session.event（每个持久事件）、session.status（running/idle）、subagent.started/finished
 // 协议没有取消和审批：停止 = 结束整个引擎进程（含它拉起的工具服务），再用 session/resume 恢复会话；
 // 越界操作由 DSH 的沙箱和审批服务处理，没有应答者时自动拒绝。
+// 协议也没有提问通道：智能体的 ask_user_question 经 ask-bridge 插件和本机命名管道转给工作台（AskBridge）。
 //
 // 只用 Node 内置模块，不需要 npm install。
 
 import { spawn, spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
-import { appendFileSync } from 'node:fs'
+import { appendFileSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
+import { tmpdir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * 智能体提问桥的工作台一端：在本机命名管道上等 DSH 里的 ask-bridge 插件连进来，
+ * 收到问题时发出 'question' 事件，界面答完调用 answer()。
+ * 一个桥可以先后服务多个引擎进程（停止后重启引擎，桥不用重建）。
+ */
+export class AskBridge extends EventEmitter {
+  constructor() {
+    super()
+    const tag = `astrolab-ask-${process.pid}-${Date.now()}`
+    this.path = process.platform === 'win32' ? `\\\\.\\pipe\\${tag}` : join(tmpdir(), `${tag}.sock`)
+    this.sockets = new Set()
+    this.open = new Map() // 问题 id -> socket
+    this.server = createServer((s) => this.onSocket(s))
+  }
+
+  listen() {
+    return new Promise((resolve, reject) => {
+      this.server.once('error', reject)
+      this.server.listen(this.path, () => resolve(this.path))
+    })
+  }
+
+  onSocket(s) {
+    this.sockets.add(s)
+    s.setEncoding('utf8')
+    let buf = ''
+    s.on('data', (chunk) => {
+      buf += chunk
+      let i
+      while ((i = buf.indexOf('\n')) >= 0) {
+        const line = buf.slice(0, i).trim()
+        buf = buf.slice(i + 1)
+        if (!line) continue
+        let msg
+        try { msg = JSON.parse(line) } catch { continue }
+        if (msg.type === 'hello') this.emit('hello', msg)
+        else if (msg.type === 'question') {
+          this.open.set(msg.id, s)
+          this.emit('question', { ...msg, receivedAt: Date.now() })
+        } else if (msg.type === 'abort') {
+          this.open.delete(msg.id)
+          this.emit('abort', msg)
+        }
+      }
+    })
+    s.on('error', () => { /* 引擎进程被结束时会出现，按断开处理 */ })
+    s.on('close', () => {
+      this.sockets.delete(s)
+      for (const [id, owner] of this.open) {
+        if (owner !== s) continue
+        this.open.delete(id)
+        this.emit('lost', { id })
+      }
+    })
+  }
+
+  /** 回答一个问题；answers 每题一项 {id, selected:[标签...], custom?}。问题已失效时返回 false */
+  answer(id, answers) { return this.reply(id, { type: 'answer', id, answers }) }
+
+  /** 不接这个问题，让 DSH 按没有回答者处理 */
+  decline(id) { return this.reply(id, { type: 'decline', id }) }
+
+  reply(id, msg) {
+    const s = this.open.get(id)
+    if (!s || s.destroyed) return false
+    this.open.delete(id)
+    s.write(JSON.stringify(msg) + '\n')
+    return true
+  }
+
+  close() {
+    for (const s of this.sockets) s.destroy()
+    return new Promise((r) => this.server.close(() => r()))
+  }
+}
+
+/**
+ * 生成 DSH 补丁文件（通过 --patch 传给引擎），返回文件路径。补丁加两行：
+ *   - DSH 自带的 ask_user_question 工具：sdk 组合包默认不挂它（网页版的预设里才有），实测智能体看不到这个工具；
+ *     用默认的阻塞模式，不回答就一直等，与界面“需要你决定，任务在等”一致
+ *   - 提问桥插件：给这个工具接上回答者
+ * 两行用我们自己的 id，DSH 以后若在 sdk 中默认挂上提问工具，升级时会出现两个同名工具，届时删掉第一行。
+ */
+export function writeAskBridgePatch(dir) {
+  const url = pathToFileURL(join(HERE, 'ask-bridge.mjs')).href.replace(/'/g, "''")
+  const file = join(dir, 'ask-bridge.patch.yml')
+  writeFileSync(file, [
+    '# 由 engine.mjs 生成：智能体提问工具 + 提问桥插件',
+    '- insert:',
+    '    - id: astrolab-tool-ask-user',
+    "      name: '@deepseek-ai/dsh-tool-ask-user'",
+    '    - id: astrolab-ask-bridge',
+    `      name: '${url}'`,
+    '',
+  ].join('\n'))
+  return file
+}
 
 export class Engine extends EventEmitter {
   /**
@@ -23,6 +128,8 @@ export class Engine extends EventEmitter {
    * @param {string} o.model
    * @param {string} [o.reasoningEffort]
    * @param {number} [o.maxTokens]
+   * @param {AskBridge} [o.askBridge] 智能体提问桥；给出时引擎加载 ask-bridge 插件并连到这个桥
+   * @param {string} [o.patchDir]  生成补丁文件的目录（用提问桥时需要）
    */
   constructor(o) {
     super()
@@ -43,8 +150,14 @@ export class Engine extends EventEmitter {
   /** 拉起进程并完成 initialize，返回 { serverInfo, ms } */
   async start() {
     const t0 = Date.now()
-    const { dshBin, cwd, env } = this.o
-    this.proc = spawn(process.execPath, [dshBin, '--profile', 'sdk'], { cwd, env: env || process.env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
+    const { dshBin, cwd } = this.o
+    const env = { ...(this.o.env || process.env) }
+    const args = [dshBin, '--profile', 'sdk']
+    if (this.o.askBridge) {
+      env.ASTROLAB_BRIDGE = this.o.askBridge.path
+      args.push('--patch', writeAskBridgePatch(this.o.patchDir || tmpdir()))
+    } else delete env.ASTROLAB_BRIDGE
+    this.proc = spawn(process.execPath, args, { cwd, env, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true })
     this.alive = true
     this.proc.stdout.setEncoding('utf8')
     this.proc.stdout.on('data', (chunk) => this.onData(chunk))
