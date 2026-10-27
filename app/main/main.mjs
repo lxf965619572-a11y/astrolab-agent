@@ -234,13 +234,22 @@ function wireController() {
   })
 }
 
+// 窗口和任务栏图标：Windows 用多尺寸的 .ico（任务栏 24/32 像素、Alt+Tab 48 像素各取合适的一张，不会糊），其他系统用 png。
+// 由 app/scripts/make-icon.cjs 从 app/build/icon.svg 生成
+function appIcon() {
+  const f = join(P.appDir, 'build', process.platform === 'win32' ? 'icon.ico' : 'icon.png')
+  if (existsSync(f)) return f
+  mlog(`找不到应用图标 ${f}，用 Electron 默认图标`)
+  return undefined
+}
+
 async function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1280, minHeight: 720,
     show: false, title: 'AstroLab', backgroundColor: '#F3F1F9',
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'win32' ? { color: '#F6F4FB', symbolColor: '#3B3946', height: 48 } : false,
-    icon: existsSync(join(P.appDir, 'build', 'icon.png')) ? join(P.appDir, 'build', 'icon.png') : undefined,
+    icon: appIcon(),
     webPreferences: {
       preload: join(P.appDir, 'main', 'preload.cjs'),
       contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false,
