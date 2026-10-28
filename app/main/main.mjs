@@ -133,6 +133,16 @@ async function createInLibrary(kind, prompt) {
   await openProject(p.id)
   return ctl.start({ stage: kind === 'plugin' ? 'plugin' : 'skill', prompt, files: [], options: { report: false } })
 }
+/**
+ * 换技能或插件前先关引擎：引擎监视着技能目录，插件的工具服务是它的子进程，在 Windows 上这些都占着文件夹，
+ * 不关就删不掉、换不了（“重新试用”报 EPERM，还会删掉一半）。装完 afterInstall 会在后台重启引擎。
+ * 任务进行中不能关引擎，就等任务结束再装。
+ */
+async function freeInstalled() {
+  if (ctl.busy) throw new Error('任务进行中：引擎正在用已安装的技能和插件，等任务结束后再安装、试用或卸载')
+  await ctl.closeEngine()
+}
+
 function afterInstall() {
   const now = ctl.requestRestart()
   return { restarted: now, skills: lib.skillCards() }
@@ -175,8 +185,8 @@ function registerIpc() {
   handle('lib:addSource', async (s) => { const id = lib.addSource(s); await lib.sync(id); ctl.requestRestart(); return lib.states() })
   handle('lib:removeSource', (id) => { lib.removeSource(id); ctl.requestRestart(); return lib.states() })
   handle('lib:catalog', () => lib.catalog())
-  handle('lib:install', async (key) => ({ ...(await lib.install(key)), ...afterInstall() }))
-  handle('lib:uninstall', (kind, name) => { lib.uninstall(kind, name); return afterInstall() })
+  handle('lib:install', async (key) => { await freeInstalled(); return { ...(await lib.install(key)), ...afterInstall() } })
+  handle('lib:uninstall', async (kind, name) => { await freeInstalled(); lib.uninstall(kind, name); return afterInstall() })
   handle('lib:readSkill', async (key) => {
     const items = await lib.catalog()
     const it = items.find((x) => x.key === key)

@@ -88,6 +88,8 @@ export interface LibSource { id: string; name: string; url: string; branch: stri
 export interface CatalogItem {
   key: string; kind: 'skill' | 'plugin'; name: string; title: string; description: string; version?: string; source: string; sourceName: string; path: string
   builtin?: boolean; mine?: boolean; installed: boolean; installedFrom?: string; update?: boolean; mcp?: string[]; skills?: string[]
+  /** 我的库里的：和哪些共享库里的内容完全一样（不用再提交） */
+  sameIn?: string[]
 }
 export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string }
 export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[]; superseded?: boolean }

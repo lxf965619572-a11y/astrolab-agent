@@ -135,7 +135,9 @@ function Grid({ items, empty, render }: { items: CatalogItem[]; empty: string; r
 function SubmitButton({ item, sources, onDone }: { item: CatalogItem; sources: LibSource[]; onDone: () => void }) {
   const run = useStore((s) => s.run)
   const [open, setOpen] = useState(false)
-  const ready = sources.filter((s) => s.cloned)
+  // 和共享库里已经一样的不用再提交（比如刚审核通过合进去的）：按钮直接说明，不让人点了才报“已经是这个版本了”
+  const ready = sources.filter((s) => s.cloned && !(item.sameIn || []).includes(s.id))
+  const same = sources.filter((s) => s.cloned && (item.sameIn || []).includes(s.id))
   const [target, setTarget] = useState('')
   // 提交要同步、复制、推送，要几秒：提交中按钮不可再点，免得连点两下交了两份
   const [sending, setSending] = useState(false)
@@ -148,6 +150,9 @@ function SubmitButton({ item, sources, onDone }: { item: CatalogItem; sources: L
     setOpen(false)
     if (r) onDone()
   }
+  if (!ready.length && same.length) {
+    return <span className="pill sm ok lib-same" title={`我的库里的这一版和${same.map((s) => s.name).join('、')}里的完全一样，改过内容后这里会变回“提交到共享库”`}><Icon name="check" size={12} stroke={2.4} />已和{same.map((s) => s.name).join('、')}一致</span>
+  }
   return (<>
     <Key size="sm" isDisabled={!ready.length} onPress={() => setOpen(true)}><Icon name="upload" size={14} />提交到共享库</Key>
     <ModalOverlay className="modal-scrim" isDismissable={!sending} isOpen={open} onOpenChange={(v) => { if (!sending) setOpen(v) }}>
@@ -156,6 +161,7 @@ function SubmitButton({ item, sources, onDone }: { item: CatalogItem; sources: L
           <Heading slot="title" className="modal-title">提交“{item.name}”</Heading>
           <p className="muted">会复制到共享库的一个待审核分支。审核人看过全部内容{item.kind === 'plugin' ? '（包括工具服务的代码）' : ''}并通过后，大家才能安装。</p>
           <label className="field"><span>提交到</span><select value={target} onChange={(e) => setTarget(e.target.value)}>{ready.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
+          {!!same.length && <p className="muted small">{same.map((s) => s.name).join('、')}里已经是这一版，不用再交。</p>}
           <div className="modal-foot">
             <Key size="sm" isDisabled={sending} onPress={() => setOpen(false)}>取消</Key>
             <Key size="sm" variant="primary" isDisabled={!target || sending} onPress={() => void send()}>{sending ? '提交中…' : '提交'}</Key>

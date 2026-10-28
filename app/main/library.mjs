@@ -16,10 +16,10 @@
 // 安装：把技能或插件从库里复制到 <数据目录>/installed/，引擎下次启动时加载（技能目录、插件的工具服务由引擎补丁加上）。
 // 只用 Node 内置模块和系统的 git。
 
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir, userInfo } from 'node:os'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { git, isRepo } from './git.mjs'
 import { parseEntry, serializeEntry } from '../../mcp/knowledge/lib/kb.mjs'
 
@@ -83,7 +83,9 @@ export function pluginInfo(dir) {
   }
 }
 
-const list = (dir) => { try { return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name) } catch { return [] } }
+/** 换文件夹时的临时目录（xxx.new-abc123 / xxx.old-abc123）不算技能或插件 */
+const TEMP_DIR = /\.(new|old)-[0-9a-f]{6}$/
+const list = (dir) => { try { return readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith('.') && !TEMP_DIR.test(e.name)).map((e) => e.name) } catch { return [] } }
 
 export class Library {
   /**
@@ -96,6 +98,11 @@ export class Library {
     this.base = join(o.dataDir, 'library')
     this.installedDir = join(o.dataDir, 'installed')
     this.status = new Map() // 库 id -> { syncing, lastSync, error, head }
+    // 上次换文件夹没删掉的旧版本（当时被占用），启动时引擎还没起来，这时清掉
+    for (const sub of ['skills', 'plugins']) {
+      const d = join(this.installedDir, sub)
+      try { for (const n of readdirSync(d)) if (TEMP_DIR.test(n)) { try { rmDir(join(d, n)) } catch { /* 下次再清 */ } } } catch { /* 还没装过 */ }
+    }
   }
 
   // ---------- 身份 ----------
@@ -346,6 +353,10 @@ export class Library {
       const info = skillInfo(join(this.o.root, 'skills', name))
       if (info) items.push({ key: `builtin:skill:${name}`, kind: 'skill', name: info.name, title: info.title, description: info.description, source: 'builtin', sourceName: '内置', installed: true, builtin: true, path: `skills/${name}` })
     }
+    // 我的库里的东西和共享库里同一路径的内容一样：提交按钮显示“已是最新”，不用点了才告诉人
+    const shared = this.available().filter((l) => !l.writable && existsSync(l.dir))
+    const digests = new Map()
+    const digestOf = (dir) => { if (!digests.has(dir)) digests.set(dir, existsSync(dir) ? dirDigest(dir) : ''); return digests.get(dir) }
     for (const lib of this.available()) {
       let head = ''
       try { head = (await git(lib.dir, ['rev-parse', 'HEAD'])).trim() } catch { /* 我的库可能还没提交 */ }
@@ -360,6 +371,13 @@ export class Library {
         items.push(await this.item(lib, 'plugin', name, info, inst))
       }
       void head
+    }
+    for (const it of items) {
+      if (!it.mine) continue
+      const mineLib = this.available().find((l) => l.id === it.source)
+      if (!mineLib) continue
+      const d = digestOf(join(mineLib.dir, it.path))
+      it.sameIn = shared.filter((l) => d && digestOf(join(l.dir, it.path)) === d).map((l) => l.id)
     }
     return items
   }
@@ -387,9 +405,7 @@ export class Library {
     if (!info) throw new Error(`${kind === 'skill' ? '技能缺 SKILL.md' : '插件缺 plugin.json'}：${dirName}`)
     if (existsSync(join(this.o.root, 'skills', info.name))) throw new Error(`“${info.name}”和内置技能同名，不能安装`)
     const dest = join(this.installedDir, kind === 'skill' ? 'skills' : 'plugins', info.name)
-    rmSync(dest, { recursive: true, force: true })
-    mkdirSync(join(dest, '..'), { recursive: true })
-    cpSync(src, dest, { recursive: true, filter: (p) => !/[\\/](\.git|\.utest)([\\/]|$)/.test(p) })
+    replaceDir(dest, (tmp) => cpSync(src, tmp, { recursive: true, filter: (p) => !/[\\/](\.git|\.utest)([\\/]|$)/.test(p) }))
     let commit = ''
     try { commit = (await git(lib.dir, ['log', '-1', '--format=%H', '--', relative(lib.dir, src).split('\\').join('/')])).trim() } catch { /* 没提交 */ }
     const inst = this.installed().filter((r) => !(r.kind === kind && r.name === info.name))
@@ -399,7 +415,7 @@ export class Library {
   }
 
   uninstall(kind, name) {
-    rmSync(join(this.installedDir, kind === 'skill' ? 'skills' : 'plugins', name), { recursive: true, force: true })
+    rmDir(join(this.installedDir, kind === 'skill' ? 'skills' : 'plugins', name))
     writeJson(join(this.installedDir, 'installed.json'), this.installed().filter((r) => !(r.kind === kind && r.name === name)))
   }
 
@@ -499,3 +515,50 @@ export class Library {
 }
 
 export { isRepo }
+
+// ---------- 文件夹工具 ----------
+const SKIP = /^(node_modules|\.utest|\.git)$/
+
+/** 内容指纹（和提交时复制的范围一样，跳过 node_modules/.utest/.git；文本换行统一成 LF，免得 Windows 检出的 CRLF 算成不同） */
+export function dirDigest(dir) {
+  const h = createHash('sha1')
+  const walk = (d, rel) => {
+    for (const name of readdirSync(d).sort()) {
+      if (SKIP.test(name)) continue
+      const p = join(d, name)
+      const r = rel ? `${rel}/${name}` : name
+      if (statSync(p).isDirectory()) { walk(p, r); continue }
+      let buf = readFileSync(p)
+      if (!buf.includes(0)) buf = Buffer.from(buf.toString('utf8').replace(/\r\n/g, '\n'))
+      h.update(`${r}\0${buf.length}\0`)
+      h.update(buf)
+    }
+  }
+  if (statSync(dir).isDirectory()) walk(dir, '')
+  return h.digest('hex')
+}
+
+/** 删文件夹：Windows 上刚关掉的进程可能还占着文件，多试几次 */
+export function rmDir(dir) {
+  rmSync(dir, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 })
+}
+
+/**
+ * 换掉一个文件夹（安装、重新试用）：先写到旁边的临时目录，写好了再把旧的挪开、新的换上。
+ * 中途失败时旧版本原样保留（以前是先删旧的，删到一半被占用就既没旧的也没新的）。
+ */
+export function replaceDir(dest, write) {
+  mkdirSync(join(dest, '..'), { recursive: true })
+  const tmp = `${dest}.new-${randomBytes(3).toString('hex')}`
+  const old = `${dest}.old-${randomBytes(3).toString('hex')}`
+  try { write(tmp) } catch (e) { rmDir(tmp); throw e }
+  if (existsSync(dest)) {
+    try { renameSync(dest, old) } catch (e) {
+      rmDir(tmp)
+      if (e.code === 'EPERM' || e.code === 'EBUSY' || e.code === 'EACCES') throw new Error(`旧版本正被占用（${basename(dest)}），换不了。关掉用到它的程序或重启软件后再试`)
+      throw e
+    }
+  }
+  renameSync(tmp, dest)
+  try { rmDir(old) } catch { /* 旧的删不掉就留着，下次启动再清 */ }
+}

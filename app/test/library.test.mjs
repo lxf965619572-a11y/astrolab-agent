@@ -155,3 +155,38 @@ test('连不上服务器：同步报错但不抛出，我的库照常可用', as
   assert.ok(!lib.sources().some((s) => s.id === 'xh-a'))
   void readFileSync
 })
+
+test('我的库里的和共享库里一样时标出来（不用再提交）；改过后就不一样了', async () => {
+  const { lib } = setup()
+  const mine = await lib.ensureMine()
+  await lib.sync('dept')
+  put(mine, 'skills/flow-skill/SKILL.md', SKILL('flow-skill', '画流程'))
+  await lib.commitMine(['skills/flow-skill'], '技能：flow-skill')
+  const sameOf = async () => (await lib.catalog()).find((i) => i.mine && i.name === 'flow-skill').sameIn
+  assert.deepEqual(await sameOf(), [], '还没交')
+  await lib.submit('dept', 'skills/flow-skill', '技能：flow-skill')
+  const [p] = await lib.pending('dept')
+  await lib.approve('dept', p.ref)
+  assert.deepEqual(await sameOf(), ['dept'], '通过合进主分支后：和部门库一样')
+  put(mine, 'skills/flow-skill/SKILL.md', SKILL('flow-skill', '画流程（改过）'))
+  assert.deepEqual(await sameOf(), [], '改过就要再交')
+})
+
+test('换文件夹：写完新的才换掉旧的；写的时候出错旧的原样保留；临时目录不留', async () => {
+  const { replaceDir, dirDigest } = await import('../main/library.mjs')
+  const { readdirSync } = await import('node:fs')
+  const base = mkdtempSync(join(tmpdir(), 'astro-replace-'))
+  const dest = join(base, 'plugins', 'p')
+  put(dest, 'a.txt', 'v1')
+  replaceDir(dest, (tmp) => put(tmp, 'a.txt', 'v2'))
+  assert.equal(readFileSync(join(dest, 'a.txt'), 'utf8'), 'v2')
+  assert.throws(() => replaceDir(dest, (tmp) => { put(tmp, 'a.txt', 'v3'); throw new Error('复制到一半失败') }), /复制到一半/)
+  assert.equal(readFileSync(join(dest, 'a.txt'), 'utf8'), 'v2', '失败时旧版本还在')
+  assert.deepEqual(readdirSync(join(base, 'plugins')), ['p'], '不留 .new-/.old- 临时目录')
+  // 指纹：Windows 检出的 CRLF 和 LF 算同一份；跳过 node_modules
+  const x = join(base, 'x'), y = join(base, 'y')
+  put(x, 'SKILL.md', 'a\r\nb\r\n'); put(y, 'SKILL.md', 'a\nb\n'); put(y, 'node_modules/k/i.js', 'z')
+  assert.equal(dirDigest(x), dirDigest(y))
+  put(y, 'SKILL.md', 'a\nc\n')
+  assert.notEqual(dirDigest(x), dirDigest(y))
+})
