@@ -64,7 +64,7 @@ function appState() {
     platform: process.platform,
     mock: P.mock,
     installed: P.installed,
-    model: { provider: m.provider, model: m.model, baseURL: m.baseURL, hasKey: m.hasKey },
+    model: { provider: m.provider, model: m.model, baseURL: m.baseURL, hasKey: m.hasKey, contextWindow: m.contextWindow },
     engineReady: P.mock || existsSync(P.dshBin),
     projects: store.list(),
     stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),

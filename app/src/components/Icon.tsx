@@ -38,6 +38,7 @@ const P: Record<string, string> = {
   palette: 'M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 22 9.7C21.6 5.9 17.3 3 12 3zM7.5 12.5h.01M9.5 8h.01M14.5 8h.01M17 11.5h.01',
   diagram: 'M3 5h7v5H3zM14 14h7v5h-7zM6.5 10v6.5H14M14 7.5h3.5V14',
   pin: 'M9 4h6l-1 5 3 3v2H7v-2l3-3zM12 14v6',
+  computer: 'M4 5h16v10H4zM9 19h6M12 15v4',
   sidebar: 'M4 5h16v14H4zM9.5 5v14M6 9h1.5M6 12h1.5',
   chat: 'M4 5h16v11H10l-6 4z',
   newTask: 'M12 20h8M4 20h2l11-11a2.1 2.1 0 0 0-3-3L3 17v3z',

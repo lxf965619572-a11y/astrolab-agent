@@ -3,6 +3,7 @@ import { useStore } from './store'
 import { getApi } from './api'
 import { Sidebar, StatusBar, TitleBar, Toasts } from './components/Shell'
 import { SideRail } from './components/Panels'
+import { modeOf } from './modes'
 import { LaunchView } from './views/LaunchView'
 import { TaskView } from './views/TaskView'
 import { CodeView } from './views/CodeView'
@@ -27,14 +28,16 @@ export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Ctrl N：新任务（任务在后台照常进行；侧栏收起时也能用）
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') { e.preventDefault(); useStore.getState().setView('launch'); return }
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'n') { e.preventDefault(); const st = useStore.getState(); st.setView(st.mode === 'code' ? 'code-launch' : 'launch'); return }
       if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'b') { e.preventDefault(); const s = useStore.getState(); s.setSettings({ sideCollapsed: !s.settings.sideCollapsed }) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
   if (!ready) return <div className="boot"><AppIcon size={56} /><span>AstroLab</span></div>
-  const v = view === 'task' && !ts?.task ? 'launch' : view === 'review' ? 'code' : view
+  // 当前任务不属于这个模式（或没有任务）时，显示这个模式的新任务页
+  const cur = ts?.task ? modeOf(ts.task) : null
+  const v = view === 'task' && cur !== 'task' ? 'launch' : (view === 'code' || view === 'review') && cur !== 'code' ? 'code-launch' : view === 'review' ? 'code' : view
   return (
     <div className="app">
       <div className="app-blob a" aria-hidden="true" />
@@ -45,7 +48,7 @@ export function App() {
         <div className="app-main">
           {v === 'launch' && <LaunchView />}
           {v === 'task' && <TaskView />}
-          {v === 'code' && <CodeView />}
+          {(v === 'code' || v === 'code-launch') && <CodeView fresh={v === 'code-launch'} />}
           {v === 'history' && <HistoryView />}
           {v === 'knowledge' && <KnowledgeView />}
           {v === 'library' && <LibraryView />}

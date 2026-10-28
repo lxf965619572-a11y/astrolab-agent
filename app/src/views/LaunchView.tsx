@@ -13,6 +13,7 @@ import type { Mention, SkillCard } from '../api'
 import { elapsed } from '../format'
 import { useNow } from './TaskView'
 import { CATEGORIES, categoryOf, skillIcon, suggestSkills } from '../skills'
+import { categoryMode, modeOf } from '../modes'
 
 const SOURCE: Record<string, string> = { builtin: '内置', installed: '已安装', mine: '我做的' }
 const MAX_SKILLS = 3
@@ -22,14 +23,14 @@ function greeting() {
   return h < 11 ? '上午好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好'
 }
 
-/** compact：代码模式里没有任务时放在中间（右边是代码面板），窄一点 */
+/** 两种模式各有一个新任务页：常用技能只列这个模式的；compact 是代码模式（右边有代码面板），窄一点 */
 export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
+  const mode = useStore((s) => s.mode)
   const app = useStore((s) => s.app)
   const ts = useStore((s) => s.ts)
   const settings = useStore((s) => s.settings)
   const setSettings = useStore((s) => s.setSettings)
   const run = useStore((s) => s.run)
-  const setView = useStore((s) => s.setView)
   const toast = useStore((s) => s.toast)
   const draft = useStore((s) => s.draft)
   const setDraft = useStore((s) => s.setDraft)
@@ -79,10 +80,10 @@ export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
     if (!prompt.trim() || prompt.startsWith('/') || starting) return
     setStarting(true)
     play('send')
-    const t = await run((api) => api.task.start({ skills: picked, prompt: prompt.trim(), files: [...files, ...auto], options: { report } }), '任务没有启动')
+    // 在哪个模式发起就属于哪个模式；切到它的对话由“任务开始”的状态事件做（引擎冷启动时 start 要等几十秒才返回）
+    const t = await run((api) => api.task.start({ skills: picked, prompt: prompt.trim(), files: [...files, ...auto], options: { report }, mode }), '任务没有启动')
     setStarting(false)
-    // 引擎冷启动时 start 要等几十秒才返回：用户这期间去了别的页面（比如代码模式），就不把人拉回来
-    if (t) { setDraft({ prompt: '', files: [], dismissed: [], skills: [] }); if (useStore.getState().view === 'launch') setView('task') }
+    if (t) setDraft({ prompt: '', files: [], dismissed: [], skills: [] })
   }
 
   const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -104,15 +105,19 @@ export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
 
   if (!project) return <NoProject />
 
-  const pinned = skills.filter((s) => s.pinned)
-  const placeholder = first?.placeholder || '说说要做什么，例如：根据任务书和 ICD 画 PCU 软件的信息流图。输入 / 选技能'
+  // 常用技能只列这个模式的（全部技能里两种都能选）；这个模式一个常用的都没有时列它的全部技能
+  const ofMode = skills.filter((s) => categoryMode(categoryOf(s).name) === mode)
+  const pinned = ofMode.some((s) => s.pinned) ? ofMode.filter((s) => s.pinned) : ofMode.slice(0, 7)
+  const placeholder = first?.placeholder || (mode === 'code'
+    ? '说说要改哪里，例如：给 rt_drv.c 的复位超时补单元测试。输入 / 选技能'
+    : '说说要做什么，例如：根据任务书和 ICD 画 PCU 软件的信息流图。输入 / 选技能')
 
   return (
     <div className={`launch launch2 ${compact ? 'compact' : ''}`}>
       <div className="launch-bg" aria-hidden="true"><div className="launch-blob a" /><div className="launch-blob b" /></div>
       <motion.div className="launch-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1>{greeting()}，要做什么？</h1>
-        <p>{compact ? '右边看着项目文件，在这里说要做什么；“加到新任务”的文件会带上。' : '说清楚要做什么，按需选一个技能；过程中随时可以插话或停止。'}</p>
+        <h1>{mode === 'code' ? `在 ${project.name} 上写代码` : `${greeting()}，要做什么？`}</h1>
+        <p>{mode === 'code' ? '编码、单元测试、代码走查。右边是项目文件和改动；看中的文件点“加到新任务”。' : '需求、设计、文档与图。说清楚要做什么，按需选一个技能；过程中随时可以插话或停止。'}</p>
       </motion.div>
 
       {!!app?.notes?.length && <div className="notes">{app.notes.map((n) => <div key={n} className="note warn"><Icon name="warn" size={14} />{n}</div>)}</div>}
@@ -193,7 +198,7 @@ export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
 
       <section className="skill-cards-wrap" aria-label="常用技能">
         <div className="skill-cards-head">
-          <span className="strong">常用技能</span>
+          <span className="strong">{mode === 'code' ? '代码模式的常用技能' : '任务模式的常用技能'}</span>
           <span className="muted small">点一下选用；在“技能与插件”里可以安装更多、设为常用</span>
         </div>
         <div className="skill-cards">
@@ -283,7 +288,7 @@ function RunningBanner() {
         <span className="muted"> · 已用 {elapsed(now - task.startedAt)} · {task.title}</span>
         <span className="muted small block">同一时间只运行一个任务。可以先把下一个写好，当前任务结束后再开始，写好的内容会保留</span>
       </span>
-      <Key size="sm" variant={asking ? 'primary' : undefined} onPress={() => setView('task')}>{asking ? '去回答' : '回到任务'}<Icon name="arrow" size={14} stroke={2} /></Key>
+      <Key size="sm" variant={asking ? 'primary' : undefined} onPress={() => setView(modeOf(ts?.task) === 'code' ? 'code' : 'task')}>{asking ? '去回答' : '回到任务'}<Icon name="arrow" size={14} stroke={2} /></Key>
     </motion.div>
   )
 }
@@ -298,7 +303,7 @@ function UnreviewedNote() {
     <div className="run-banner quiet">
       <Icon name="branch" size={16} stroke={2} />
       <span className="grow"><span className="strong">{t.stageName}</span>任务改了 {ts.summary.files} 个文件，还没提交<span className="muted small block">建议先审核提交，再开始新任务，这样每个任务的改动能分开看</span></span>
-      <Key size="sm" onPress={() => setView('code')}>看改动<Icon name="arrow" size={14} stroke={2} /></Key>
+      <Key size="sm" onPress={() => setView(modeOf(t) === 'code' ? 'code' : 'task')}>看改动<Icon name="arrow" size={14} stroke={2} /></Key>
     </div>
   )
 }

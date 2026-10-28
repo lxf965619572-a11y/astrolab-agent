@@ -7,6 +7,7 @@ import { useStore, type Theme } from '../store'
 import type { Task } from '../api'
 import { AppIcon, Icon } from './Icon'
 import { play } from '../sound'
+import { modeOf } from '../modes'
 import { CollapseButton, SideResizer } from './Panels'
 
 export function TitleBar() {
@@ -104,43 +105,53 @@ function SoundToggle() {
 
 const statusText: Record<string, string> = { starting: '启动中', running: '进行中', asking: '等你决定', done: '待审核', stopped: '已停止', error: '出错', interrupted: '已中断', idle: '' }
 
-// 侧栏（和 Claude 一样）：新任务、最近的任务（按天分组），底部是知识库、技能与插件、全部任务。
-// 研制环节不再是导航，而是技能的类别：发起页里选技能，任务历史里按类别筛选。
+// 侧栏（和 Claude 一样）：上面是模式切换、新任务和共用页面（全部任务、知识库、技能与插件），下面是这个模式的最近任务。
+// 任务模式按天分组；代码模式按项目分组（和 Claude Code 按仓库分组一样）。
 export function Sidebar() {
   const ts = useStore((s) => s.ts)
   const view = useStore((s) => s.view)
+  const mode = useStore((s) => s.mode)
   const setView = useStore((s) => s.setView)
   const run = useStore((s) => s.run)
   const [list, setList] = useState<Task[]>([])
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
   useEffect(() => { void run((api) => api.task.history()).then((h) => setList(h || [])) }, [run, ts?.project?.id, ts?.task?.id, ts?.status, ts?.task?.commit?.sha])
   const curId = ts?.task?.id
-  const items = curId && ts?.task && !list.some((t) => t.id === curId) ? [ts.task, ...list] : list
-  const groups = groupByDay(items.slice(0, 40))
-  const open = async (id: string) => {
-    if (curId === id) { setView('task'); return }
-    const st = await run(async (api) => { await api.task.open(id); return api.getState() }, '打不开这个任务')
-    if (st) { useStore.getState().applyAppState(st); setView('task') }
+  const all = curId && ts?.task && !list.some((t) => t.id === curId) ? [ts.task, ...list] : list
+  const items = all.filter((t) => modeOf(t) === mode)
+  const other = all.length - items.length
+  const groups = mode === 'code'
+    ? (items.length ? [{ label: ts?.project?.name || '项目', items: items.slice(0, 40).sort((a, b) => b.startedAt - a.startedAt) }] : [])
+    : groupByDay(items.slice(0, 40))
+  const newView = mode === 'code' ? 'code-launch' : 'launch'
+  const open = async (t: Task) => {
+    const target = modeOf(t) === 'code' ? 'code' : 'task'
+    if (curId === t.id) { setView(target); return }
+    const st = await run(async (api) => { await api.task.open(t.id); return api.getState() }, '打不开这个任务')
+    if (st) { useStore.getState().applyAppState(st); setView(target) }
   }
   return (
     <nav className="sidebar side2" aria-label="任务">
       <SideTop />
-      <Button className={`nav side-new ${view === "launch" ? "on" : ""}`} onPress={() => setView('launch')}>
-        <Icon name="newTask" size={17} stroke={1.8} /><span className="nav-name">新任务</span><span className="side-kbd">Ctrl N</span>
+      <Button className={`nav side-new ${view === newView ? 'on' : ''}`} onPress={() => setView(newView)}>
+        <Icon name="newTask" size={17} stroke={1.8} /><span className="nav-name">{mode === 'code' ? '新的代码任务' : '新任务'}</span><span className="side-kbd">Ctrl N</span>
       </Button>
+      <Button className={`nav ${view === 'history' ? 'on' : ''}`} onPress={() => setView('history')}><Icon name="search" size={17} stroke={1.7} /><span className="nav-name">全部任务</span></Button>
+      <Button className={`nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={17} stroke={1.7} /><span className="nav-name">知识库</span></Button>
+      <Button className={`nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={17} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
       <div className="side-scroll">
         {groups.map((g) => (
           <div key={g.label} className="side-group">
-            <div className="nav-label">{g.label}</div>
+            <div className="nav-label">{mode === 'code' && <Icon name="folder" size={12} stroke={1.8} />}{g.label}{mode === 'code' && ts?.project?.branch ? <span className="side-branch mono">{ts.project.branch}</span> : null}</div>
             {g.items.map((t) => {
               const isCur = t.id === curId
               // 不是当前任务却记着“进行中”：上次关闭软件时它还没做完，实际已经中断（打开后可以继续）
               const status = isCur ? ts!.status : ['starting', 'running', 'asking'].includes(t.status) ? 'interrupted' : t.status
               const live = isCur && busy
-              const on = isCur && ['task', 'code', 'review'].includes(view)
+              const on = isCur && ['task', 'code'].includes(view)
               const committed = isCur ? !!ts?.task?.commit : !!t.commit
               return (
-                <Button key={t.id} className={`nav side-item ${on ? "on" : ""}`} isDisabled={busy && !isCur} onPress={() => void open(t.id)}
+                <Button key={t.id} className={`nav side-item ${on ? 'on' : ''}`} isDisabled={busy && !isCur} onPress={() => void open(t)}
                   aria-label={`${t.title}，${t.stageName}`}>
                   <span className="side-title">{t.title}</span>
                   <span className="side-meta">
@@ -152,12 +163,15 @@ export function Sidebar() {
             })}
           </div>
         ))}
-        {!items.length && <div className="side-empty muted small">还没有任务。说说要做什么就开始。</div>}
+        {!items.length && <div className="side-empty muted small">{mode === 'code' ? '还没有代码任务。编码、单元测试、代码走查在这里做。' : '还没有任务。需求、设计、文档和图在这里做。'}{other ? `另一个模式里有 ${other} 个任务。` : ''}</div>}
+        {/* 正在运行的任务属于另一个模式：给个入口，不然切过来就看不到它了 */}
+        {busy && ts?.task && modeOf(ts.task) !== mode && (
+          <Button className="nav side-item side-elsewhere" onPress={() => setView(modeOf(ts.task!) === 'code' ? 'code' : 'task')}>
+            <span className="side-title">{ts.task.title}</span>
+            <span className="side-meta"><span className="led" />在{modeOf(ts.task) === 'code' ? '代码' : '任务'}模式里进行中 · 点击过去</span>
+          </Button>
+        )}
       </div>
-      <div className="nav-sep" />
-      <Button className={`nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={18} stroke={1.7} /><span className="nav-name">知识库</span></Button>
-      <Button className={`nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={18} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
-      <Button className={`nav side-all ${view === 'history' ? 'on' : ''}`} onPress={() => setView('history')}><Icon name="history" size={18} stroke={1.7} /><span className="nav-name">全部任务</span></Button>
       <div className="nav-foot">
         <Icon name="shield" size={14} />
         <span>智能体只能写项目目录，不能提交 Git</span>
@@ -237,16 +251,14 @@ export function SideTop() {
 // 侧栏最上面的模式切换（和 Claude 一样）：任务模式中间是对话；代码模式中间还是对话，右边多一个代码面板。
 // 没有任务时代码模式也能用：右边浏览项目文件，中间直接写新任务。
 export function ModeSwitch() {
-  const view = useStore((s) => s.view)
-  const setView = useStore((s) => s.setView)
-  const ts = useStore((s) => s.ts)
-  const code = view === 'code' || view === 'review'
+  const mode = useStore((s) => s.mode)
+  const setMode = useStore((s) => s.setMode)
   return (
     <div className="mode-switch" role="tablist" aria-label="模式">
-      <button type="button" role="tab" aria-selected={!code} className={`mode-btn ${!code ? 'on' : ''}`} onClick={() => { if (code) setView(ts?.task ? 'task' : 'launch') }}>
+      <button type="button" role="tab" aria-selected={mode === 'task'} className={`mode-btn ${mode === 'task' ? 'on' : ''}`} onClick={() => setMode('task')} title="任务模式：需求、设计、文档与图">
         <Icon name="chat" size={15} stroke={1.8} />任务
       </button>
-      <button type="button" role="tab" aria-selected={code} className={`mode-btn ${code ? 'on' : ''}`} onClick={() => setView('code')}>
+      <button type="button" role="tab" aria-selected={mode === 'code'} className={`mode-btn ${mode === 'code' ? 'on' : ''}`} onClick={() => setMode('code')} title="代码模式：编码、单元测试、代码走查">
         <Icon name="coding" size={15} stroke={1.8} />代码
       </button>
     </div>

@@ -40,9 +40,13 @@ const MCP_LABEL: Record<string, string> = {
   mcp__docgen__export_xlsx: '导出 Excel',
   mcp__docgen__list_templates: '查看 Word 模板',
   mcp__docreader__read_document: '读取文档',
+  mcp__knowledge__search_knowledge: '查知识库',
+  mcp__knowledge__read_knowledge: '读知识条目',
+  mcp__knowledge__propose_knowledge: '提议存入知识库',
 }
 
 export function callLabel(c: Call) {
+  if (c.name === 'mcp__knowledge__search_knowledge' && c.summary) return `查知识库“${c.summary}”`
   if (MCP_LABEL[c.name]) return MCP_LABEL[c.name]
   switch (c.name) {
     case 'read': case 'read_image': return `读 ${c.summary}`
@@ -53,6 +57,7 @@ export function callLabel(c: Call) {
     case 'skill': return `加载技能 ${c.skill || c.summary}`
     case 'ask_user_question': return `提了 ${c.questions || 1} 个问题`
     case 'subagent': case 'subagent_fork': return '分出子任务'
+    case 'todo_write': return '更新步骤'
     default: return c.name
   }
 }
@@ -110,6 +115,6 @@ export function toolsTitle(item: Extract<Item, { kind: 'tools' }>) {
       return { title: callLabel(c), detail, tone: c.status === 'running' ? 'ask' as const : tone }
     }
     case 'doc': return { title: n === 1 ? callLabel(calls[0]) : `生成了 ${n} 个文档`, detail: '', tone }
-    default: return { title: n === 1 ? callLabel(calls[0]) : `调用了 ${n} 个工具`, detail: list(calls.map((c) => callLabel(c)), 3), tone }
+    default: return { title: n === 1 ? callLabel(calls[0]) : `调用了 ${n} 个工具`, detail: n === 1 ? '' : list(calls.map((c) => callLabel(c)), 3), tone }
   }
 }

@@ -3,8 +3,10 @@
 import { create } from 'zustand'
 import type { AppState, AstroApi, AstroEvent, Item, KbMeta, LibSource, Question, SkillCard, Stage, TaskState, Project } from './api'
 import { play, setSoundSettings } from './sound'
+import { modeOf, type Mode } from './modes'
 
-export type View = 'launch' | 'task' | 'code' | 'review' | 'history' | 'knowledge' | 'library'
+// launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'history' | 'knowledge' | 'library'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'
@@ -12,17 +14,19 @@ interface Settings {
   sound: boolean; volume: number; notify: boolean; theme: Theme; reviewer: boolean
   /** 侧栏宽度、是否收成图标列；代码面板宽度（都有上下限，见 components/Panels） */
   sideW: number; sideCollapsed: boolean; codeW: number
+  /** 右边的面板（任务模式：进度和产出；代码模式：环境和改动）开着还是收起 */
+  panel: boolean
 }
 /** 发起页写了一半的任务：切到别的页面再回来还在（任务进行中可以先写好下一个） */
 export interface Draft { prompt: string; files: string[]; report: boolean; dismissed: string[]; skills: string[] }
 
 function loadSettings(): Settings {
-  const d: Settings = { sound: true, volume: 0.3, notify: true, theme: 'lavender', reviewer: false, sideW: 248, sideCollapsed: false, codeW: 620 }
+  const d: Settings = { sound: true, volume: 0.3, notify: true, theme: 'lavender', reviewer: false, sideW: 248, sideCollapsed: false, codeW: 540, panel: true }
   try {
     const v = { ...d, ...JSON.parse(localStorage.getItem('astrolab.settings') || '{}') }
     if (!['lavender', 'cream', 'mars'].includes(v.theme)) v.theme = v.theme === 'clay' ? 'mars' : 'lavender' // 旧的“陶土”换成“黑橙”
     const n = (x: unknown, lo: number, hi: number, def: number) => (typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, x)) : def)
-    v.sideW = n(v.sideW, 200, 420, 248); v.codeW = n(v.codeW, 480, 1400, 620); delete v.chatW; v.sideCollapsed = !!v.sideCollapsed
+    v.sideW = n(v.sideW, 200, 420, 248); v.codeW = n(v.codeW, 480, 1400, 540); delete v.chatW; v.sideCollapsed = !!v.sideCollapsed; v.panel = v.panel !== false
     return v
   } catch { return d }
 }
@@ -36,6 +40,9 @@ interface Store {
   index: Map<string, number>
   questions: Question[]
   view: View
+  /** 当前模式：跟着视图走（知识库、技能这些共用页面保持进来前的模式） */
+  mode: Mode
+  setMode(m: Mode): void
   draft: Draft
   chatDraft: string
   /** 知识条目编辑框：null 不显示；id 有值时是编辑我的库里的条目 */
@@ -85,6 +92,7 @@ export const useStore = create<Store>((set, get) => ({
   index: new Map(),
   questions: [],
   view: 'launch',
+  mode: 'task',
   draft: { prompt: '', files: [], report: true, dismissed: [], skills: [] },
   chatDraft: '',
   kbEditor: null,
@@ -101,12 +109,14 @@ export const useStore = create<Store>((set, get) => ({
     api.onEvent((e) => onEvent(e))
     const s = await api.getState()
     get().applyAppState(s)
-    set({ ready: true, view: s.task.task ? 'task' : 'launch' })
+    const m = s.task.task ? modeOf(s.task.task) : 'task'
+    set({ ready: true, mode: m, view: s.task.task ? (m === 'code' ? 'code' : 'task') : 'launch' })
   },
 
   codeFocus: null,
   setCodeFocus(p) { set({ codeFocus: p }) },
-  openInCode(p) { set({ codeFocus: p, view: 'code' }) },
+  // 对话里点文件：代码模式在右边代码面板打开；任务模式在右边“产出”里预览
+  openInCode(p) { set({ codeFocus: p }) },
   setSkills(skills) { const app = get().app; if (app) set({ app: { ...app, skills } }) },
   applyAppState(s) {
     const { task, items, ...app } = s
@@ -115,7 +125,15 @@ export const useStore = create<Store>((set, get) => ({
     set({ app, ts: task, items, index, questions: task.questions })
   },
 
-  setView(v) { set({ view: v }) },
+  setView(v) {
+    const mode: Mode = v === 'code' || v === 'code-launch' || v === 'review' ? 'code' : v === 'launch' || v === 'task' ? 'task' : get().mode
+    set({ view: v === 'review' ? 'code' : v, mode })
+  },
+  setMode(m) {
+    const t = get().ts?.task
+    const cur = t && modeOf(t) === m
+    get().setView(m === 'code' ? (cur ? 'code' : 'code-launch') : (cur ? 'task' : 'launch'))
+  },
   setDraft(d) { set({ draft: { ...get().draft, ...d } }) },
   setChatDraft(t) { set({ chatDraft: t }) },
   openKbEditor(e) { set({ kbEditor: { id: e.id, body: e.body, meta: { title: '', kind: '经验', tags: [], ...e.meta } } }) },
@@ -168,8 +186,8 @@ function onEvent(e: AstroEvent) {
       const isNewTask = prev?.task?.id !== e.payload.task?.id
       if (isNewTask) useStore.setState({ items: [], index: new Map(), chatDraft: '' })
       useStore.setState({ ts: e.payload, questions: e.payload.questions })
-      // 新任务启动（不论从哪里发起）时切到任务页；在代码模式里发起的留在代码模式（中间就是对话，右边看着它改）
-      if (isNewTask && e.payload.task && e.payload.status === 'starting' && !['code', 'review'].includes(useStore.getState().view)) useStore.setState({ view: 'task' })
+      // 新任务启动（不论从哪里发起）时切到它所属模式的对话
+      if (isNewTask && e.payload.task && e.payload.status === 'starting') useStore.getState().setView(modeOf(e.payload.task) === 'code' ? 'code' : 'task')
       break
     }
     case 'activity': upsert(e.payload); break
@@ -185,7 +203,7 @@ function onEvent(e: AstroEvent) {
       if (e.payload.kind === 'done') play('done')
       else if (e.payload.kind === 'ask') play('ask')
       else if (e.payload.kind === 'error') play('error')
-      if (e.payload.kind === 'done') st.toast({ text: `${e.payload.title}，改动等你审核`, tone: 'ok', action: { label: '看改动', run: () => useStore.getState().setView('code') } }, 6000)
+      if (e.payload.kind === 'done') st.toast({ text: `${e.payload.title}，改动等你审核`, tone: 'ok' }, 6000)
       break
     }
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break

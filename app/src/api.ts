@@ -31,14 +31,18 @@ export interface Summary {
   current: null | { kind: 'thinking' | 'tool'; since: number; name?: string; summary?: string; group?: string }
   todos: Todo[]; files: number; added: number; removed: number
   startedAt: number | null; endedAt: number | null; endReason: string | null; lastAssistantText: string
+  /** 最近一次模型调用：used 是上下文大小（totalTokens）；calls 是累计调用次数 */
+  usage?: Usage | null
 }
+export interface Usage { used: number; input: number; output: number; cacheRead: number; calls: number }
 
 export interface Task {
-  id: string; sessionId: string; stage: string; stageName: string; skill: string; skills?: string[]; category?: string; title: string; prompt: string
+  id: string; sessionId: string; stage: string; stageName: string; skill: string; skills?: string[]; category?: string; mode?: 'task' | 'code'; title: string; prompt: string
   files: string[]; startedAt: number; endedAt: number | null; status: Status
   snapshot: { commit: string; tree: string } | null
   commit: { sha: string; message: string; at: number; files: number } | null
   restoredAt?: number
+  usage?: Usage | null
 }
 
 export interface QuestionItem { id: string; header?: string; question: string; options?: { label: string; description?: string }[]; multiSelect?: boolean }
@@ -55,7 +59,7 @@ export interface TaskState {
 
 export interface AppState {
   platform: string; mock: boolean; installed: boolean
-  model: { provider: string; model: string; baseURL: string; hasKey: boolean }
+  model: { provider: string; model: string; baseURL: string; hasKey: boolean; contextWindow?: number }
   engineReady: boolean; projects: Project[]; stages: Stage[]; skills?: SkillCard[]; notes: string[]; libraryDir?: string
   task: TaskState; items: Item[]
 }
@@ -88,7 +92,7 @@ export interface CatalogItem {
 export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string }
 export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[]; superseded?: boolean }
 
-export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean } }
+export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean }; mode?: 'task' | 'code' }
 
 export interface AstroApi {
   platform: string

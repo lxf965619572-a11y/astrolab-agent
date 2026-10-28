@@ -29,6 +29,9 @@ export const STAGES = [
   { id: 'plugin', name: '插件创作', skill: 'plugin-authoring', hidden: true },
 ]
 // 研制环节现在是技能的类别（发起页按技能选，任务历史按类别筛）；老的环节 id 换算成类别
+/** 代码模式的类别（编码、测试、走查在项目代码上做）；其余（需求、设计、文档与图……）是任务模式 */
+export const CODE_CATEGORIES = ['编码', '测试', '走查']
+export const modeOf = (t) => (t && (t.mode === 'code' || t.mode === 'task') ? t.mode : CODE_CATEGORIES.includes(t && t.category) ? 'code' : 'task')
 export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设计', coding: '编码', utest: '测试', review: '走查', skill: '创作', plugin: '创作' }
 const MAX_SKILLS = 3
 
@@ -309,8 +312,10 @@ export class TaskController extends EventEmitter {
       category = '其他'
     }
     const id = `t-${stamp()}-${randomBytes(2).toString('hex')}`
+    // 在哪个模式发起就属于哪个模式（侧栏按模式分开列）；没说时按技能类别判断
+    const mode = input.mode === 'code' || input.mode === 'task' ? input.mode : modeOf({ category })
     this.task = {
-      id, sessionId: id, stage: stage.id, stageName: stage.name, skill: stage.skill, skills: chosen.map((c) => c.name), category,
+      id, sessionId: id, stage: stage.id, stageName: stage.name, skill: stage.skill, skills: chosen.map((c) => c.name), category, mode,
       reportable: chosen.some((c) => c.report) || !cards.length,
       title: prompt.split('\n')[0].slice(0, 60), prompt, files: input.files || [], options: input.options || {},
       startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: null, commit: null,
@@ -534,6 +539,7 @@ export class TaskController extends EventEmitter {
     try {
       const dir = this.tasksDir()
       mkdirSync(dir, { recursive: true })
+      if (this.activity.usage) this.task.usage = this.activity.usage // 打开历史任务时还能看到上下文用了多少
       writeFileSync(join(dir, `${this.task.id}.json`), JSON.stringify({ task: this.task, items: this.activity.items.map(plainItem) }, null, 1))
     } catch (e) { this.emit('warn', `保存任务记录失败：${e.message}`) }
   }
@@ -557,6 +563,7 @@ export class TaskController extends EventEmitter {
     this.activity = createActivity()
     for (const it of rec.items) { this.activity.items.push(it); this.activity.byId.set(it.id, it) }
     this.activity.seq = rec.items.length + 1000
+    this.activity.usage = rec.task.usage || null
     this.questions.clear()
     this.queued = []
     this.status = ['running', 'asking', 'starting'].includes(rec.task.status) ? 'stopped' : rec.task.status

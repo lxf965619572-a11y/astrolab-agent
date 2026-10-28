@@ -92,6 +92,8 @@ export function modelConfig(env) {
     reasoningEffort: env.ASTROLAB_REASONING || 'high',
     baseURL: env.DEPT_LLM_BASE_URL || 'https://api.deepseek.com',
     hasKey: !!(env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY),
+    /** 和 cordis.patch.yml 里的 contextWindow 一致（vLLM 的 --max-model-len） */
+    contextWindow: Number(env.DEPT_LLM_CONTEXT_WINDOW) || 1048576,
   }
 }
 

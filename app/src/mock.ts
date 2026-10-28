@@ -5,6 +5,7 @@
 import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
+import { categoryMode } from './modes'
 
 const STAGES = [
   { id: 'requirements', name: '需求分析', skill: 'requirements-analysis', hasSkill: true },
@@ -248,6 +249,28 @@ const RT_DRV_BEFORE = `int rt_reset(unsigned ticks)
     return RT_ERR_TIMEOUT;
 }
 `
+// 任务模式的示例产出：信息流总图（SVG）和说明（Markdown），右边“产出”里能直接预览
+const FLOW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="300" viewBox="0 0 760 300" font-family="Microsoft YaHei, sans-serif" font-size="13">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#64748b"/></marker></defs>
+  <rect width="760" height="300" fill="#ffffff"/>
+  <g fill="#fff" stroke-width="1.4">
+    <rect x="30" y="40" width="170" height="64" rx="8" stroke="#0f766e"/><rect x="300" y="40" width="170" height="64" rx="8" stroke="#2563eb"/>
+    <rect x="570" y="40" width="160" height="64" rx="8" stroke="#d97706"/><rect x="300" y="190" width="170" height="64" rx="8" stroke="#2563eb"/>
+    <rect x="570" y="190" width="160" height="64" rx="8" stroke="#d97706"/>
+  </g>
+  <g text-anchor="middle" fill="#0f172a">
+    <text x="115" y="77">星务计算机（BC）</text><text x="385" y="70">PCU 软件</text><text x="385" y="88" font-size="11" fill="#475569">1553B RT · 子地址 1～6</text>
+    <text x="650" y="77">电源控制单元</text><text x="385" y="220">遥测组帧</text><text x="385" y="238" font-size="11" fill="#475569">每 1 s 一帧</text><text x="650" y="227">执行机构</text>
+  </g>
+  <g stroke="#64748b" stroke-width="1.4" fill="none" marker-end="url(#ar)">
+    <path d="M200 62H300"/><path d="M300 84H200"/><path d="M470 72H570"/><path d="M385 104V190"/><path d="M470 222H570"/>
+  </g>
+  <g font-size="11" fill="#2563eb" text-anchor="middle">
+    <text x="250" y="56">遥控指令 6 条</text><text x="250" y="100">遥测 8 条</text><text x="520" y="64">电压/电流、温度</text><text x="420" y="150">采样值</text><text x="520" y="214">OC 指令</text>
+  </g>
+</svg>`
+const FLOW_MD = `# PCU 软件信息流说明\n\n依据：《PCU 软件研制任务书（示例）》、《PCU-1553B 接口控制文件（示例2）》。\n\n## 外部接口\n\n| 对端 | 方向 | 信息 | 周期 |\n|---|---|---|---|\n| 星务计算机（BC） | 收 | 遥控指令 6 条 | 按需 |\n| 星务计算机（BC） | 发 | 遥测 8 条 | 1 s |\n| 电源控制单元 | 收 | 电压/电流、温度 | 100 ms |\n| 执行机构 | 发 | OC 指令、负载继电器 | 按需 |\n\n## 待确认\n\n1. ICD 第 4.3 节遥测第 7 条的字数与任务书不一致（6 字 / 8 字）。\n`
+
 const REPORT = `# 单元测试报告 · rt_drv\n\n| 项目 | 结果 |\n|---|---|\n| 用例 | 39 个 |\n| 通过 | 30 个 |\n| 失败 | 9 个，归为 3 个疑似缺陷 |\n`
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
@@ -297,7 +320,7 @@ export function createMockApi(): AstroApi {
   async function tool(r: number, name: string, args: Record<string, unknown>, result: string | (() => Promise<string>), reason?: string) {
     if (r !== run) throw new Error('stopped')
     const callId = `c${callN++}`
-    ev('assistant/message', { message: { role: 'assistant', content: [...(reason ? [{ type: 'reasoning', text: reason }] : []), { type: 'tool-call', id: callId, name, arguments: JSON.stringify(args) }] } })
+    ev('assistant/message', { message: { role: 'assistant', content: [...(reason ? [{ type: 'reasoning', text: reason }] : []), { type: 'tool-call', id: callId, name, arguments: JSON.stringify(args) }] }, usage: nextUsage() })
     ev('tool/call', { callId, name, arguments: JSON.stringify(args) })
     const text = typeof result === 'string' ? (await wait(250), result) : await result()
     if (r !== run) throw new Error('stopped')
@@ -311,7 +334,15 @@ export function createMockApi(): AstroApi {
   }
   async function say(r: number, text: string, reason?: string) {
     await stepStart(r, 600)
-    ev('assistant/message', { message: { role: 'assistant', content: [...(reason ? [{ type: 'reasoning', text: reason }] : []), { type: 'text', text }] } })
+    ev('assistant/message', { message: { role: 'assistant', content: [...(reason ? [{ type: 'reasoning', text: reason }] : []), { type: 'text', text }] }, usage: nextUsage() })
+  }
+  // 模拟用量：上下文每次调用涨一些，大部分命中缓存（和真实日志的形状一样）
+  let ctx = 0
+  function nextUsage() {
+    const prev = ctx
+    ctx = (ctx || 9800) + 1400 + Math.round(Math.random() * 900)
+    const output = 120 + Math.round(Math.random() * 300)
+    return { inputTokens: ctx - prev - output > 0 ? ctx - Math.max(prev, 0) - output : 600, outputTokens: output, totalTokens: ctx, cacheReadTokens: Math.max(0, prev - 200) }
   }
   const todos = (done: number) => ['读设计和源码', '设计用例', '写测试和桩', '编译运行', '写报告', '自查'].map((content, i) => ({ content, status: i < done ? 'completed' : i === done ? 'in_progress' : 'pending' }))
 
@@ -336,6 +367,23 @@ export function createMockApi(): AstroApi {
         return JSON.stringify({ answers })
       })
       await say(r, reply)
+    } else if (task?.skills?.includes('info-flow') || /信息流/.test(text)) {
+      const steps = (done: number) => ['读任务书和 ICD', '抽取接口和信息', '建信息流模型', '出总图和说明', '自查'].map((content, i) => ({ content, status: i < done ? 'completed' : i === done ? 'in_progress' : 'pending' }))
+      await stepStart(r)
+      await tool(r, 'skill', { name: 'info-flow' }, 'skill loaded', '用信息流梳理技能：先从文档抽接口，再建模型、出图。')
+      await tool(r, 'todo_write', { todos: steps(0) }, 'ok')
+      await tool(r, 'mcp__docreader__read_document', { path: 'docs/软件研制任务书-示例.docx' }, '任务书：PCU 软件……')
+      await tool(r, 'mcp__knowledge__search_knowledge', { query: 'PCU 1553B 子地址分配' }, '1 条：型号A 1553B 子地址分配')
+      await tool(r, 'read', { file_path: 'utest/rt1553/doc/rt1553-详细设计.md' }, 'ok')
+      await stepStart(r, 1800)
+      await tool(r, 'todo_write', { todos: steps(2) }, 'ok', '任务书和 ICD 对得上的接口 4 个；遥测第 7 条两份文件字数不一致，记为待确认。')
+      await tool(r, 'write', { file_path: 'diagrams/PCU-软件总体信息流（示例）-总图.svg', content: FLOW_SVG }, 'ok')
+      files.set('diagrams/PCU-软件总体信息流（示例）-总图.svg', { before: null, after: FLOW_SVG })
+      await tool(r, 'todo_write', { todos: steps(3) }, 'ok')
+      await tool(r, 'write', { file_path: 'diagrams/PCU-信息流说明.md', content: FLOW_MD }, 'ok')
+      files.set('diagrams/PCU-信息流说明.md', { before: null, after: FLOW_MD })
+      await tool(r, 'todo_write', { todos: steps(5) }, 'ok')
+      await say(r, '信息流梳理完了：4 个外部接口、19 条信息，总图和说明已生成。\n\n有 **1 处待确认**：ICD 第 4.3 节遥测第 7 条的字数与任务书不一致（6 字 / 8 字），图里先按 ICD 画，标了虚线。\n\n产出在右边，点开就能看图。')
     } else {
       await stepStart(r)
       await tool(r, 'skill', { name: 'unit-test-design' }, 'skill loaded', '先加载单元测试技能，按技能步骤做。')
@@ -383,14 +431,14 @@ export function createMockApi(): AstroApi {
       status = 'done'
       if (task) task.endedAt = Date.now()
       pushState()
-      emitUi({ type: 'notify', payload: { level: 2, kind: 'done', title: '单元测试完成', body: '39 个用例，30 通过，9 失败' } })
+      emitUi({ type: 'notify', payload: { level: 2, kind: 'done', title: `${task?.stageName || '任务'}完成`, body: '' } })
     } catch { /* 停止 */ }
   }
 
   function appState(): AppState {
     return {
       platform: 'win32', mock: true, installed: false,
-      model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true },
+      model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 },
       engineReady: true, projects: [project], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem),
     }
   }
@@ -449,10 +497,11 @@ export function createMockApi(): AstroApi {
         const legacy = STAGES.find((s) => s.id === input.stage)
         const stage = first ? { id: first.name, name: picked.map((x) => x.title).join(' + '), skill: first.name } : legacy || { id: 'general', name: '通用', skill: '' }
         act = createActivity()
+        ctx = 0
         files = new Map()
         questions = []
         queued = []
-        task = { id: `t-${Date.now()}`, sessionId: 's', stage: stage.id, stageName: stage.name, skill: stage.skill, skills: picked.map((x) => x.name), category: first?.category, title: input.prompt.split('\n')[0].slice(0, 60), prompt: input.prompt, files: input.files, startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: { commit: 'abc', tree: 'def' }, commit: null }
+        task = { id: `t-${Date.now()}`, sessionId: 's', stage: stage.id, stageName: stage.name, skill: stage.skill, skills: picked.map((x) => x.name), category: first?.category, mode: input.mode || categoryMode(first?.category || '其他'), title: input.prompt.split('\n')[0].slice(0, 60), prompt: input.prompt, files: input.files, startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: { commit: 'abc', tree: 'def' }, commit: null }
         history.unshift(task)
         status = 'starting'
         pushState()

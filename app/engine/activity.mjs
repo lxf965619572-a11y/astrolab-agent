@@ -50,6 +50,9 @@ export function summarizeCall(name, args) {
     case 'grep': return args.pattern || ''
     case 'pwsh': case 'bash': return args.description || String(args.command || '').slice(0, 120)
     case 'skill': return args.name || ''
+    case 'mcp__knowledge__search_knowledge': return String(args.query || '').slice(0, 60)
+    case 'mcp__knowledge__read_knowledge': return String(args.id || '').split('/').pop()
+    case 'mcp__knowledge__propose_knowledge': return String(args.title || '').slice(0, 60)
     default: return ''
   }
 }
@@ -74,6 +77,7 @@ export function createActivity() {
     startedAt: null,
     endedAt: null,
     endReason: null,
+    usage: null, // 最近一次模型调用的用量（上下文有多大）+ 累计调用次数
   }
 }
 
@@ -116,6 +120,13 @@ export function applyEvent(st, ev) {
     }
     case 'assistant/message': {
       const blocks = (d.message && d.message.content) || []
+      if (d.usage) {
+        const u = d.usage
+        const input = Number(u.inputTokens) || 0, output = Number(u.outputTokens) || 0, cacheRead = Number(u.cacheReadTokens) || 0
+        // totalTokens 是这次调用的完整量（提示 + 输出），就是现在上下文的大小
+        const used = Number(u.totalTokens) || input + cacheRead + output
+        st.usage = { used, input, output, cacheRead, calls: (st.usage ? st.usage.calls : 0) + 1 }
+      }
       const reasoning = blocks.filter((b) => b.type === 'reasoning' || b.type === 'thinking').map((b) => b.text || b.thinking || '').join('\n').trim()
       if (reasoning) {
         const ms = st.stepStartAt ? Math.max(0, at - st.stepStartAt) : null
@@ -218,6 +229,7 @@ export function summarize(st) {
     endedAt: st.endedAt,
     endReason: st.endReason,
     lastAssistantText: st.lastAssistantText.slice(0, 600),
+    usage: st.usage,
   }
 }
 

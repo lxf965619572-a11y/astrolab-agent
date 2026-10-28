@@ -20,14 +20,16 @@ type Node = { name: string; path: string; dir: boolean; children: Node[]; change
 
 const ST: Record<string, { text: string; tag: string }> = { A: { text: '新', tag: '新文件' }, M: { text: '改', tag: '修改' }, D: { text: '删', tag: '已删除' } }
 
-export function CodeView() {
+/** fresh：代码模式的新任务页（中间是输入框，右边浏览项目）；否则中间是当前代码任务的对话 */
+export function CodeView({ fresh = false }: { fresh?: boolean }) {
   const ts = useStore((s) => s.ts)
+  const panel = useStore((s) => s.settings.panel)
   const items = useStore((s) => s.items)
   const run = useStore((s) => s.run)
   const toast = useStore((s) => s.toast)
   const focus = useStore((s) => s.codeFocus)
   const draft = useStore((s) => s.draft)
-  const task = ts?.task
+  const task = fresh ? null : ts?.task
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
 
   const [changes, setChanges] = useState<Change[]>([])
@@ -139,11 +141,16 @@ export function CodeView() {
         {task ? <Conversation inCode /> : <LaunchView compact />}
       </div>
 
-      <aside className="code-panel" aria-label="代码">
+      {/* 环境和上下文跟着任务走；还没开始时把位置让给中间的输入框 */}
+      {panel && task && <InfoColumn task={task} />}
+      {panel && <aside className="code-panel" aria-label="代码">
         <CodeResizer />
         <div className="cp-head">
           <div className="cp-title">
-            <span className="strong">{task ? '改动' : '项目文件'}</span>
+            <span className="strong cp-route">{task?.snapshot ? <><Icon name="branch" size={14} />{ts?.project?.branch || 'HEAD'}<Icon name="arrow" size={13} stroke={2} />工作区</> : '项目文件'}
+              {/* 窗口窄、环境那一列藏起来时，上下文用量放这里 */}
+              {task && (ts?.summary.usage || task.usage) && <span className="cp-ctx-mini" title="上下文已用">上下文 {ctxPct(ts?.summary.usage || task.usage, useStore.getState().app?.model.contextWindow)}</span>}
+            </span>
             <span className="muted small">
               {!task ? `${ts?.project?.name || ''} · 只读浏览`
                 : task.snapshot
@@ -220,10 +227,48 @@ export function CodeView() {
           </div>
         )}
         {task?.snapshot && <div className="cp-note muted small"><Icon name="undo" size={13} />开始前已保存快照，不满意可以一键恢复</div>}
-      </aside>
+      </aside>}
     </div>
   )
 }
+
+/** 代码模式：环境（本机、项目、分支、快照）和上下文用量（和 Claude Code 右边那一列一样） */
+function InfoColumn({ task }: { task: import('../api').Task | null | undefined }) {
+  const ts = useStore((s) => s.ts)
+  const app = useStore((s) => s.app)
+  const p = ts?.project
+  const usage = task ? ts?.summary.usage || task.usage || null : null
+  const win = app?.model.contextWindow || 1048576
+  const pct = usage ? Math.min(100, (usage.used / win) * 100) : 0
+  const live = !!task && !!ts && ['starting', 'running', 'asking'].includes(ts.status)
+  return (
+    <aside className="code-info" aria-label="环境和上下文">
+      <section className="ci-card">
+        <div className="ci-title">环境</div>
+        <div className="ci-row"><Icon name="computer" size={15} stroke={1.7} /><span className="grow">本机</span><span className="muted small">{app?.mock ? '模拟引擎' : app?.model.model}</span></div>
+        <div className="ci-row" title={p?.path}><Icon name="folder" size={15} stroke={1.7} /><span className="ellipsis"><span className="strong">{p?.name}</span><span className="muted small"> · {p?.path}</span></span></div>
+        <div className="ci-row"><Icon name="branch" size={15} stroke={1.7} /><span className="mono">{p?.git === false ? '不是 Git 仓库' : p?.branch || 'main'}</span></div>
+        <div className="ci-row"><Icon name="undo" size={15} stroke={1.7} /><span className="small">{!task ? '开始任务时保存快照' : task.snapshot ? '任务前快照已保存' : '没有快照（不能一键恢复）'}</span></div>
+        <div className="ci-row"><Icon name="shield" size={15} stroke={1.7} /><span className="small">只能写项目目录，不能提交 Git</span></div>
+      </section>
+      <section className="ci-card">
+        <div className="ci-title">上下文</div>
+        {usage ? (<>
+          <div className="ci-ctx"><span className="strong">{pct < 1 ? pct.toFixed(1) : Math.round(pct)}% 已用</span><span className="muted small mono">{tok(usage.used)} / {tok(win)}</span></div>
+          <div className="ci-bar" role="meter" aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100} aria-label="上下文已用"><span style={{ width: `${Math.max(1.5, pct)}%` }} /></div>
+          <div className="ci-kv"><span className="ci-dot a" />最近一次输入<span className="grow" /><span className="mono">{tok(usage.input + usage.cacheRead)}</span></div>
+          <div className="ci-kv"><span className="ci-dot b" />其中缓存命中<span className="grow" /><span className="mono">{tok(usage.cacheRead)}</span></div>
+          <div className="ci-kv"><span className="ci-dot c" />最近一次输出<span className="grow" /><span className="mono">{tok(usage.output)}</span></div>
+          <div className="ci-kv"><span className="ci-dot d" />调用模型<span className="grow" /><span className="mono">{usage.calls} 次</span></div>
+          {pct > 80 && <div className="ci-warn small"><Icon name="warn" size={13} />快满了：引擎会自动压缩早先的对话，细节可能丢，必要时开个新任务</div>}
+        </>) : <div className="muted small">{live ? '等第一次模型调用…' : task ? '这个任务没有记录用量' : '开始任务后显示用了多少上下文'}</div>}
+      </section>
+    </aside>
+  )
+}
+
+const ctxPct = (u: { used: number } | null | undefined, win?: number) => { const p = u ? (u.used / (win || 1048576)) * 100 : 0; return `${p < 1 ? p.toFixed(1) : Math.round(p)}%` }
+const tok = (n: number) => (n >= 1048576 && n % 1048576 === 0 ? `${n / 1048576}M` : n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 
 function buildTree(paths: string[], byPath: Map<string, Change>): Node {
   const root: Node = { name: '', path: '', dir: true, children: [], changedBelow: 0 }
@@ -285,7 +330,7 @@ function TreeRow({ n, depth, open, setOpen, sel, onPick }: { n: Node; depth: num
 }
 
 /** 恢复快照：撤掉这次任务的全部改动（对话保留） */
-function RestoreButton({ disabled, onDone }: { disabled: boolean; onDone: () => void }) {
+export function RestoreButton({ disabled, onDone }: { disabled: boolean; onDone: () => void }) {
   const run = useStore((s) => s.run)
   const toast = useStore((s) => s.toast)
   return (

@@ -13,6 +13,7 @@ import { Markdown } from '../components/Markdown'
 import { QuestionCard } from '../components/QuestionCard'
 import { baseName, clock, duration, elapsed, nowLabel, toolsTitle } from '../format'
 import { play } from '../sound'
+import { TaskSide } from './TaskSide'
 
 export function useNow(active: boolean, ms = 1000) {
   const [now, setNow] = useState(Date.now())
@@ -31,7 +32,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 const LIVE = ['starting', 'running', 'asking']
 
 export function TaskView() {
-  return <div className="conv-page"><Conversation /></div>
+  const panel = useStore((s) => s.settings.panel)
+  return <div className="conv-page"><Conversation />{panel && <TaskSide />}</div>
 }
 
 /** 一条完整的对话：任务模式占满中间；代码模式在中间，右边是代码面板（inCode） */
@@ -79,6 +81,7 @@ function useToggle() {
 
 function ConvHead({ inCode }: { inCode: boolean }) {
   const ts = useStore((s) => s.ts)!
+  const panel = useStore((s) => s.settings.panel)
   const run = useStore((s) => s.run)
   const setView = useStore((s) => s.setView)
   const hasDraft = useStore((s) => !!s.chatDraft.trim())
@@ -106,14 +109,27 @@ function ConvHead({ inCode }: { inCode: boolean }) {
           </div>
         </div>
         <div className="conv-actions">
+          <PanelToggle inCode={inCode} />
           {live && <Key size="sm" onPress={() => void toggle()}><Icon name="stop" size={14} />停止<Kbd>Ctrl .</Kbd></Key>}
           {(ts.status === 'stopped' || ts.status === 'error') && <Key size="sm" variant="primary" onPress={() => void toggle()}><Icon name="play" size={14} />{hasDraft ? '发送并继续' : '继续'}</Key>}
-          {ts.status === 'done' && !inCode && !ts.summary.files && <Key size="sm" onPress={() => setView('code')}><Icon name="coding" size={14} />看代码</Key>}
           {!live && <Key size="sm" onPress={() => void run((api) => api.task.reset()).then(() => setView(inCode ? 'code' : 'launch'))}><Icon name="plus" size={14} stroke={2} />新任务</Key>}
         </div>
       </div>
-      {!!ts.summary.todos.length && <Progress todos={ts.summary.todos} live={live} />}
+      {/* 任务模式右边面板开着时，进度在面板里，这里不重复 */}
+      {!!ts.summary.todos.length && (inCode || !panel) && <Progress todos={ts.summary.todos} live={live} />}
     </header>
+  )
+}
+
+/** 右边面板的开关（和 Claude 右上角一样） */
+function PanelToggle({ inCode }: { inCode: boolean }) {
+  const panel = useStore((s) => s.settings.panel)
+  const setSettings = useStore((s) => s.setSettings)
+  const label = `${panel ? '收起' : '展开'}${inCode ? '代码面板' : '进度和产出'}`
+  return (
+    <Button className={`side-collapse panel-toggle ${panel ? 'on' : ''}`} aria-label={label} aria-pressed={panel} onPress={() => setSettings({ panel: !panel })}>
+      <Icon name="sidebar" size={17} stroke={1.7} className="flip" /><span className="rail-tip" aria-hidden="true">{label}</span>
+    </Button>
   )
 }
 
@@ -287,7 +303,8 @@ function LiveRow() {
 /** 对话最后一行：结束时的状态和下一步（做完了去看改动；停了可以继续） */
 function StatusRow({ inCode }: { inCode: boolean }) {
   const ts = useStore((s) => s.ts)!
-  const setView = useStore((s) => s.setView)
+  const panel = useStore((s) => s.settings.panel)
+  const setSettings = useStore((s) => s.setSettings)
   const toggle = useToggle()
   const hasDraft = useStore((s) => !!s.chatDraft.trim())
   // 代码模式里不写文件数：右边面板按快照算的才准（这里的数是写文件的次数）
@@ -298,8 +315,9 @@ function StatusRow({ inCode }: { inCode: boolean }) {
     <div className={`tc-now conv-status ${ts.status}`}>
       <Icon name={ts.status === 'error' ? 'warn' : ts.status === 'done' ? 'check' : 'terminal'} size={16} />
       <span className="grow">{text}</span>
-      {ts.status === 'done' && !!ts.summary.files && !inCode && <Key size="sm" variant="primary" onPress={() => setView('code')}>看代码和改动<Icon name="arrow" size={14} stroke={2} /></Key>}
-      {ts.status === 'done' && !!ts.summary.files && inCode && <span className="muted small">在右边看改动，满意就提交</span>}
+      {ts.status === 'done' && !!ts.summary.files && (panel
+        ? <span className="muted small">{inCode ? '在右边看改动，满意就提交' : '在右边“产出”里预览，满意就提交'}</span>
+        : <Key size="sm" variant="primary" onPress={() => setSettings({ panel: true })}>{inCode ? '看改动' : '看产出'}<Icon name="arrow" size={14} stroke={2} /></Key>)}
       {(ts.status === 'stopped' || ts.status === 'error') && <Key size="sm" variant="primary" onPress={() => void toggle()}><Icon name="play" size={14} />{hasDraft ? '发送并继续' : '继续'}</Key>}
     </div>
   )

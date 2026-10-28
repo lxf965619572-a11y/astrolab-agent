@@ -41,6 +41,8 @@ test('真实日志：基本任务整理为活动', () => {
   assert.equal(s.steps, 6)
   assert.equal(s.current, null)
   assert.ok(s.lastAssistantText.length > 0)
+  // 上下文用量：最近一次调用的 totalTokens（代码模式右边“上下文”显示它）
+  assert.ok(s.usage && s.usage.used > 10000 && s.usage.calls >= 2, `用量：${JSON.stringify(s.usage)}`)
 })
 
 test('真实日志：提问工具单独成条', () => {

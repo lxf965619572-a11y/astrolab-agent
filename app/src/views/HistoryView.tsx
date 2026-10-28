@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from 'react-aria-components'
 import { useStore } from '../store'
+import { modeOf } from '../modes'
 import type { Task } from '../api'
 import { Icon, STAGE_ICON } from '../components/Icon'
 import { CATEGORIES } from '../skills'
@@ -25,10 +26,12 @@ export function HistoryView() {
   const shown = cat === '全部' ? list : list.filter((t) => catOf(t) === cat)
   useEffect(() => { void run((api) => api.task.history()).then((h) => setList(h || [])) }, [run, ts?.task?.id, ts?.status])
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
-  const open = async (id: string) => {
-    if (ts?.task?.id === id) { setView('task'); return }
-    const s = await run(async (api) => { await api.task.open(id); return api.getState() }, '打不开这个任务')
-    if (s) { useStore.getState().applyAppState(s); setView('task') }
+  // 打开到任务所属的模式（代码任务在代码模式里看对话和改动）
+  const open = async (t: Task) => {
+    const target = modeOf(t) === 'code' ? 'code' : 'task'
+    if (ts?.task?.id === t.id) { setView(target); return }
+    const s = await run(async (api) => { await api.task.open(t.id); return api.getState() }, '打不开这个任务')
+    if (s) { useStore.getState().applyAppState(s); setView(target) }
   }
   return (
     <div className="history-layout">
@@ -45,9 +48,10 @@ export function HistoryView() {
       </div>
       <div className="history-list card">
         {shown.map((t) => (
-          <Button key={t.id} className="hist-row" isDisabled={busy && ts?.task?.id !== t.id} onPress={() => void open(t.id)}>
+          <Button key={t.id} className="hist-row" isDisabled={busy && ts?.task?.id !== t.id} onPress={() => void open(t)}>
             <Icon name={iconOf(t)} size={18} stroke={1.7} />
             <span className="hist-stage">{t.stageName}</span>
+            <span className={`hist-mode ${modeOf(t)}`}>{modeOf(t) === 'code' ? '代码' : '任务'}</span>
             <span className="hist-title">{t.title}</span>
             <span className="muted small">{new Date(t.startedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
             <span className="muted small mono">{t.endedAt ? elapsed(t.endedAt - t.startedAt) : ''}</span>

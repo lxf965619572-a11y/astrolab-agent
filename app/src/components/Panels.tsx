@@ -8,7 +8,7 @@ import { Icon } from './Icon'
 
 export const SIDE = { min: 200, max: 420, def: 248 }
 /** 代码面板：最窄放得下文件树 + 代码；最宽时中间的对话也还留 380px（CSS 里再按窗口宽度限一次） */
-export const CODE = { min: 480, max: 1400, def: 620 }
+export const CODE = { min: 480, max: 1400, def: 540 }
 
 type Props = {
   /** right：把手在左边栏的右边缘（往右拖变宽）；left：把手在右边栏的左边缘（往左拖变宽） */
@@ -100,9 +100,10 @@ export function CodeResizer() {
 export function SideRail() {
   const view = useStore((s) => s.view)
   const setView = useStore((s) => s.setView)
-  const ts = useStore((s) => s.ts)
   const setSettings = useStore((s) => s.setSettings)
-  const code = view === 'code' || view === 'review'
+  const mode = useStore((s) => s.mode)
+  const setMode = useStore((s) => s.setMode)
+  const code = mode === 'code'
   const expand = () => setSettings({ sideCollapsed: false })
   const B = ({ icon, label, on, onPress }: { icon: string; label: string; on?: boolean; onPress: () => void }) => (
     <Button className={`nav rail-btn ${on ? 'on' : ''}`} aria-label={label} aria-current={on ? 'page' : undefined} onPress={onPress}>
@@ -113,10 +114,10 @@ export function SideRail() {
     <nav className="rail" aria-label="侧栏（已收起）">
       <B icon="sidebar" label="展开侧栏 · Ctrl B" onPress={expand} />
       <div className="rail-sep" />
-      <B icon="chat" label="任务" on={!code} onPress={() => { if (code) setView(ts?.task ? 'task' : 'launch') }} />
-      <B icon="coding" label="代码" on={code} onPress={() => setView('code')} />
+      <B icon="chat" label="任务模式" on={!code} onPress={() => setMode('task')} />
+      <B icon="coding" label="代码模式" on={code} onPress={() => setMode('code')} />
       <div className="rail-sep" />
-      <B icon="newTask" label="新任务 · Ctrl N" on={view === 'launch'} onPress={() => setView(code ? 'code' : 'launch')} />
+      <B icon="newTask" label="新任务 · Ctrl N" on={view === 'launch' || view === 'code-launch'} onPress={() => setView(code ? 'code-launch' : 'launch')} />
       <span className="grow" />
       <B icon="book" label="知识库" on={view === 'knowledge'} onPress={() => setView('knowledge')} />
       <B icon="puzzle" label="技能与插件" on={view === 'library'} onPress={() => setView('library')} />
