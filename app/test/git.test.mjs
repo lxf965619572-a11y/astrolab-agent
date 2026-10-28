@@ -79,6 +79,32 @@ test('只提交指定文件；撤销提交保留改动', async () => {
   assert.equal(readFileSync(join(d, 'test', 't.c'), 'utf8'), 'x\n')
 })
 
+test('提交列表里的文件已经不在：没跟踪过的跳过，跟踪过的记为删除；没有改动时说清楚', async () => {
+  const d = await repo()
+  const snap = await g.snapshot(d, 't3')
+  mkdirSync(join(d, 'diagrams'))
+  writeFileSync(join(d, 'diagrams', '信息流（示例）.mmd'), 'flowchart LR\n')
+  writeFileSync(join(d, 'src', 'b.c'), 'int b4;\n')
+  const out = {}
+  const listed = (await g.changes(d, snap.tree, out)).map((c) => c.path)
+  assert.ok(out.tree)
+  // 列出之后：.mmd 被改名成 .md（git 从没见过 .mmd），a.c（跟踪的）被删
+  unlinkSync(join(d, 'diagrams', '信息流（示例）.mmd'))
+  writeFileSync(join(d, 'diagrams', '信息流（示例）.md'), '```mermaid\nflowchart LR\n```\n')
+  unlinkSync(join(d, 'src', 'a.c'))
+  assert.notEqual(await g.currentTree(d), out.tree, '工作区变了，树也变')
+  const sha = await g.commit(d, '画图', [...listed, 'src/a.c'])
+  const files = execFileSync('git', ['show', '--name-status', '--format=', sha], { cwd: d, encoding: 'utf8' }).trim().split('\n').sort()
+  assert.deepEqual(files, ['D\tsrc/a.c', 'M\tsrc/b.c'])
+  await assert.rejects(g.commit(d, '再提交', ['diagrams/信息流（示例）.mmd']), /都已经不在了/)
+  await assert.rejects(g.commit(d, '再提交', ['src/b.c']), /没有可提交的改动/)
+})
+
+test('git 失败原因只写在标准输出时，错误信息里也带上', async () => {
+  const d = await repo()
+  await assert.rejects(g.git(d, ['commit', '-q', '-m', '空提交']), /nothing to commit|无文件要提交|nothing added/)
+})
+
 test('防护钩子：无标记的提交被拦住，界面的提交和快照照常', async () => {
   const d = await repo()
   const r = await g.installGuardHook(d, HOOK)
@@ -147,4 +173,24 @@ test('任务描述里提到的文件：按文件名识别，同名的列出全�
   assert.equal(m[2].paths.length, 2)
   const none = await findMentions(d, '看看 data.c 和 RT_DRV.cpp')
   assert.deepEqual(none, [])
+})
+
+test('代码模式：列出项目全部文件（不含忽略的），只读看文件；二进制、过大、越界的不给内容', async () => {
+  const { listFiles, readProjectFile } = await import('../main/projects.mjs')
+  const d = await repo()
+  mkdirSync(join(d, 'build'))
+  writeFileSync(join(d, 'build', 'x.o'), 'obj')
+  writeFileSync(join(d, 'new.c'), 'int n;\n')
+  writeFileSync(join(d, 'bin.dat'), Buffer.from([1, 0, 2, 3]))
+  const all = await listFiles(d, '', 5000)
+  assert.ok(all.includes('src/a.c') && all.includes('new.c'))
+  assert.ok(!all.some((f) => f.startsWith('build/')), '忽略的目录不列出')
+  assert.deepEqual(readProjectFile(d, 'src/a.c'), { path: 'src/a.c', binary: false, text: 'int a;\n', size: 7 })
+  const b = readProjectFile(d, 'bin.dat')
+  assert.equal(b.binary, true)
+  assert.equal(b.text, null)
+  writeFileSync(join(d, 'big.txt'), 'x'.repeat(2 * 1024 * 1024 + 1))
+  assert.equal(readProjectFile(d, 'big.txt').tooLarge, true)
+  assert.throws(() => readProjectFile(d, '../etc/passwd'), /不在项目里/)
+  assert.throws(() => readProjectFile(d, 'nope.c'), /不存在/)
 })

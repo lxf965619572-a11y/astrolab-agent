@@ -38,6 +38,39 @@ export function skillInfo(dir) {
   } catch { return null }
 }
 
+// 技能的研制环节类别：只用于发起页分组、任务历史筛选和图标，不是导航
+export const SKILL_CATEGORIES = ['需求', '设计', '编码', '测试', '走查', '文档与图', '创作', '其他']
+
+const list1 = (v) => (Array.isArray(v) ? v : String(v || '').replace(/^\[|\]$/g, '').split(/[,，]/)).map((x) => String(x).trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+const truthy = (v) => v === true || /^(true|yes|是)$/i.test(String(v || '').trim())
+
+/**
+ * 发起页用的技能卡片：SKILL.md 头信息里除了 name、description，还可以写
+ * title（显示名）、category（类别）、summary（一句话）、keywords、pinned（默认放进常用）、placeholder、hint、report。
+ * 没写的按 name / description 推出来，老技能不用改也能用。
+ */
+export function skillCard(dir) {
+  try {
+    const { meta, body } = parseEntry(readFileSync(join(dir, 'SKILL.md'), 'utf8'))
+    const name = String(meta.name || basename(dir))
+    const description = String(meta.description || '')
+    const h1 = (body.match(/^#\s+(.+)$/m) || [])[1] || ''
+    const first = description.split(/[。；]/)[0]
+    const category = SKILL_CATEGORIES.includes(String(meta.category || '').trim()) ? String(meta.category).trim() : '其他'
+    const card = {
+      name,
+      title: String(meta.title || h1 || name).trim(),
+      description,
+      summary: String(meta.summary || (first.length > 40 ? `${first.slice(0, 38)}…` : first)).trim(),
+      category,
+      keywords: list1(meta.keywords),
+      pinned: truthy(meta.pinned),
+    }
+    for (const k of ['placeholder', 'hint', 'report', 'icon']) if (meta[k]) card[k] = String(meta[k]).trim()
+    return card
+  } catch { return null }
+}
+
 /** plugin.json：{ name, title, version, description, author, skills: [目录], mcp: [{ name, command, args, env }], templates: [] } */
 export function pluginInfo(dir) {
   const j = readJson(join(dir, 'plugin.json'), null)
@@ -209,6 +242,8 @@ export class Library {
         writeFileSync(dest, serializeEntry(meta, body))
       }
       await git(wt, ['add', '-A', '--', relPath])
+      // 和共享库里现在的版本一模一样（比如已经通过审核了），没什么可提交的，直接说清楚
+      if (!(await git(wt, ['diff', '--cached', '--name-only'])).trim()) throw new Error(`“${target.name}”里已经是这个版本了，不用再提交。改过内容再提交即可。`)
       await git(wt, [...(await this.gitId()), 'commit', '-q', '-m', title || `提交：${relPath}`])
       await git(wt, ['push', '-q', 'origin', `HEAD:refs/heads/${branch}`])
     } finally {
@@ -256,7 +291,12 @@ export class Library {
       const files = (await git(s.dir, ['diff', '--name-status', '--no-renames', `origin/${s.branch}...${ref}`])).trim().split('\n').filter(Boolean).map((l) => { const [st, ...p] = l.split('\t'); return { status: st, path: p.join('\t') } })
       out.push({ ref, branch: ref.replace(/^origin\//, ''), author, at: Number(at) * 1000, title: subject, files })
     }
-    return out.sort((a, b) => b.at - a.at)
+    // 同一个人对同一项提交了好几次（改了再交、或者连点了两下）：只有最新的一次有效，旧的标出来，建议退回
+    const key = (b) => b.replace(/-\d{14}$/, '')
+    const latest = new Map()
+    for (const p of out) if (!latest.has(key(p.branch)) || latest.get(key(p.branch)) < p.branch) latest.set(key(p.branch), p.branch)
+    for (const p of out) p.superseded = latest.get(key(p.branch)) !== p.branch
+    return out.sort((a, b) => b.at - a.at || (a.branch < b.branch ? 1 : -1))
   }
 
   async pendingFile(id, ref, path) {
@@ -377,6 +417,63 @@ export class Library {
       }
     }
     return [...new Set(dirs)]
+  }
+
+  /** 偏好：哪些技能放进“常用”（覆盖技能头信息里的 pinned） */
+  skillPrefs() {
+    const p = readJson(join(this.base, 'skill-prefs.json'), {})
+    return { pinned: Array.isArray(p.pinned) ? p.pinned : [], unpinned: Array.isArray(p.unpinned) ? p.unpinned : [] }
+  }
+
+  setPinned(name, on) {
+    const p = this.skillPrefs()
+    p.pinned = p.pinned.filter((n) => n !== name)
+    p.unpinned = p.unpinned.filter((n) => n !== name)
+    ;(on ? p.pinned : p.unpinned).push(name)
+    mkdirSync(this.base, { recursive: true })
+    writeJson(join(this.base, 'skill-prefs.json'), p)
+    return this.skillCards()
+  }
+
+  /**
+   * 引擎能加载的全部技能，做成发起页的卡片：内置的、安装的（标出是不是我做的）、插件里的。
+   * 同名的只留第一个（和引擎加载顺序一致）。
+   */
+  skillCards() {
+    const inst = this.installed()
+    const prefs = this.skillPrefs()
+    const out = []
+    const seen = new Set()
+    const add = (dir, extra) => {
+      const c = skillCard(dir)
+      if (!c || seen.has(c.name)) return
+      seen.add(c.name)
+      const pinned = prefs.pinned.includes(c.name) ? true : prefs.unpinned.includes(c.name) ? false : c.pinned
+      out.push({ ...c, ...extra, pinned })
+    }
+    const sourceOf = (kind, name) => {
+      const rec = inst.find((r) => r.kind === kind && r.name === name)
+      return rec && rec.source === 'mine' ? 'mine' : 'installed'
+    }
+    for (const n of list(join(this.o.root, 'skills'))) add(join(this.o.root, 'skills', n), { source: 'builtin' })
+    for (const n of list(join(this.installedDir, 'skills'))) add(join(this.installedDir, 'skills', n), { source: sourceOf('skill', n) })
+    for (const pn of list(join(this.installedDir, 'plugins'))) {
+      const dir = join(this.installedDir, 'plugins', pn)
+      const info = pluginInfo(dir)
+      if (!info) continue
+      for (const s of info.skills) {
+        const p = resolve(dir, s)
+        if (relative(dir, p).startsWith('..') || !existsSync(p)) continue
+        const dirs = existsSync(join(p, 'SKILL.md')) ? [p] : list(p).map((x) => join(p, x))
+        for (const d of dirs) add(d, { source: sourceOf('plugin', info.name), plugin: info.name })
+      }
+    }
+    // 按研制流程排：需求 → 设计 → 编码 → 测试 → 走查 → 文档与图 → 创作 → 其他；同类里内置的在前
+    const rank = { builtin: 0, installed: 1, mine: 2 }
+    const order = ['requirements-analysis', 'preliminary-design', 'detailed-design', 'coding', 'unit-test-design', 'code-walkthrough']
+    const pos = (c) => (order.includes(c.name) ? order.indexOf(c.name) : 99)
+    return out.sort((a, b) => SKILL_CATEGORIES.indexOf(a.category) - SKILL_CATEGORIES.indexOf(b.category)
+      || rank[a.source] - rank[b.source] || pos(a) - pos(b) || a.title.localeCompare(b.title, 'zh'))
   }
 
   /** 引擎要拉起的插件工具服务：[{ id, name, command, args, env, toolCallTimeoutMs }]，路径已换成绝对路径 */

@@ -24,10 +24,13 @@ export const STAGES = [
   { id: 'coding', name: '编码', skill: 'coding' },
   { id: 'utest', name: '单元测试', skill: 'unit-test-design' },
   { id: 'review', name: '代码走查', skill: 'code-walkthrough' },
-  // 不在侧栏的环节：在“技能与插件”里发起，工作区是“我的库”
+  // 在“技能与插件”里发起，工作区是“我的库”
   { id: 'skill', name: '技能创作', skill: 'skill-authoring', hidden: true },
   { id: 'plugin', name: '插件创作', skill: 'plugin-authoring', hidden: true },
 ]
+// 研制环节现在是技能的类别（发起页按技能选，任务历史按类别筛）；老的环节 id 换算成类别
+export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设计', coding: '编码', utest: '测试', review: '走查', skill: '创作', plugin: '创作' }
+const MAX_SKILLS = 3
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
 
@@ -229,7 +232,7 @@ export class TaskController extends EventEmitter {
       this.setStatus('done')
       this.save()
       if (this.restartPending) this.requestRestart()
-      this.emit('notify', { level: 2, kind: 'done', title: `${this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120) })
+      this.emit('notify', { level: 2, kind: 'done', title: `${this.task.stage === 'general' ? '任务' : this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120) })
     }
   }
 
@@ -249,29 +252,66 @@ export class TaskController extends EventEmitter {
 
   // ---------- 任务 ----------
   composeFirstMessage(t) {
-    const hasSkill = !this.o.skillsDir || existsSync(join(this.o.skillsDir, t.skill))
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
     const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处；做完后，有值得留下的经验或踩过的坑，用 mcp__knowledge__propose_knowledge 记一条草稿。' : ''
-    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。${kb}`, `【环节】${t.stageName}`]
-    if (t.skill && hasSkill) parts.push(`请先用 skill 工具加载技能 ${t.skill}，按技能的步骤完成。`)
+    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。${kb}`]
+    const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
+    if (skills.length) {
+      parts.push(`【技能】${t.stageName}`)
+      parts.push(skills.length === 1
+        ? `请先用 skill 工具加载技能 ${skills[0]}，按技能的步骤完成。`
+        : `请先用 skill 工具依次加载技能 ${skills.join('、')}，按技能的步骤完成；几个技能的要求有冲突时先问我。`)
+    } else {
+      parts.push('【技能】未指定。先看 skill 工具列出的部门技能里有没有适合这项工作的：有就加载它并按步骤做，没有就按通用方法做；开头用一句话说明用了哪个技能（或为什么不用）。')
+    }
     parts.push(`【要求】${t.prompt}`)
     if (t.files && t.files.length) parts.push(`【相关文件】\n${t.files.map((f) => `- ${f}`).join('\n')}`)
-    if (t.options && t.options.report === false) parts.push('这次不需要生成 Word 报告。')
+    if (t.options && t.options.report === false && t.reportable !== false) parts.push('这次不需要生成 Word 报告。')
     return parts.join('\n\n')
   }
 
-  /** 发起任务：{ stage, prompt, files?, options? } */
+  /** 技能是否存在：发起页给的技能卡片，或内置技能目录 */
+  knownSkill(name) {
+    if (this.o.skillCards && this.o.skillCards().some((c) => c.name === name)) return true
+    return !!this.o.skillsDir && existsSync(join(this.o.skillsDir, name))
+  }
+
+  /**
+   * 发起任务：{ skills?: [技能名], prompt, files?, options? }。
+   * 不给 skills 时智能体自己判断用哪个技能；老的调用方式 { stage } 仍然可用（换算成对应的技能）。
+   */
   async start(input) {
     if (!this.project) throw new Error('还没有打开项目')
     if (this.busy) throw new Error('已有任务在进行')
-    const stage = STAGES.find((s) => s.id === input.stage) || STAGES[4]
     const prompt = String(input.prompt || '').trim()
     if (!prompt) throw new Error('请写一句要做什么')
+    const cards = this.o.skillCards ? this.o.skillCards() : []
+    const names = [...new Set((Array.isArray(input.skills) ? input.skills : []).map(String))]
+    if (names.length > MAX_SKILLS) throw new Error(`一次最多选 ${MAX_SKILLS} 个技能`)
+    let chosen = names.map((n) => cards.find((c) => c.name === n) || (this.knownSkill(n) ? { name: n, title: n, category: '其他' } : null))
+    const missing = names.filter((n, i) => !chosen[i])
+    if (missing.length) throw new Error(`没有这个技能：${missing.join('、')}（可能已经卸载，请重新选）`)
+    let stage
+    let category
+    if (chosen.length) {
+      stage = { id: chosen[0].name, name: chosen.map((c) => c.title).join(' + '), skill: chosen[0].name }
+      category = chosen[0].category || '其他'
+    } else if (input.stage) {
+      const st = STAGES.find((x) => x.id === input.stage) || STAGES[4]
+      stage = { id: st.id, name: st.name, skill: st.skill }
+      category = STAGE_CATEGORY[st.id] || '其他'
+      const card = cards.find((c) => c.name === st.skill)
+      chosen = card || !this.o.skillsDir || this.knownSkill(st.skill) ? [card || { name: st.skill, title: st.name }] : []
+    } else {
+      stage = { id: 'general', name: '通用', skill: '' }
+      category = '其他'
+    }
     const id = `t-${stamp()}-${randomBytes(2).toString('hex')}`
     this.task = {
-      id, sessionId: id, stage: stage.id, stageName: stage.name, skill: stage.skill,
+      id, sessionId: id, stage: stage.id, stageName: stage.name, skill: stage.skill, skills: chosen.map((c) => c.name), category,
+      reportable: chosen.some((c) => c.report) || !cards.length,
       title: prompt.split('\n')[0].slice(0, 60), prompt, files: input.files || [], options: input.options || {},
       startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: null, commit: null,
       firstSent: false, firstMessageId: null,
@@ -436,7 +476,10 @@ export class TaskController extends EventEmitter {
   // ---------- 审核 ----------
   async changes() {
     if (!this.task || !this.task.snapshot) return []
-    return git.changes(this.project.path, this.task.snapshot.tree)
+    const out = {}
+    const list = await git.changes(this.project.path, this.task.snapshot.tree, out)
+    this.listed = { taskId: this.task.id, tree: out.tree }
+    return list
   }
 
   async fileVersions(path) {
@@ -456,6 +499,15 @@ export class TaskController extends EventEmitter {
 
   async commit(message, paths) {
     if (this.busy) throw new Error('任务进行中，等它做完再提交')
+    // 界面给的是用户看过的列表：列出之后工作区又变了（在别处改名、删除、编辑了文件），先让用户重新看，不提交没看过的内容
+    if (paths && paths.length && this.listed && this.listed.taskId === this.task.id) {
+      const now = await git.currentTree(this.project.path)
+      if (now !== this.listed.tree) {
+        const e = new Error('列出改动之后，文件又有变化（比如在别处改名、删除或编辑了文件）。改动列表已经刷新，请再看一眼再提交。')
+        e.code = 'STALE'
+        throw e
+      }
+    }
     const list = paths && paths.length ? paths : (await this.changes()).map((c) => c.path)
     const sha = await git.commit(this.project.path, message, list)
     this.task.commit = { sha, message, at: Date.now(), files: list.length }

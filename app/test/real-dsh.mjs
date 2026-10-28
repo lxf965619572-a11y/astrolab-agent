@@ -8,9 +8,9 @@
 //   E 任务控制器全流程：预热引擎、发起、插话、停止、继续、完成，只启动一次引擎
 //   F 知识库工具服务、从库里安装的技能和插件（插件的工具服务）都能被智能体用上
 
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { TaskController } from '../main/task.mjs'
@@ -173,6 +173,14 @@ try {
     writeFileSync(join(mine, 'skills', 'my-marker-skill', 'SKILL.md'), '---\nname: my-marker-skill\ndescription: 我的库里装上的技能（验证用）\n---\n\n# 验证\n')
     await lib.install('mine:plugin:crc-tools')
     await lib.install('mine:skill:my-marker-skill')
+    // 可选：再装一个真实插件（ASTROLAB_EXTRA_PLUGIN=插件目录），检查它的技能能被引擎加载
+    const extra = process.env.ASTROLAB_EXTRA_PLUGIN
+    let extraSkills = []
+    if (extra) {
+      cpSync(extra, join(mine, 'plugins', basename(extra)), { recursive: true, filter: (p) => !/[\\/]\.git([\\/]|$)/.test(p) })
+      await lib.install(`mine:plugin:${basename(extra)}`)
+      extraSkills = lib.skillCards().filter((c) => c.plugin === basename(extra)).map((c) => c.name)
+    }
     const home2 = mkdtempSync(join(tmpdir(), 'astrolab-dshhome2-'))
     writeFileSync(join(home2, 'cordis.patch.yml'), readFileSync(join(home, 'cordis.patch.yml'), 'utf8') + `- insert:
     - id: mcp-knowledge
@@ -203,6 +211,10 @@ try {
     const toolNames = reqs[0] ? reqs[0].tools : []
     check('F 知识库工具服务可用，查到我的库的条目', toolNames.includes('mcp__knowledge__search_knowledge') && /复位等待用大于或等于/.test(final), { 结果: final.slice(0, 200) })
     check('F 插件的工具服务可用', toolNames.includes('mcp__crc_tools_crc__count_lines') && /a\.txt：3 行/.test(final))
+    const builtin = ['requirements-analysis', 'preliminary-design', 'detailed-design', 'coding', 'unit-test-design', 'code-walkthrough', 'skill-authoring', 'plugin-authoring']
+    const lost = builtin.filter((n) => !reqs.some((r) => r.text.includes(n)))
+    check('F 内置技能（头信息加了显示字段）全部被引擎加载', lost.length === 0, lost.join('、'))
+    if (extra) check(`F 真实插件 ${basename(extra)} 的技能被引擎加载`, extraSkills.length > 0 && extraSkills.every((n) => reqs.some((r) => r.text.includes(n))), extraSkills.join('、'))
     check('F 安装的技能和插件带的技能都加载了', reqs.some((r) => r.text.includes('my-marker-skill')) && reqs.some((r) => r.text.includes('crc-check-marker')) && reqs.some((r) => r.text.includes('unit-test-design')))
     await eng2.shutdown(5000)
   }

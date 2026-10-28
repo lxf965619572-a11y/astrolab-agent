@@ -5,8 +5,8 @@
 //   - 是 Git 仓库时安装防护钩子 reference-transaction（智能体不能自行提交）
 // 示例工程：首次运行时把仓库里的 sample 复制到用户数据目录，建成 Git 仓库，作为第一个项目。
 
-import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { basename, join, resolve } from 'node:path'
+import { cpSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import * as git from './git.mjs'
@@ -117,6 +117,25 @@ export async function listFiles(dir, query = '', limit = 200) {
     .sort((a, b) => (a.l.split('/').pop().includes(terms[0]) ? 0 : 1) - (b.l.split('/').pop().includes(terms[0]) ? 0 : 1) || a.f.length - b.f.length)
     .slice(0, limit)
     .map(({ f }) => f)
+}
+
+const READ_LIMIT = 2 * 1024 * 1024
+
+/**
+ * 代码模式看文件：读项目里的一个文件（只读）。路径必须在项目里；超过 2 MB 或是二进制（Word、Excel、目标文件）时不给内容。
+ * 返回 { path, binary, text, size, tooLarge? }
+ */
+export function readProjectFile(dir, rel) {
+  const abs = resolve(dir, String(rel || ''))
+  const r = relative(resolve(dir), abs)
+  if (!r || r.startsWith('..') || isAbsolute(r)) throw new Error(`路径不在项目里：${rel}`)
+  if (!existsSync(abs)) throw new Error(`文件不存在：${rel}`)
+  const st = statSync(abs)
+  if (!st.isFile()) throw new Error(`不是文件：${rel}`)
+  if (st.size > READ_LIMIT) return { path: rel, binary: false, text: null, size: st.size, tooLarge: true }
+  const buf = readFileSync(abs)
+  const binary = buf.subarray(0, 8000).includes(0) || /\.(docx?|xlsx?|pptx?|pdf|zip|o|obj|elf|bin|hex|exe|dll|a|lib)$/i.test(abs)
+  return { path: rel, binary, text: binary ? null : buf.toString('utf8'), size: st.size }
 }
 
 /**

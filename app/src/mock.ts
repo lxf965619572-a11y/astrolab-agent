@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, StartInput, Task, TaskState } from './api'
+import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 
@@ -14,10 +14,186 @@ const STAGES = [
   { id: 'utest', name: '单元测试', skill: 'unit-test-design', hasSkill: true },
   { id: 'review', name: '代码走查', skill: 'code-walkthrough', hasSkill: false },
 ]
+// 技能卡片（取自各技能 SKILL.md 的头信息）
+const SKILLS: SkillCard[] = [
+ {
+  "name": "requirements-analysis",
+  "summary": "任务书、ICD → 需求规格说明，标出说不清的地方",
+  "title": "需求分析",
+  "description": "依据单机软件研制任务书、技术要求、接口控制文件（ICD）等上级材料做航天嵌入式软件需求分析：划分配置项、梳理功能模块和外部接口，编写需求条目，做质量自查和上级追溯，列出待确认问题，按需输出 GJB 438B 软件需求规格说明初稿。当用户要求需求分析、梳理任务书或技术要求、编写软件需求规格说明、划分配置项、梳理接口、检查需求条目时使用。",
+  "category": "需求",
+  "keywords": [
+   "需求",
+   "任务书",
+   "ICD",
+   "需求规格"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：根据任务书第 3 章整理 RT 通信软件的需求规格",
+  "hint": "会按部门需求规格模板逐条编号，并标出任务书里说得不清的地方",
+  "report": "生成需求规格说明（部门模板）"
+ },
+ {
+  "name": "preliminary-design",
+  "summary": "需求 → 模块划分、接口定义和需求分配",
+  "title": "概要设计",
+  "description": "依据软件需求规格说明、硬件接口文件和通信协议（ICD），编写航天嵌入式软件配置项的概要设计说明：CSCI 级设计决策、模块划分和需求分配、执行方案（启动流程、主循环调度、中断）、最坏情况时序分析、共享数据保护、外部接口和模块接口、数据和存储分配、资源余量、可靠性安全性设计、需求追溯，并列出上级文件之间的矛盾和缺漏。当用户要求写概要设计、软件结构设计、体系结构设计、执行方案、模块划分或需求分配时使用。",
+  "category": "设计",
+  "keywords": [
+   "概要设计",
+   "模块划分",
+   "接口"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：为 RT 通信软件划分模块并定义接口",
+  "hint": "每个模块都会追溯到需求条目，缺口会单独列出",
+  "report": "生成概要设计说明（部门模板）"
+ },
+ {
+  "name": "detailed-design",
+  "summary": "写到每个函数的处理步骤、异常和共享数据",
+  "title": "详细设计",
+  "description": "依据软件需求规格说明、概要设计说明和硬件接口文件，编写航天嵌入式软件模块的详细设计说明：写到每个函数（含 static）的原型、输入输出、处理步骤、异常处理、全局数据和共享数据保护、时序，关键函数画流程图，建立需求追溯。也支持已有代码时补写详细设计，并列出代码与需求、概要设计、接口文件不一致的地方。当用户要求写详细设计、软件单元设计、函数设计、程序流程图，或为已有代码补写设计文档时使用。",
+  "category": "设计",
+  "keywords": [
+   "详细设计",
+   "函数",
+   "流程图"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：写 rt_drv 模块的详细设计，含流程图",
+  "hint": "流程图会以 Word 可编辑的形式放进文档",
+  "report": "生成详细设计说明（部门模板）"
+ },
+ {
+  "name": "coding",
+  "summary": "按详细设计写 C 代码，编译并跑 Cppcheck",
+  "title": "编码",
+  "description": "依据详细设计为航天嵌入式软件（SPARC BM3803/3823/3883 裸机、飞腾 D2000 Linux）编写或修改 C 代码：逐个函数对照设计实现，遵守部门 C 编码规则（GJB 8114 方向），写文件头和函数头注释并标注设计追溯，用严格告警编译、用 Cppcheck 检查，问题修完后按走查检查表自查，输出编码说明。当用户要求按设计写代码、实现某个函数或模块、按设计修改代码、修复走查或测试发现的问题时使用。",
+  "category": "编码",
+  "keywords": [
+   "编码",
+   "实现",
+   "代码",
+   "编译"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：按详细设计 4.2 实现 rt_reset 和 rt_stack_push",
+  "hint": "写完会用平台编译器编译、跑 Cppcheck，问题修完再交给你",
+  "report": "附编码说明和静态检查结果"
+ },
+ {
+  "name": "unit-test-design",
+  "summary": "设计用例、写驱动和桩，跑测试出报告",
+  "title": "单元测试",
+  "description": "依据详细设计为航天嵌入式 C 软件模块设计单元测试：分析被测函数，按等价类、边界值、判定/条件/MC/DC 设计用例，编写手写驱动和桩（SPARC 等裸机代码）或 gtest 用例（D2000 Linux 代码），在主机上编译运行并统计语句、分支、MC/DC 覆盖率，记录疑似缺陷和未覆盖项，输出单元测试报告。当用户要求单元测试、写测试用例、写驱动和桩、补覆盖率、分析 MC/DC 时使用。",
+  "category": "测试",
+  "keywords": [
+   "单元测试",
+   "测试用例",
+   "覆盖率",
+   "桩"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：为 rt_drv 和 rt_msg 设计并运行单元测试",
+  "hint": "预期值只取自设计，失败不会改预期；疑似缺陷会单独列出",
+  "report": "生成单元测试报告（部门模板）"
+ },
+ {
+  "name": "code-walkthrough",
+  "summary": "按 GJB 8114 和部门规范逐项走查",
+  "title": "代码走查",
+  "description": "按 GJB 8114 与部门 C 编码规范对嵌入式 C 代码（SPARC BM3803/3823/3883 或 D2000）进行走查，结合 Cppcheck 结果输出问题清单。当用户要求代码走查、代码审查、规范检查、静态分析告警甄别时使用。",
+  "category": "走查",
+  "keywords": [
+   "走查",
+   "审查",
+   "规范检查",
+   "Cppcheck"
+  ],
+  "source": "builtin",
+  "pinned": true,
+  "placeholder": "例如：走查 rt_msg.c，重点看中断和共享数据",
+  "hint": "按部门走查单逐项检查，每条意见都给出行号和依据",
+  "report": "生成走查记录（部门模板）"
+ },
+ {
+  "name": "skill-authoring",
+  "summary": "把一项工作的做法写成部门技能",
+  "title": "技能创作",
+  "description": "和用户一起把一项研发工作的做法写成部门技能（SKILL.md + 参考资料 + 检查脚本 + 试用用例），放进“我的库”的 skills/ 下，试用通过后再提交到共享库审核。当用户要求新建技能、把自己的做法或部门规范做成技能、改进已有技能时使用。",
+  "category": "创作",
+  "keywords": [
+   "技能",
+   "创作"
+  ],
+  "source": "builtin",
+  "pinned": false,
+  "placeholder": "例如：把我们做 FPGA 接口走查的方法写成技能",
+  "hint": "智能体会先问你几个问题，再把技能写进我的库"
+ },
+ {
+  "name": "plugin-authoring",
+  "summary": "技能 + 工具服务打成一个插件",
+  "title": "插件创作",
+  "description": "和用户一起做一个部门插件：把一项工作需要的技能、工具服务（MCP，给智能体调用的检查、计算、转换工具）和模板打成一个包，放进“我的库”的 plugins/ 下，试用通过后提交到共享库审核，大家一键安装。当用户要求做插件、给智能体加一个新工具、把一个检查程序或计算脚本接给智能体用时使用。",
+  "category": "创作",
+  "keywords": [
+   "插件",
+   "工具",
+   "MCP"
+  ],
+  "source": "builtin",
+  "pinned": false,
+  "placeholder": "例如：做一个计算和核对 CRC 的插件",
+  "hint": "技能 + 工具服务打成一个包，试用通过后提交共享库"
+ },
+ {
+  "name": "info-flow",
+  "summary": "文档 → 信息流模型，出总图、链路图和 N² 矩阵",
+  "title": "信息流梳理",
+  "description": "把任务书、需求规格说明、ICD 等材料梳理成信息流模型，出泳道信息流图（全图、总图、分图、链路图）和 N² 接口矩阵，列出依据和待确认问题。用户说“画信息流图”“梳理一下项目的信息流”“给需求文档画一张总体图”“画模块/接口关系图”“把数据流向画出来”“这条指令经过哪些环节”“核对接口齐不齐”时使用。",
+  "category": "文档与图",
+  "keywords": [
+   "信息流",
+   "流程图",
+   "接口关系",
+   "N2"
+  ],
+  "source": "mine",
+  "plugin": "info-flow-diagram",
+  "pinned": true,
+  "placeholder": "例如：根据任务书和 ICD 画 PCU 软件的总体信息流",
+  "hint": "先建信息流模型，再出全图、总图、链路图和 N² 接口矩阵"
+ },
+ {
+  "name": "spw-review",
+  "summary": "按部门规范走查 SpaceWire 报文和超时",
+  "title": "SpaceWire 报文走查",
+  "description": "按部门 SpaceWire 通信设计规范走查报文头、长度、CRC 和超时处理。用户要求走查 SpaceWire 报文或通信程序时使用。",
+  "category": "走查",
+  "keywords": [
+   "SpaceWire",
+   "报文",
+   "CRC"
+  ],
+  "source": "installed"
+ }
+]
+
+// 很宽很长的文件（像信息流插件画的 SVG）：用来检查长行不会把页面撑宽
+const LONG_SVG = ['<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="620" viewBox="0 0 1480 620" font-family="Microsoft YaHei, sans-serif">',
+  ...Array.from({ length: 160 }, (_, i) => `  <rect x="${274 + i}" y="${114.5 + i}" width="137.3" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/><text x="${342.6 + i}" y="127.5" text-anchor="middle" font-size="11" fill="#d97706">遥测请求、指令码 等 ${i} 条，这一行故意写得很长很长，用来检查横向滚动只在代码区域里发生，而不会把整个页面撑宽</text>`), '</svg>'].join('\n')
 const FILES = [
   'utest/rt1553/doc/rt1553-详细设计.md', 'utest/rt1553/src/rt_drv.c', 'utest/rt1553/src/rt_msg.c', 'utest/rt1553/src/rt_hw.h',
   'utest/rt1553/include/rt_drv.h', 'utest/rt1553/include/rt_msg.h', 'utest/cmd_check/doc/cmd_check-详细设计.md',
   'utest/cmd_check/src/cmd_check.c', 'utest/uart_drv/src/uart_drv.c', 'docs/软件研制任务书-示例.docx',
+  'diagrams/PCU-软件总体信息流（示例）-总图.svg',
 ]
 const TEST_C = `#include "ut_assert.h"
 #include "rt_drv.h"
@@ -87,7 +263,22 @@ export function createMockApi(): AstroApi {
   let questions: Question[] = []
   let queued: { id: string; text: string; at: number }[] = []
   let files = new Map<string, { before: string | null; after: string }>()
-  const history: Task[] = []
+  // 侧栏“最近”演示用的历史任务
+  const past = (h: number, skill: string, title: string, status: Task['status'], committed?: number): Task => {
+    const sk = SKILLS.find((x) => x.name === skill)!
+    const at = Date.now() - h * 3600_000
+    return { id: `t-past-${h}`, sessionId: 's', stage: sk.name, stageName: sk.title, skill, skills: [skill], category: sk.category, title, prompt: title, files: [], startedAt: at, endedAt: at + 900_000, status,
+      snapshot: { commit: 'a', tree: 'b' }, commit: committed ? { sha: '8fa01be', message: title, at: at + 1000_000, files: committed } : null }
+  }
+  const history: Task[] = new URLSearchParams(location.search).has('nohist') ? [] : [
+    past(1.2, 'info-flow', '按 tests/pcu-demo/expected.md 画一次图', 'done', 11),
+    past(3, 'unit-test-design', '为 rt_drv 和 rt_msg 设计并运行单元测试', 'done', 3),
+    past(5, 'coding', '按详细设计 4.2 实现 rt_reset 和 rt_stack_push', 'stopped'),
+    past(26, 'detailed-design', '写 rt_drv 模块的详细设计，含流程图', 'done', 2),
+    past(30, 'requirements-analysis', '根据任务书第 3 章整理 RT 通信软件的需求规格', 'done', 1),
+    past(54, 'code-walkthrough', '走查 rt_msg.c，重点看中断和共享数据', 'done'),
+    past(75, 'preliminary-design', '为 RT 通信软件划分模块并定义接口', 'done', 2),
+  ]
   let seq = 0
   let turn = 0
   let run = 0 // 每次停止加一，旧剧本发现后退出
@@ -200,7 +391,7 @@ export function createMockApi(): AstroApi {
     return {
       platform: 'win32', mock: true, installed: false,
       model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true },
-      engineReady: true, projects: [project], stages: STAGES, notes: [], task: state(), items: act.items.map(plainItem),
+      engineReady: true, projects: [project], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem),
     }
   }
 
@@ -232,6 +423,17 @@ export function createMockApi(): AstroApi {
       async open() { return appState() },
       async add() { return null },
       async files(q) { const t = q.toLowerCase(); return FILES.filter((f) => f.toLowerCase().includes(t)) },
+      async tree() { return [...new Set([...FILES, ...files.keys()])].sort() },
+      async read(path) {
+        const f = files.get(path)
+        if (/\.(docx?|xlsx?)$/i.test(path)) return { path, binary: true, text: null, size: 9876 }
+        const text = f ? f.after : path.endsWith('rt_drv.c') ? RT_DRV_BEFORE
+          : path.endsWith('.h') ? `/* ${path.split('/').pop()}：接口声明（示例） */\n#ifndef RT_DRV_H\n#define RT_DRV_H\n\n#define RT_RESET_TMO_TICKS  10U\n\nint rt_reset(unsigned ticks);\nint rt_stack_push(unsigned short word);\n\n#endif\n`
+          : path.endsWith('.svg') ? LONG_SVG
+          : path.endsWith('.md') ? `# ${path.split('/').pop()?.replace(/\.md$/, '')}\n\n## 4.2 复位\n\n复位后等待就绪位，elapsed ≥ 10 tick 视为超时，返回 RT_ERR_TIMEOUT。\n`
+          : `/* ${path} */\n`
+        return { path, binary: false, text, size: text.length }
+      },
       async mentions(text) {
         const out: { name: string; paths: string[]; at: number }[] = []
         const names = new Map<string, string[]>()
@@ -242,12 +444,15 @@ export function createMockApi(): AstroApi {
     },
     task: {
       async start(input: StartInput) {
-        const stage = STAGES.find((s) => s.id === input.stage) || STAGES[4]
+        const picked = (input.skills || []).map((n) => SKILLS.find((x) => x.name === n)).filter(Boolean) as SkillCard[]
+        const first = picked[0]
+        const legacy = STAGES.find((s) => s.id === input.stage)
+        const stage = first ? { id: first.name, name: picked.map((x) => x.title).join(' + '), skill: first.name } : legacy || { id: 'general', name: '通用', skill: '' }
         act = createActivity()
         files = new Map()
         questions = []
         queued = []
-        task = { id: `t-${Date.now()}`, sessionId: 's', stage: stage.id, stageName: stage.name, skill: stage.skill, title: input.prompt.split('\n')[0].slice(0, 60), prompt: input.prompt, files: input.files, startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: { commit: 'abc', tree: 'def' }, commit: null }
+        task = { id: `t-${Date.now()}`, sessionId: 's', stage: stage.id, stageName: stage.name, skill: stage.skill, skills: picked.map((x) => x.name), category: first?.category, title: input.prompt.split('\n')[0].slice(0, 60), prompt: input.prompt, files: input.files, startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: { commit: 'abc', tree: 'def' }, commit: null }
         history.unshift(task)
         status = 'starting'
         pushState()
@@ -328,7 +533,11 @@ export function createMockApi(): AstroApi {
       },
       async file(path) {
         const f = files.get(path)
-        return { path, binary: false, before: f?.before ?? null, after: f?.after ?? null, existedBefore: f?.before != null, existsNow: !!f }
+        if (!f) { // 没改过的文件：前后一样，和真实主进程一致
+          const r = await api.project.read(path)
+          return { path, binary: r.binary, before: r.text, after: r.text, existedBefore: true, existsNow: true }
+        }
+        return { path, binary: false, before: f.before ?? null, after: f.after ?? null, existedBefore: f.before != null, existsNow: true }
       },
       async commit(message, paths) {
         await wait(400)
@@ -355,6 +564,10 @@ export function createMockApi(): AstroApi {
       },
       async remove(id) { kbEntries = kbEntries.filter((x) => x.id !== id) },
       async publish() { await wait(300); return { branch: 'submit/lixf/x-20261027' } },
+    },
+    skills: {
+      async list() { return SKILLS },
+      async pin(name: string, on: boolean) { const x = SKILLS.find((k) => k.name === name); if (x) x.pinned = on; return SKILLS.map((k) => ({ ...k })) },
     },
     lib: {
       async state() { return { sources: libSources, mine: 'D:\\…\\library\\mine' } },

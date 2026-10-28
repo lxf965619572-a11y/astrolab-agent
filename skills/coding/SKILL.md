@@ -1,6 +1,14 @@
 ---
 name: coding
 description: 依据详细设计为航天嵌入式软件（SPARC BM3803/3823/3883 裸机、飞腾 D2000 Linux）编写或修改 C 代码：逐个函数对照设计实现，遵守部门 C 编码规则（GJB 8114 方向），写文件头和函数头注释并标注设计追溯，用严格告警编译、用 Cppcheck 检查，问题修完后按走查检查表自查，输出编码说明。当用户要求按设计写代码、实现某个函数或模块、按设计修改代码、修复走查或测试发现的问题时使用。
+title: 编码
+category: 编码
+summary: 按详细设计写 C 代码，编译并跑 Cppcheck
+keywords: [编码, 实现, 代码, 编译, 修复]
+pinned: true
+placeholder: 例如：按详细设计 4.2 实现 rt_reset 和 rt_stack_push
+hint: 写完会用平台编译器编译、跑 Cppcheck，问题修完再交给你
+report: 附编码说明和静态检查结果
 ---
 
 # 航天嵌入式软件编码

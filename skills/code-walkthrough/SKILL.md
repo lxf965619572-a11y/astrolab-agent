@@ -1,6 +1,14 @@
 ---
 name: code-walkthrough
 description: 按 GJB 8114 与部门 C 编码规范对嵌入式 C 代码（SPARC BM3803/3823/3883 或 D2000）进行走查，结合 Cppcheck 结果输出问题清单。当用户要求代码走查、代码审查、规范检查、静态分析告警甄别时使用。
+title: 代码走查
+category: 走查
+summary: 按 GJB 8114 和部门规范逐项走查
+keywords: [走查, 审查, 规范检查, Cppcheck, 静态分析]
+pinned: true
+placeholder: 例如：走查 rt_msg.c，重点看中断和共享数据
+hint: 按部门走查单逐项检查，每条意见都给出行号和依据
+report: 生成走查记录（部门模板）
 ---
 
 # 嵌入式 C 代码走查

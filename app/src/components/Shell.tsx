@@ -1,11 +1,13 @@
-// 外壳：标题栏（玻璃，可拖动窗口）、研发环节侧栏、状态栏、提示条。
+// 外壳：标题栏（玻璃，可拖动窗口）、任务侧栏、状态栏、提示条。
 
 import { useEffect, useState } from 'react'
 import { Button, Dialog, DialogTrigger, Menu, MenuItem, MenuTrigger, Popover, Separator } from 'react-aria-components'
 import { AnimatePresence, motion } from 'motion/react'
-import { useStore, type Theme, type View } from '../store'
-import { AppIcon, Icon, STAGE_ICON } from './Icon'
+import { useStore, type Theme } from '../store'
+import type { Task } from '../api'
+import { AppIcon, Icon } from './Icon'
 import { play } from '../sound'
+import { CollapseButton, SideResizer } from './Panels'
 
 export function TitleBar() {
   const app = useStore((s) => s.app)
@@ -100,58 +102,85 @@ function SoundToggle() {
   )
 }
 
-const statusText: Record<string, string> = { starting: '启动中', running: '进行中', asking: '等你决定', done: '待审核', stopped: '已停止', error: '出错', idle: '' }
+const statusText: Record<string, string> = { starting: '启动中', running: '进行中', asking: '等你决定', done: '待审核', stopped: '已停止', error: '出错', interrupted: '已中断', idle: '' }
 
+// 侧栏（和 Claude 一样）：新任务、最近的任务（按天分组），底部是知识库、技能与插件、全部任务。
+// 研制环节不再是导航，而是技能的类别：发起页里选技能，任务历史里按类别筛选。
 export function Sidebar() {
-  const app = useStore((s) => s.app)
   const ts = useStore((s) => s.ts)
   const view = useStore((s) => s.view)
-  const launchStage = useStore((s) => s.launchStage)
   const setView = useStore((s) => s.setView)
-  const setLaunchStage = useStore((s) => s.setLaunchStage)
+  const run = useStore((s) => s.run)
+  const [list, setList] = useState<Task[]>([])
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
-  const current = ts?.task?.stage
+  useEffect(() => { void run((api) => api.task.history()).then((h) => setList(h || [])) }, [run, ts?.project?.id, ts?.task?.id, ts?.status, ts?.task?.commit?.sha])
+  const curId = ts?.task?.id
+  const items = curId && ts?.task && !list.some((t) => t.id === curId) ? [ts.task, ...list] : list
+  const groups = groupByDay(items.slice(0, 40))
+  const open = async (id: string) => {
+    if (curId === id) { setView('task'); return }
+    const st = await run(async (api) => { await api.task.open(id); return api.getState() }, '打不开这个任务')
+    if (st) { useStore.getState().applyAppState(st); setView('task') }
+  }
   return (
-    <nav className="sidebar" aria-label="研发环节">
-      <div className="nav-label">研发环节</div>
-      {(app?.stages || []).filter((s) => !s.hidden).map((s) => {
-        const isTask = current === s.id && !!ts?.task
-        const on = view === 'launch' ? launchStage === s.id : isTask
-        const live = isTask && busy
-        return (
-          <Button key={s.id} className={`nav ${on ? 'on' : ''}`} aria-current={on ? 'page' : undefined}
-            onPress={() => {
-              // 随时都能切换：当前任务所在的环节回到任务页，其他环节打开发起页（任务在后台照常进行）
-              if (isTask) setView('task')
-              else { setLaunchStage(s.id); setView('launch') }
-            }}>
-            <Icon name={STAGE_ICON[s.id]} size={18} stroke={1.7} />
-            <span className="nav-name">{s.name}</span>
-            {live && <span className={`led ${ts?.status === 'asking' ? 'ask' : ''}`} />}
-            {isTask && <span className={`nav-status st-${ts?.task?.commit ? 'done' : ts?.status}`}>{ts?.task?.commit ? '已提交' : statusText[ts?.status || 'idle']}</span>}
-            {!isTask && !s.hasSkill && <span className="nav-status muted">无技能</span>}
-          </Button>
-        )
-      })}
-      {ts?.task && (app?.stages || []).find((s) => s.id === ts.task!.stage)?.hidden && (
-        <Button className={`nav ${['task', 'review'].includes(view) ? 'on' : ''}`} onPress={() => setView('task')}>
-          <Icon name={ts.task.stage === 'plugin' ? 'puzzle' : 'sparkle'} size={18} stroke={1.7} />
-          <span className="nav-name">{ts.task.stageName}</span>
-          {busy && <span className={`led ${ts.status === 'asking' ? 'ask' : ''}`} />}
-          <span className={`nav-status st-${ts.task.commit ? 'done' : ts.status}`}>{ts.task.commit ? '已提交' : statusText[ts.status || 'idle']}</span>
-        </Button>
-      )}
+    <nav className="sidebar side2" aria-label="任务">
+      <SideTop />
+      <Button className={`nav side-new ${view === "launch" ? "on" : ""}`} onPress={() => setView('launch')}>
+        <Icon name="newTask" size={17} stroke={1.8} /><span className="nav-name">新任务</span><span className="side-kbd">Ctrl N</span>
+      </Button>
+      <div className="side-scroll">
+        {groups.map((g) => (
+          <div key={g.label} className="side-group">
+            <div className="nav-label">{g.label}</div>
+            {g.items.map((t) => {
+              const isCur = t.id === curId
+              // 不是当前任务却记着“进行中”：上次关闭软件时它还没做完，实际已经中断（打开后可以继续）
+              const status = isCur ? ts!.status : ['starting', 'running', 'asking'].includes(t.status) ? 'interrupted' : t.status
+              const live = isCur && busy
+              const on = isCur && ['task', 'code', 'review'].includes(view)
+              const committed = isCur ? !!ts?.task?.commit : !!t.commit
+              return (
+                <Button key={t.id} className={`nav side-item ${on ? "on" : ""}`} isDisabled={busy && !isCur} onPress={() => void open(t.id)}
+                  aria-label={`${t.title}，${t.stageName}`}>
+                  <span className="side-title">{t.title}</span>
+                  <span className="side-meta">
+                    {live ? <span className={`led ${status === 'asking' ? 'ask' : ''}`} /> : <span className={`dot st-${committed ? 'done' : status}`} />}
+                    {t.stageName}<span className="side-dot">·</span>{committed ? '已提交' : statusText[status] || ''}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
+        ))}
+        {!items.length && <div className="side-empty muted small">还没有任务。说说要做什么就开始。</div>}
+      </div>
       <div className="nav-sep" />
       <Button className={`nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={18} stroke={1.7} /><span className="nav-name">知识库</span></Button>
       <Button className={`nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={18} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
-      <Button className={`nav ${view === 'history' ? 'on' : ''}`} onPress={() => setView('history')}><Icon name="history" size={18} stroke={1.7} /><span className="nav-name">任务历史</span></Button>
-      <div className="nav-grow" />
+      <Button className={`nav side-all ${view === 'history' ? 'on' : ''}`} onPress={() => setView('history')}><Icon name="history" size={18} stroke={1.7} /><span className="nav-name">全部任务</span></Button>
       <div className="nav-foot">
         <Icon name="shield" size={14} />
         <span>智能体只能写项目目录，不能提交 Git</span>
       </div>
+      <SideResizer />
     </nav>
   )
+}
+
+function groupByDay(tasks: Task[]) {
+  const day = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime() }
+  const today = day(Date.now())
+  const label = (t: number) => {
+    const d = (today - day(t)) / 86400_000
+    return d <= 0 ? '今天' : d === 1 ? '昨天' : d < 7 ? '最近 7 天' : '更早'
+  }
+  const out: { label: string; items: Task[] }[] = []
+  for (const t of [...tasks].sort((a, b) => b.startedAt - a.startedAt)) {
+    const l = label(t.startedAt)
+    if (!out.length || out[out.length - 1].label !== l) out.push({ label: l, items: [] })
+    out[out.length - 1].items.push(t)
+  }
+  return out
 }
 
 export function StatusBar() {
@@ -200,13 +229,26 @@ export function Toasts() {
   )
 }
 
-export function ViewTabs({ value, onChange, review }: { value: View; onChange: (v: View) => void; review?: number }) {
-  const tabs: [View, string][] = [['task', '任务'], ['review', review ? `审核 ${review}` : '审核'], ['history', '历史']]
+/** 侧栏顶上一行：模式切换 + 收起 */
+export function SideTop() {
+  return <div className="side-top"><ModeSwitch /><CollapseButton /></div>
+}
+
+// 侧栏最上面的模式切换（和 Claude 一样）：任务模式中间是对话；代码模式中间还是对话，右边多一个代码面板。
+// 没有任务时代码模式也能用：右边浏览项目文件，中间直接写新任务。
+export function ModeSwitch() {
+  const view = useStore((s) => s.view)
+  const setView = useStore((s) => s.setView)
+  const ts = useStore((s) => s.ts)
+  const code = view === 'code' || view === 'review'
   return (
-    <div className="segmented" role="tablist" aria-label="视图">
-      {tabs.map(([v, label]) => (
-        <button key={v} type="button" role="tab" aria-selected={value === v} className={`seg-btn ${value === v ? 'on' : ''}`} onClick={() => onChange(v)}>{label}</button>
-      ))}
+    <div className="mode-switch" role="tablist" aria-label="模式">
+      <button type="button" role="tab" aria-selected={!code} className={`mode-btn ${!code ? 'on' : ''}`} onClick={() => { if (code) setView(ts?.task ? 'task' : 'launch') }}>
+        <Icon name="chat" size={15} stroke={1.8} />任务
+      </button>
+      <button type="button" role="tab" aria-selected={code} className={`mode-btn ${code ? 'on' : ''}`} onClick={() => setView('code')}>
+        <Icon name="coding" size={15} stroke={1.8} />代码
+      </button>
     </div>
   )
 }

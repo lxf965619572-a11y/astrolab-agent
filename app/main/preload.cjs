@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('astro', {
     add: () => invoke('project:add'),
     files: (q) => invoke('project:files', q),
     mentions: (text) => invoke('project:mentions', text),
+    tree: () => invoke('project:tree'),
+    read: (rel) => invoke('project:read', rel),
   },
   task: {
     start: (input) => invoke('task:start', input),
@@ -44,6 +46,10 @@ contextBridge.exposeInMainWorld('astro', {
     save: (e) => invoke('kb:save', e),
     remove: (id) => invoke('kb:delete', id),
     publish: (id, target) => invoke('kb:publish', id, target),
+  },
+  skills: {
+    list: () => invoke('skills:list'),
+    pin: (name, on) => invoke('skills:pin', name, on),
   },
   lib: {
     state: () => invoke('lib:state'),

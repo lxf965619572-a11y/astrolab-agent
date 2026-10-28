@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
 import { useStore } from '../store'
-import type { CatalogItem, LibSource, Pending, Submission } from '../api'
+import type { CatalogItem, LibSource, Pending, SkillCard, Submission } from '../api'
 import { Icon } from '../components/Icon'
 import { Key, Toggle } from '../components/Keys'
 import { Markdown } from '../components/Markdown'
@@ -39,9 +39,10 @@ export function LibraryView() {
   const shared = sources.filter((s) => !s.local)
   const tabs: [Tab, string][] = [['installed', `已安装 ${installed.length}`], ['available', `可安装 ${available.length}`], ['mine', `我做的 ${mine.length}`], ['submissions', '我的提交'], ...(settings.reviewer ? [['review', '审核'] as [Tab, string]] : []), ['sources', '共享库']]
 
-  const act = async (f: () => Promise<{ restarted?: boolean } | undefined | void>, ok: string) => {
+  const act = async (f: () => Promise<{ restarted?: boolean; skills?: SkillCard[] } | undefined | void>, ok: string) => {
     const r = await f()
     if (r === undefined) return
+    if (r && r.skills) useStore.getState().setSkills(r.skills) // 发起页的技能卡片跟着更新
     toast({ text: r && 'restarted' in r ? `${ok}。${r.restarted ? '引擎正在重新加载，下个任务就能用' : '当前任务结束后引擎会重新加载'}` : ok, tone: 'ok' }, 5000)
     await load()
   }
@@ -66,6 +67,7 @@ export function LibraryView() {
       <div className="lib-body pad-x">
         {tab === 'installed' && <Grid items={installed} empty="还没有安装。" render={(i) => (<>
           <Key size="sm" onPress={() => setViewing(i.key)}>查看</Key>
+          <PinButton item={i} />
           {!i.builtin && i.update && <Key size="sm" variant="primary" onPress={() => void act(() => run((api) => api.lib.install(i.key), '更新失败'), `已更新 ${i.name}`)}>更新</Key>}
           {!i.builtin && <Key size="sm" onPress={() => void act(() => run((api) => api.lib.uninstall(i.kind, i.name), '卸载失败'), `已卸载 ${i.name}`)}>卸载</Key>}
         </>)} />}
@@ -85,6 +87,25 @@ export function LibraryView() {
       {viewing && <Viewer itemKey={viewing} onClose={() => setViewing(null)} />}
       {creating && <CreateDialog kind={creating} onClose={() => setCreating(null)} />}
     </div>
+  )
+}
+
+/** 设为常用：放进发起页的“常用技能”。插件是把它带的技能一起设 */
+function PinButton({ item }: { item: CatalogItem }) {
+  const skills = useStore((s) => s.app?.skills || [])
+  const run = useStore((s) => s.run)
+  const names = item.kind === 'skill' ? [item.name] : skills.filter((k) => k.plugin === item.name).map((k) => k.name)
+  if (!names.length) return null
+  const on = names.every((n) => skills.find((k) => k.name === n)?.pinned)
+  const toggle = async () => {
+    let last: SkillCard[] | undefined
+    for (const n of names) last = await run((api) => api.skills.pin(n, !on), '设置失败')
+    if (last) { useStore.getState().setSkills(last); play('tick') }
+  }
+  return (
+    <Key size="sm" onPress={() => void toggle()} aria-pressed={on}>
+      <Icon name={on ? 'check' : 'pin'} size={13} stroke={2} />{on ? '常用' : '设为常用'}
+    </Key>
   )
 }
 
@@ -116,18 +137,28 @@ function SubmitButton({ item, sources, onDone }: { item: CatalogItem; sources: L
   const [open, setOpen] = useState(false)
   const ready = sources.filter((s) => s.cloned)
   const [target, setTarget] = useState('')
+  // 提交要同步、复制、推送，要几秒：提交中按钮不可再点，免得连点两下交了两份
+  const [sending, setSending] = useState(false)
   useEffect(() => { setTarget(ready[0]?.id || '') }, [ready.length])
+  const send = async () => {
+    if (sending) return
+    setSending(true)
+    const r = await run((api) => api.lib.submit(item.key, target), '提交失败')
+    setSending(false)
+    setOpen(false)
+    if (r) onDone()
+  }
   return (<>
     <Key size="sm" isDisabled={!ready.length} onPress={() => setOpen(true)}><Icon name="upload" size={14} />提交到共享库</Key>
-    <ModalOverlay className="modal-scrim" isDismissable isOpen={open} onOpenChange={setOpen}>
+    <ModalOverlay className="modal-scrim" isDismissable={!sending} isOpen={open} onOpenChange={(v) => { if (!sending) setOpen(v) }}>
       <Modal className="modal">
         <Dialog className="modal-dialog">
           <Heading slot="title" className="modal-title">提交“{item.name}”</Heading>
           <p className="muted">会复制到共享库的一个待审核分支。审核人看过全部内容{item.kind === 'plugin' ? '（包括工具服务的代码）' : ''}并通过后，大家才能安装。</p>
           <label className="field"><span>提交到</span><select value={target} onChange={(e) => setTarget(e.target.value)}>{ready.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></label>
           <div className="modal-foot">
-            <Key size="sm" onPress={() => setOpen(false)}>取消</Key>
-            <Key size="sm" variant="primary" isDisabled={!target} onPress={() => void run((api) => api.lib.submit(item.key, target), '提交失败').then((r) => { setOpen(false); if (r) onDone() })}>提交</Key>
+            <Key size="sm" isDisabled={sending} onPress={() => setOpen(false)}>取消</Key>
+            <Key size="sm" variant="primary" isDisabled={!target || sending} onPress={() => void send()}>{sending ? '提交中…' : '提交'}</Key>
           </div>
         </Dialog>
       </Modal>
@@ -165,7 +196,7 @@ function CreateDialog({ kind, onClose }: { kind: 'skill' | 'plugin'; onClose: ()
   const start = async () => {
     if (!text.trim()) return
     const t = await run((api) => api.lib.create(kind, text.trim()), '没有开始')
-    if (t) { onClose(); setView('task') }
+    if (t) { onClose(); if (useStore.getState().view === 'library') setView('task') }
   }
   return (
     <ModalOverlay className="modal-scrim" isDismissable isOpen onOpenChange={(o) => { if (!o) onClose() }}>
@@ -250,7 +281,8 @@ function Review({ sources }: { sources: LibSource[] }) {
       {!list ? <div className="lib-empty muted">读取中…</div> : !list.length ? <div className="lib-empty muted">没有待审核的提交。</div> : list.map((p) => (
         <div key={p.ref} className="card pend">
           <Button className="pend-head" onPress={() => { setOpen(open === p.ref ? null : p.ref); setFile(null) }}>
-            <span className="strong">{p.title}</span><span className="muted small">{p.author} · {clock(p.at)} · {p.files.length} 个文件</span><span className="grow" /><Icon name="chevron" size={14} />
+            <span className="strong">{p.title}</span><span className="muted small">{p.author} · {clock(p.at)} · {p.files.length} 个文件</span>
+            {p.superseded && <span className="pill sm ask" title="同一个人对同一项后来又提交了一次，以最新的为准">已有更新的提交，建议退回</span>}<span className="grow" /><Icon name="chevron" size={14} />
           </Button>
           {open === p.ref && (<div className="pend-body">
             <div className="pend-files">{p.files.map((f) => <Button key={f.path} className={`file-opt ${file?.path === f.path ? 'on' : ''}`} onPress={() => void show(p, f.path)}><span className="mono small">{f.status}</span><span className="mono">{f.path}</span></Button>)}</div>

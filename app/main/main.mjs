@@ -6,7 +6,7 @@ import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
-import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore } from './projects.mjs'
+import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile } from './projects.mjs'
 import { STAGES, TaskController } from './task.mjs'
 import { Library } from './library.mjs'
 import { buildIndex, readEntry, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
@@ -68,6 +68,7 @@ function appState() {
     engineReady: P.mock || existsSync(P.dshBin),
     projects: store.list(),
     stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),
+    skills: lib.skillCards(),
     libraryDir: lib.sources()[0].dir,
     notes,
     task: ctl.snapshotState(),
@@ -134,7 +135,7 @@ async function createInLibrary(kind, prompt) {
 }
 function afterInstall() {
   const now = ctl.requestRestart()
-  return { restarted: now }
+  return { restarted: now, skills: lib.skillCards() }
 }
 
 function registerIpc() {
@@ -148,6 +149,9 @@ function registerIpc() {
   })
   handle('project:files', (q) => (ctl.project ? listFiles(ctl.project.path, q) : []))
   handle('project:mentions', (text) => (ctl.project ? findMentions(ctl.project.path, text) : []))
+  // 代码模式：整个项目的文件（git 跟踪的 + 没被忽略的新文件，最多 5000 个）和只读看一个文件
+  handle('project:tree', () => (ctl.project ? listFiles(ctl.project.path, '', 5000) : []))
+  handle('project:read', (rel) => { if (!ctl.project) throw new Error('还没有打开项目'); return readProjectFile(ctl.project.path, rel) })
   handle('task:start', (input) => ctl.start(input))
   handle('task:send', (text) => ctl.send(text))
   handle('task:stop', () => ctl.stop())
@@ -195,6 +199,8 @@ function registerIpc() {
   handle('lib:approve', (id, ref) => lib.approve(id, ref))
   handle('lib:reject', (id, ref) => lib.reject(id, ref))
   handle('lib:create', (kind, prompt) => createInLibrary(kind, prompt))
+  handle('skills:list', () => lib.skillCards())
+  handle('skills:pin', (name, on) => lib.setPinned(String(name), !!on))
   handle('sys:openPath', async (rel) => { const err = await shell.openPath(projectPath(rel)); if (err) throw new Error(err) })
   handle('sys:showItem', (rel) => shell.showItemInFolder(projectPath(rel)))
   // 皮肤：Windows 标题栏右侧的系统按钮区（最小化、关闭）跟着换底色
@@ -282,7 +288,7 @@ async function boot() {
   store = new ProjectStore(join(P.data, 'projects.json'))
   lib = new Library({ dataDir: P.data, root: P.root })
   try { await lib.ensureMine() } catch (e) { notes.push(`我的库没有建好：${e.message}`) }
-  ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, makeEngine, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
+  ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
   wireController()
   registerIpc()
   if (!store.list().length) {

@@ -17,7 +17,9 @@ export function git(cwd, args, { env = {}, input, maxBuffer = 64 * 1024 * 1024, 
       cwd, env: { ...process.env, ...UI_ENV, ...env }, maxBuffer, encoding, windowsHide: true,
     }, (err, stdout, stderr) => {
       if (err) {
-        err.message = `git ${args.join(' ')}：${String(stderr || err.message).trim()}`
+        // 有些失败原因 git 写在标准输出（比如 nothing to commit），标准错误为空时用它，免得只剩一句 Command failed
+        err.message = `git ${args.join(' ')}：${String(stderr || stdout || err.message).trim()}`
+        err.stdout = stdout
         err.stderr = stderr
         return reject(err)
       }
@@ -86,9 +88,10 @@ function parseNameStatus(out) {
 }
 
 /** 相对快照的改动：[{ path, status: A|M|D, added, removed, binary }] */
-export async function changes(cwd, snapTree) {
+export async function changes(cwd, snapTree, out = {}) {
   const info = await repoInfo(cwd)
   const now = await worktreeTree(cwd, info.gitDir, 'now')
+  out.tree = now // 列出改动时的工作区树，提交前用来核对
   if (now === snapTree) return []
   // --relative：项目是仓库的子目录时，只看项目内的改动，路径相对项目
   const ns = parseNameStatus(await git(cwd, ['diff-tree', '-r', '-z', '--no-renames', '--relative', '--name-status', snapTree, now]))
@@ -152,13 +155,37 @@ function removeEmptyDirs(root, dir) {
   }
 }
 
-/** 界面提交：只提交给出的路径（不带上用户另外暂存的内容），返回提交号 */
+/**
+ * 界面提交：只提交给出的路径（不带上用户另外暂存的内容），返回提交号。
+ * 列表里的文件已经不在了：git 认识的（原来跟踪的）算删除照常提交；git 从来没见过的（任务中生成后又删掉、改名）跳过，
+ * 不让一个消失的文件挡住整次提交。
+ */
 export async function commit(cwd, message, paths) {
   if (!paths || !paths.length) throw new Error('没有要提交的文件')
   const exist = paths.filter((p) => existsSync(safeJoin(cwd, p)))
+  const gone = paths.filter((p) => !exist.includes(p))
+  let known = []
+  if (gone.length) {
+    const inIndex = (await git(cwd, ['ls-files', '-z', '--', ...gone])).split('\0')
+    let inHead = []
+    try { inHead = (await git(cwd, ['ls-tree', '-r', '-z', '--name-only', 'HEAD', '--', ...gone])).split('\0') } catch { /* 还没有提交 */ }
+    const set = new Set([...inIndex, ...inHead].filter(Boolean))
+    known = gone.filter((p) => set.has(p))
+  }
+  const list = [...exist, ...known]
+  if (!list.length) throw new Error('列表里的文件都已经不在了，没有可提交的改动')
   if (exist.length) await git(cwd, ['add', '-A', '--', ...exist])
-  await git(cwd, ['commit', '-q', '--only', '-m', message, '--', ...paths])
+  if (known.length) await git(cwd, ['rm', '-q', '--cached', '--ignore-unmatch', '--', ...known]) // 已删除的跟踪文件：记为删除
+  const staged = (await git(cwd, ['diff', '--cached', '--name-only', 'HEAD', '--', ...list]).catch(() => 'x')).trim()
+  if (!staged) throw new Error('这些文件和上次提交时一样，没有可提交的改动')
+  await git(cwd, ['commit', '-q', '--only', '-m', message, '--', ...list])
   return (await git(cwd, ['rev-parse', 'HEAD'])).trim()
+}
+
+/** 工作区现在的树（含未跟踪、不含忽略的文件），用来判断列出改动之后文件有没有再变 */
+export async function currentTree(cwd) {
+  const info = await repoInfo(cwd)
+  return worktreeTree(cwd, info.gitDir, 'check')
 }
 
 /** 撤销界面刚做的提交（工作区保留改动），只在 HEAD 就是这个提交时执行 */

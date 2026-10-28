@@ -1,4 +1,4 @@
-// 差异视图：CodeMirror 6 的统一差异（删除的行内嵌显示），只读；C/C++ 和 Markdown 有语法高亮，长文件只渲染可见部分。
+// 差异视图和全文视图：CodeMirror 6，只读；统一差异（删除的行内嵌显示）；C/C++ 和 Markdown 有语法高亮，长文件只渲染可见部分。
 
 import { useEffect, useRef } from 'react'
 import { EditorState, type Extension } from '@codemirror/state'
@@ -64,5 +64,22 @@ export function Diff({ path, before, after }: { path: string; before: string; af
     })
     return () => view.destroy()
   }, [path, before, after])
+  return <div className="diff-host" ref={host} />
+}
+
+/** 只读看一个文件的全文（没有改动，或者想看改完后的完整内容时） */
+export function CodeFile({ path, text }: { path: string; text: string }) {
+  const host = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!host.current) return
+    const view = new EditorView({
+      parent: host.current,
+      state: EditorState.create({
+        doc: text,
+        extensions: [lineNumbers(), theme, syntaxHighlighting(highlight), ...language(path), EditorState.readOnly.of(true), EditorView.editable.of(false)],
+      }),
+    })
+    return () => view.destroy()
+  }, [path, text])
   return <div className="diff-host" ref={host} />
 }

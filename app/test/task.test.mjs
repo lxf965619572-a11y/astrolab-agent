@@ -13,7 +13,7 @@ import * as git from '../main/git.mjs'
 const HERE = dirname(fileURLToPath(import.meta.url))
 const MOCK = join(HERE, '..', 'engine', 'mock-dsh.mjs')
 
-async function setup(t, { env = {}, warm, bridgeOn = true } = {}) {
+async function setup(t, { env = {}, warm, bridgeOn = true, skillCards } = {}) {
   const ws = mkdtempSync(join(tmpdir(), 'astro-proj-'))
   mkdirSync(join(ws, 'utest', 'rt1553', 'src'), { recursive: true })
   writeFileSync(join(ws, 'utest', 'rt1553', 'src', 'rt_drv.c'), 'int rt_reset(int t) { return 0; }\n')
@@ -23,7 +23,7 @@ async function setup(t, { env = {}, warm, bridgeOn = true } = {}) {
   await bridge.listen()
   let made = 0
   const ctl = new TaskController({
-    bridge, dataDir: data, logDir: join(data, 'logs'), warm,
+    bridge, dataDir: data, logDir: join(data, 'logs'), warm, skillCards,
     makeEngine: () => {
       made++
       const e = { ...process.env, MOCK_DSH_SPEED: '0.02', ...env }
@@ -66,6 +66,56 @@ test('发起任务 → 完成 → 审核改动 → 只提交任务改动', async
   assert.equal(ctl.task.commit.files, 3)
   // 审核始终相对任务前的快照：提交后列表不变，界面按 task.commit 显示“已提交”
   assert.equal((await ctl.changes()).length, 3)
+})
+
+test('审核时列出改动后文件又变了：先拒绝并要求重看，重新列出后照常提交', async (t) => {
+  const { ws, ctl } = await setup(t)
+  await ctl.start({ stage: 'utest', prompt: '为 rt_drv 设计并运行单元测试', files: ['utest/rt1553/src/rt_drv.c'] })
+  await until(() => ctl.status === 'done')
+  const first = (await ctl.changes()).map((c) => c.path)
+  // 用户在资源管理器里把报告改了名
+  const { renameSync } = await import('node:fs')
+  renameSync(join(ws, 'utest/rt1553/test/单元测试报告-rt_drv.md'), join(ws, 'utest/rt1553/test/报告.md'))
+  await assert.rejects(ctl.commit('单元测试：rt_drv', first), (e) => e.code === 'STALE' && /请再看一眼/.test(e.message))
+  assert.ok(!ctl.task.commit)
+  const again = (await ctl.changes()).map((c) => c.path)
+  assert.ok(again.includes('utest/rt1553/test/报告.md') && !again.includes('utest/rt1553/test/单元测试报告-rt_drv.md'))
+  const sha = await ctl.commit('单元测试：rt_drv', again)
+  assert.ok(sha)
+  assert.equal(ctl.task.commit.files, 3)
+})
+
+test('按技能发起：记下技能和类别；没选技能时让智能体自己判断；老的环节方式照常', async (t) => {
+  const cards = [
+    { name: 'unit-test-design', title: '单元测试', category: '测试', report: '生成单元测试报告' },
+    { name: 'coding', title: '编码', category: '编码', report: '附编码说明' },
+    { name: 'info-flow', title: '信息流梳理', category: '文档与图' },
+  ]
+  const { ctl } = await setup(t, { skillCards: () => cards })
+  const a = await ctl.start({ skills: ['coding', 'unit-test-design'], prompt: '实现并测试 rt_reset', files: [], options: { report: false } })
+  assert.deepEqual(a.skills, ['coding', 'unit-test-design'])
+  assert.equal(a.category, '编码')
+  assert.equal(a.stageName, '编码 + 单元测试')
+  assert.match(a.firstMessage, /【技能】编码 \+ 单元测试/)
+  assert.match(a.firstMessage, /依次加载技能 coding、unit-test-design/)
+  assert.match(a.firstMessage, /不需要生成 Word 报告/)
+  await until(() => ctl.status === 'done')
+  const b = await ctl.start({ skills: ['info-flow'], prompt: '画信息流图', files: [], options: { report: false } })
+  assert.match(b.firstMessage, /加载技能 info-flow，按技能的步骤完成/)
+  assert.doesNotMatch(b.firstMessage, /Word 报告/, '不出报告的技能不提报告')
+  await until(() => ctl.status === 'done')
+  const c = await ctl.start({ prompt: '帮我看看这个工程', files: [], options: {} })
+  assert.equal(c.stage, 'general')
+  assert.deepEqual(c.skills, [])
+  assert.match(c.firstMessage, /【技能】未指定/)
+  await until(() => ctl.status === 'done')
+  const d = await ctl.start({ stage: 'utest', prompt: '做单元测试' })
+  assert.equal(d.category, '测试')
+  assert.deepEqual(d.skills, ['unit-test-design'])
+  assert.match(d.firstMessage, /加载技能 unit-test-design/)
+  await until(() => ctl.status === 'done')
+  await assert.rejects(ctl.start({ skills: ['nope'], prompt: 'x' }), /没有这个技能：nope/)
+  await assert.rejects(ctl.start({ skills: ['a', 'b', 'c', 'd'], prompt: 'x' }), /最多选 3 个/)
 })
 
 test('提问：状态变为等你决定，回答后继续并完成', async (t) => {
