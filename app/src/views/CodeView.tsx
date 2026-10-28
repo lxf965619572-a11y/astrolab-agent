@@ -10,6 +10,7 @@ import type { Change } from '../api'
 import { Icon } from '../components/Icon'
 import { Key, Kbd } from '../components/Keys'
 import { CodeFile, Diff } from '../components/Diff'
+import { FileRender, RENDERABLE } from '../components/FileRender'
 import { CodeResizer } from '../components/Panels'
 import { play } from '../sound'
 import { Conversation } from './TaskView'
@@ -39,7 +40,7 @@ export function CodeView({ fresh = false }: { fresh?: boolean }) {
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<string | null>(null)
   const [shown, setShown] = useState<Shown | null>(null)
-  const [mode, setMode] = useState<'diff' | 'full'>('diff')
+  const [mode, setMode] = useState<'diff' | 'full' | 'view'>('diff')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [message, setMessage] = useState('')
   const [committing, setCommitting] = useState(false)
@@ -133,6 +134,11 @@ export function CodeView({ fresh = false }: { fresh?: boolean }) {
   const cur = shown && shown.path === sel ? shown : null
   const isChanged = !!cur?.changed
   const showDiff = isChanged && mode === 'diff'
+  // Markdown、SVG、HTML 可以看渲染后的样子（HTML 比如信息流插件的交互版，能点能缩放）
+  const renderable = !!cur && !cur.binary && cur.changed?.status !== 'D' && RENDERABLE.test(cur.path)
+  const isHtml = !!cur && /\.html?$/i.test(cur.path)
+  // 换到不能预览的文件时回到代码
+  useEffect(() => { if (mode === 'view' && cur && !renderable) setMode('diff') }, [mode, cur, renderable])
 
   return (
     <div className="code-layout">
@@ -185,10 +191,11 @@ export function CodeView({ fresh = false }: { fresh?: boolean }) {
                 {cur.changed && <span className={`tag fs-${cur.changed.status}`}>{ST[cur.changed.status]?.tag}</span>}
                 {cur.changed && !cur.binary && <span className="mono small"><span className="add">+{cur.changed.added ?? 0}</span>{cur.changed.removed ? <span className="rem"> −{cur.changed.removed}</span> : null}</span>}
                 <span className="grow" />
-                {isChanged && !cur.binary && cur.changed?.status === 'M' && (
+                {((isChanged && !cur.binary && cur.changed?.status === 'M') || renderable) && (
                   <div className="segmented small" role="tablist" aria-label="显示方式">
-                    <button type="button" role="tab" aria-selected={mode === 'diff'} className={`seg-btn ${mode === 'diff' ? 'on' : ''}`} onClick={() => setMode('diff')}>改动</button>
-                    <button type="button" role="tab" aria-selected={mode === 'full'} className={`seg-btn ${mode === 'full' ? 'on' : ''}`} onClick={() => setMode('full')}>全文</button>
+                    {renderable && <button type="button" role="tab" aria-selected={mode === 'view'} className={`seg-btn ${mode === 'view' ? 'on' : ''}`} onClick={() => setMode('view')}>预览</button>}
+                    {cur.changed?.status === 'M' && <button type="button" role="tab" aria-selected={mode === 'diff'} className={`seg-btn ${mode === 'diff' ? 'on' : ''}`} onClick={() => setMode('diff')}>改动</button>}
+                    <button type="button" role="tab" aria-selected={mode === 'full' || (mode === 'diff' && cur.changed?.status !== 'M')} className={`seg-btn ${mode === 'full' || (mode === 'diff' && cur.changed?.status !== 'M') ? 'on' : ''}`} onClick={() => setMode('full')}>{renderable ? '源码' : '全文'}</button>
                   </div>
                 )}
                 {!task && cur.changed?.status !== 'D' && (
@@ -201,8 +208,10 @@ export function CodeView({ fresh = false }: { fresh?: boolean }) {
               </div>
               <motion.div key={`${cur.path}|${mode}`} className="diff-body" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.18 }}>
                 {cur.binary && <div className="pad muted">这是二进制文件（如 Word、Excel），不能逐行查看。点右上角“打开”用对应程序看。</div>}
-                {cur.tooLarge && <div className="pad muted">文件太大（超过 2 MB），这里不显示。点右上角“打开”用编辑器看。</div>}
-                {!cur.binary && !cur.tooLarge && (showDiff
+                {/* HTML 预览不用读进来（主进程直接给预览框），大文件也能看 */}
+                {mode === 'view' && renderable && (isHtml || !cur.tooLarge) ? <FileRender path={cur.path} text={cur.after ?? cur.before ?? ''} version={toolCount} />
+                  : cur.tooLarge ? <div className="pad muted">文件太大（超过 2 MB），这里不显示。点右上角“打开”用编辑器看。</div> : null}
+                {mode !== 'view' && !cur.binary && !cur.tooLarge && (showDiff
                   ? <Diff path={cur.path} before={cur.before ?? ''} after={cur.after ?? ''} />
                   : <CodeFile path={cur.path} text={cur.after ?? cur.before ?? ''} />)}
               </motion.div>

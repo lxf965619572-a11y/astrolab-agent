@@ -45,6 +45,15 @@ test('真实日志：基本任务整理为活动', () => {
   assert.ok(s.usage && s.usage.used > 10000 && s.usage.calls >= 2, `用量：${JSON.stringify(s.usage)}`)
 })
 
+test('第一条消息里 /技能名 由 DSH 附上的技能：记成一条“加载技能”，不显示成你说的话', () => {
+  const st = createActivity()
+  applyEvent(st, { type: 'user/message', time: 1, data: { source: { kind: 'user' }, content: [{ type: 'text', text: '画图' }] } })
+  applyEvent(st, { type: 'user/message', time: 2, data: { source: { kind: 'skill-invocation', name: 'info-flow', form: 'instructions' }, content: [{ type: 'text', text: '<skill_content name="info-flow">…' }] } })
+  assert.deepEqual(st.items.map((i) => i.kind), ['user', 'tools'])
+  assert.equal(st.items[1].group, 'skill')
+  assert.equal(st.items[1].calls[0].skill, 'info-flow')
+})
+
 test('真实日志：提问工具单独成条', () => {
   const st = replay('s6-ask.jsonl')
   const ask = st.items.find((i) => i.kind === 'tools' && i.group === 'ask')

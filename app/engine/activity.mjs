@@ -114,6 +114,13 @@ export function applyEvent(st, ev) {
       break
     case 'user/message': {
       const src = d.source && d.source.kind
+      // 第一条消息里写了 /技能名：DSH 在第一步之前把技能内容附上。记成一条“加载技能”，界面和“用到的”照常显示
+      if (src === 'skill-invocation') {
+        const name = String(d.source.name || '')
+        const item = add(st, { kind: 'tools', at, group: 'skill', calls: [{ callId: `inv-${name}-${at}`, name: 'skill', summary: name, skill: name, status: 'done', at, endedAt: at }] }, changed)
+        item.closed = true
+        break
+      }
       if (src !== 'user') break // 系统注入的上下文、迟到的提问回复等不显示为“你说的话”
       add(st, { kind: 'user', at, text: textOf(d.content).slice(0, MAX_TEXT) }, changed)
       break

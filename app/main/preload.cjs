@@ -71,6 +71,8 @@ contextBridge.exposeInMainWorld('astro', {
   sys: {
     titlebar: (c) => invoke('sys:titlebar', c),
     openPath: (rel) => invoke('sys:openPath', rel),
+    /** 项目里 HTML 文件的预览地址（主进程的 astro-preview: 协议，带自己的 CSP） */
+    previewUrl: (rel) => `astro-preview://project/${String(rel).split('/').map(encodeURIComponent).join('/')}?t=${Date.now()}`,
     showItem: (rel) => invoke('sys:showItem', rel),
   },
 })

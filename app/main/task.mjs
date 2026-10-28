@@ -32,6 +32,8 @@ export const STAGES = [
 /** 代码模式的类别（编码、测试、走查在项目代码上做）；其余（需求、设计、文档与图……）是任务模式 */
 export const CODE_CATEGORIES = ['编码', '测试', '走查']
 export const modeOf = (t) => (t && (t.mode === 'code' || t.mode === 'task') ? t.mode : CODE_CATEGORIES.includes(t && t.category) ? 'code' : 'task')
+/** DSH 识别的“直接调用技能”写法（dsh-tool-skill 的 SKILL_GESTURE）：小写字母、数字和连字符 */
+const SKILL_GESTURE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
 export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设计', coding: '编码', utest: '测试', review: '走查', skill: '创作', plugin: '创作' }
 const MAX_SKILLS = 3
 
@@ -251,6 +253,14 @@ export class TaskController extends EventEmitter {
       this.save()
       this.emit('notify', { level: 3, kind: 'error', title: '任务中断', body: '引擎进程意外退出，对话和已写的文件都保留，可以继续' })
     }
+    // 空闲时引擎自己退了（日志里见过：预热好的引擎没有 shutdown 就没了）：后台再热一个，下个任务不用等启动。
+    // 2 分钟内最多 3 次，免得引擎本身起不来时一直重启
+    const now = Date.now()
+    this.rewarms = (this.rewarms || []).filter((t) => now - t < 120_000)
+    if (this.rewarms.length < 3 && this.o.warm !== false) {
+      this.rewarms.push(now)
+      setTimeout(() => { if (!this.engine && !this.engineStarting && !this.stopping) this.warm() }, this.o.rewarmDelay ?? 1500)
+    }
   }
 
   // ---------- 任务 ----------
@@ -262,10 +272,17 @@ export class TaskController extends EventEmitter {
     const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。${kb}`]
     const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
     if (skills.length) {
-      parts.push(`【技能】${t.stageName}`)
-      parts.push(skills.length === 1
-        ? `请先用 skill 工具加载技能 ${skills[0]}，按技能的步骤完成。`
-        : `请先用 skill 工具依次加载技能 ${skills.join('、')}，按技能的步骤完成；几个技能的要求有冲突时先问我。`)
+      // 写成 /技能名：DSH 在第一步之前就把技能内容附到对话里（和 skill 工具返回的一样），
+      // 省掉“先调用 skill 工具加载”那一次模型往返（实测每个任务省 1～4 秒）。名字不符合 /name 写法的照旧让它加载
+      const direct = skills.filter((n) => SKILL_GESTURE.test(n))
+      const viaTool = skills.filter((n) => !SKILL_GESTURE.test(n))
+      // /名字 前后要有空白（DSH 的识别规则），所以单独占一行
+      parts.push(`【技能】${t.stageName}${direct.length ? `\n${direct.map((n) => `/${n}`).join(' ')}` : ''}`)
+      const lines = []
+      if (direct.length) lines.push(`技能内容已附在下面（${direct.join('、')}），按技能的步骤完成，不用再用 skill 工具加载；万一没有附上，再用 skill 工具加载。`)
+      if (viaTool.length) lines.push(`请先用 skill 工具加载技能 ${viaTool.join('、')}，按技能的步骤完成。`)
+      if (skills.length > 1) lines.push('几个技能的要求有冲突时先问我。')
+      parts.push(lines.join(''))
     } else {
       parts.push('【技能】未指定。先看 skill 工具列出的部门技能里有没有适合这项工作的：有就加载它并按步骤做，没有就按通用方法做；开头用一句话说明用了哪个技能（或为什么不用）。')
     }

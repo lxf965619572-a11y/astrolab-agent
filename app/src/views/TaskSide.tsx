@@ -8,8 +8,8 @@ import { useStore } from '../store'
 import type { Change, Item } from '../api'
 import { Icon } from '../components/Icon'
 import { Key } from '../components/Keys'
-import { Markdown } from '../components/Markdown'
 import { CodeFile, Diff } from '../components/Diff'
+import { FileRender, RENDERABLE } from '../components/FileRender'
 import { baseName, callLabel } from '../format'
 import { play } from '../sound'
 import { RestoreButton } from './CodeView'
@@ -158,7 +158,7 @@ function usedOf(items: Item[]) {
   return { skills: [...skills], kb, reads: [...reads], tools: [...tools.entries()] }
 }
 
-const kindOf = (p: string) => (/\.md$/i.test(p) ? 'md' : /\.(svg|png|jpe?g)$/i.test(p) ? 'img' : /\.(docx?|xlsx?|pdf)$/i.test(p) ? 'office' : /\.(c|h|cpp|hpp|py|mjs|js|ts)$/i.test(p) ? 'code' : 'other')
+const kindOf = (p: string) => (/\.md$/i.test(p) ? 'md' : /\.(svg|png|jpe?g|html?)$/i.test(p) ? 'img' : /\.(docx?|xlsx?|pdf)$/i.test(p) ? 'office' : /\.(c|h|cpp|hpp|py|mjs|js|ts)$/i.test(p) ? 'code' : 'other')
 const iconOf = (p: string) => ({ md: 'file', img: 'diagram', office: 'book', code: 'coding', other: 'file' } as Record<string, string>)[kindOf(p)]
 
 /** 接受并提交 / 恢复快照（和代码模式的提交栏同一套接口） */
@@ -201,7 +201,7 @@ function FilePreview({ path, change, toolCount, onClose }: { path: string; chang
   const ts = useStore((s) => s.ts)!
   const run = useStore((s) => s.run)
   const [f, setF] = useState<{ binary: boolean; before: string | null; after: string | null; tooLarge?: boolean } | null>(null)
-  const renderable = /\.(md|svg)$/i.test(path)
+  const renderable = RENDERABLE.test(path)
   const [mode, setMode] = useState<'view' | 'source' | 'diff'>(renderable ? 'view' : change?.status === 'M' ? 'diff' : 'source')
   useEffect(() => { setMode(renderable ? 'view' : change?.status === 'M' ? 'diff' : 'source') }, [path]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -218,7 +218,6 @@ function FilePreview({ path, change, toolCount, onClose }: { path: string; chang
     return () => { alive = false }
   }, [path, run, ts.task?.snapshot, toolCount])
   const text = f?.after ?? f?.before ?? ''
-  const svgUrl = useMemo(() => (/\.svg$/i.test(path) && text ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}` : ''), [path, text])
   return (
     <div className="fp">
       <div className="fp-head">
@@ -243,8 +242,7 @@ function FilePreview({ path, change, toolCount, onClose }: { path: string; chang
         {f?.binary && <div className="pad muted">这是 Word、Excel 这类文件，这里看不了内容。点右上角“打开”用 Office 看。</div>}
         {f?.tooLarge && <div className="pad muted">文件太大（超过 2 MB），点右上角“打开”。</div>}
         {f && !f.binary && !f.tooLarge && (
-          mode === 'view' && /\.md$/i.test(path) ? <div className="fp-md"><Markdown text={text} /></div>
-            : mode === 'view' && svgUrl ? <div className="fp-img"><img src={svgUrl} alt={baseName(path)} /></div>
+          mode === 'view' ? <FileRender path={path} text={text} version={toolCount} />
               : mode === 'diff' ? <Diff path={path} before={f.before ?? ''} after={f.after ?? ''} />
                 : <CodeFile path={path} text={text} />
         )}

@@ -216,6 +216,16 @@ try {
     check('F 内置技能（头信息加了显示字段）全部被引擎加载', lost.length === 0, lost.join('、'))
     if (extra) check(`F 真实插件 ${basename(extra)} 的技能被引擎加载`, extraSkills.length > 0 && extraSkills.every((n) => reqs.some((r) => r.text.includes(n))), extraSkills.join('、'))
     check('F 安装的技能和插件带的技能都加载了', reqs.some((r) => r.text.includes('my-marker-skill')) && reqs.some((r) => r.text.includes('crc-check-marker')) && reqs.some((r) => r.text.includes('unit-test-design')))
+    // G 第一条消息写 /技能名：DSH 在第一步之前附上技能内容，模型的第一个请求里就有，不用先调用 skill 工具
+    const n1 = llm.requests.length
+    const e1 = ev2.length
+    await eng2.prompt('G', '【技能】单元测试\n/unit-test-design\n\n技能内容已附在下面。分几步做')
+    await until(() => idle2 >= 2, 60000)
+    const gReqs = llm.requests.slice(n1)
+    const inj = ev2.slice(e1).find((e) => e.type === 'user/message' && e.data && e.data.source && e.data.source.kind === 'skill-invocation')
+    const first = gReqs[0]
+    const counts = gReqs.map((r) => (r.text.match(/Base directory for this skill: [^\n]*unit-test-design/g) || []).length)
+    check('G /技能名：第一个模型请求里已经有技能内容（省一次往返），只附一次、留在历史里', !!first && /Base directory for this skill: .*unit-test-design/.test(first.text) && counts.every((c) => c === 1) && !!inj && inj.data.source.name === 'unit-test-design', { 次数: counts.join(','), 注入事件: !!inj })
     await eng2.shutdown(5000)
   }
 } catch (e) {

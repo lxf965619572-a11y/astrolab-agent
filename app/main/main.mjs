@@ -1,8 +1,8 @@
 // AstroLab 主进程（Electron）：窗口、项目、任务控制器、与界面之间的接口（IPC）、系统通知。
 // 界面进程不接触 Node：contextIsolation + sandbox，只能调用 preload.cjs 暴露的接口；不加载任何网络内容。
 
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron'
-import { appendFileSync, existsSync, mkdirSync } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
@@ -16,6 +16,13 @@ mkdirSync(P.data, { recursive: true })
 app.setPath('userData', join(P.data, 'electron'))
 app.setAppUserModelId('AstroLab')
 const DEV_URL = process.env.ASTROLAB_DEV_URL || ''
+
+// 预览项目里的 HTML（比如信息流插件的交互版）：走单独的 astro-preview: 地址，带自己的 CSP——
+// 允许页面里的脚本，但什么网也连不了；界面用 sandbox iframe（不给 allow-same-origin）显示，碰不到工作台和 preload。
+// 不能用 srcdoc：它继承工作台的 CSP（script-src 'self'），页面里的脚本不运行。
+const PREVIEW = 'astro-preview'
+const PREVIEW_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'"
+protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW, privileges: { standard: true, secure: true } }])
 
 if (!app.requestSingleInstanceLock()) app.quit()
 
@@ -277,6 +284,10 @@ async function createWindow() {
   win.webContents.on('will-navigate', (e, url) => {
     if (!(url.startsWith('file:') || (DEV_URL && url.startsWith(DEV_URL)))) e.preventDefault()
   })
+  // 预览框里的页面只能停在预览地址上，不能跳去别的网址
+  win.webContents.on('will-frame-navigate', (e) => {
+    if (!e.isMainFrame && !e.url.startsWith(`${PREVIEW}:`) && e.url !== 'about:blank') e.preventDefault()
+  })
   win.on('close', (e) => {
     if (ctl && ctl.busy && !app.isQuitting) {
       const r = dialog.showMessageBoxSync(win, {
@@ -290,8 +301,24 @@ async function createWindow() {
   else await win.loadFile(join(P.appDir, 'dist', 'index.html'))
 }
 
+function servePreview() {
+  protocol.handle(PREVIEW, (req) => {
+    const deny = (status, text) => new Response(text, { status, headers: { 'content-type': 'text/plain; charset=utf-8' } })
+    try {
+      const u = new URL(req.url)
+      if (u.hostname !== 'project' || !ctl || !ctl.project) return deny(404, '没有打开项目')
+      const rel = decodeURIComponent(u.pathname.replace(/^\//, ''))
+      if (!/\.html?$/i.test(rel)) return deny(403, '只预览 HTML')
+      const abs = projectPath(rel)
+      if (!existsSync(abs) || statSync(abs).size > 30 * 1024 * 1024) return deny(404, '文件不存在或太大')
+      return new Response(readFileSync(abs), { headers: { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': PREVIEW_CSP, 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } })
+    } catch (e) { return deny(403, e.message) }
+  })
+}
+
 async function boot() {
   mkdirSync(P.logs, { recursive: true })
+  servePreview()
   prepareDshHome(P)
   bridge = new EngineBridge()
   await bridge.listen()

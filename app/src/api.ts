@@ -128,7 +128,7 @@ export interface AstroApi {
     submissions(): Promise<Submission[]>; pending(id: string): Promise<Pending[]>; pendingFile(id: string, ref: string, path: string): Promise<{ path: string; before: string | null; after: string | null }>
     approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string): Promise<{ branch: string; title: string; rejected: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
   }
-  sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void> }
+  sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
 }
 
 declare global { interface Window { astro?: AstroApi } }
