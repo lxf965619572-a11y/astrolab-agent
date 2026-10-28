@@ -15,6 +15,7 @@ sample/design/*/doc/
 sample/design/*/doc-*/
 evals/detailed-design/results/
 evals/preliminary-design/results/
+evals/coding/results/
 sample/design/*/src/
 sample/design/*/include/
 
@@ -28,3 +29,5 @@ cppcheck-*.msi
 # 工作台（阶段 2）
 app/node_modules/
 app/dist/
+sample/coding/*/src/
+sample/coding/*/doc/编码说明-*

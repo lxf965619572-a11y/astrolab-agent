@@ -2,8 +2,8 @@
 // 界面进程不接触 Node：contextIsolation + sandbox，只能调用 preload.cjs 暴露的接口；不加载任何网络内容。
 
 import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, statSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile } from './projects.mjs'
@@ -24,7 +24,9 @@ const PREVIEW = 'astro-preview'
 const PREVIEW_CSP = "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; base-uri 'none'; form-action 'none'"
 protocol.registerSchemesAsPrivileged([{ scheme: PREVIEW, privileges: { standard: true, secure: true } }])
 
-if (!app.requestSingleInstanceLock()) app.quit()
+// 只建快捷方式的调用（安装脚本）不占单实例锁：软件开着时也能执行
+const SHORTCUTS_ONLY = process.argv.includes('--install-shortcuts') || process.argv.includes('--remove-shortcuts')
+if (!SHORTCUTS_ONLY && !app.requestSingleInstanceLock()) app.quit()
 
 // 主进程日志：启动信息和未处理的错误，排查问题时看 <用户数据>\logs\main.log
 function mlog(...args) {
@@ -43,6 +45,8 @@ let store = null
 let ctl = null
 let lib = null
 let notes = []
+/** 启动时的提醒（打开项目时 notes 会换成项目的，这些不跟着换） */
+const bootNotes = []
 
 function send(type, payload) {
   if (win && !win.isDestroyed()) win.webContents.send('astro:event', { type, payload })
@@ -77,7 +81,7 @@ function appState() {
     stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),
     skills: lib.skillCards(),
     libraryDir: lib.sources()[0].dir,
-    notes,
+    notes: [...bootNotes, ...notes],
     task: ctl.snapshotState(),
     items: ctl.items(),
   }
@@ -214,7 +218,7 @@ function registerIpc() {
   handle('lib:pending', (id) => lib.pending(id))
   handle('lib:pendingFile', (id, ref, path) => lib.pendingFile(id, ref, path))
   handle('lib:approve', (id, ref) => lib.approve(id, ref))
-  handle('lib:reject', (id, ref) => lib.reject(id, ref))
+  handle('lib:reject', (id, ref, reason) => lib.reject(id, ref, reason))
   handle('lib:create', (kind, prompt) => createInLibrary(kind, prompt))
   handle('skills:list', () => lib.skillCards())
   handle('skills:pin', (name, on) => lib.setPinned(String(name), !!on))
@@ -319,6 +323,8 @@ function servePreview() {
 async function boot() {
   mkdirSync(P.logs, { recursive: true })
   servePreview()
+  ensureLocalEnv()
+  ensureShortcuts()
   prepareDshHome(P)
   bridge = new EngineBridge()
   await bridge.listen()
@@ -350,7 +356,42 @@ app.on('window-all-closed', async () => {
   try { if (bridge) await bridge.close() } catch { /* 同上 */ }
   app.quit()
 })
-app.whenReady().then(boot).catch((e) => {
+// ---------- 安装后：快捷方式、首次运行的设置文件 ----------
+// 任务栏图标：Windows 按 AppUserModelID 找开始菜单里同一个 ID 的快捷方式，用它的图标和名字（没有就用 exe 的，开发时是 Electron 的）。
+// 所以安装后的程序每次启动都确认开始菜单里有带 ID 和图标的快捷方式；安装脚本用 --install-shortcuts 顺带建桌面快捷方式。
+const AUMID = 'AstroLab'
+function shortcutPaths() {
+  return {
+    menu: join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'AstroLab.lnk'),
+    desktop: join(app.getPath('desktop'), 'AstroLab.lnk'),
+  }
+}
+function writeShortcut(file) {
+  const icon = join(P.appDir, 'build', 'icon.ico')
+  return shell.writeShortcutLink(file, existsSync(file) ? 'replace' : 'create', {
+    target: process.execPath, cwd: dirname(process.execPath), description: 'AstroLab 部门研发智能体工作台',
+    icon: existsSync(icon) ? icon : process.execPath, iconIndex: 0, appUserModelId: AUMID,
+  })
+}
+function ensureShortcuts({ desktop = false } = {}) {
+  if (process.platform !== 'win32' || !P.installed) return
+  const s = shortcutPaths()
+  try { mkdirSync(dirname(s.menu), { recursive: true }); if (!writeShortcut(s.menu)) mlog('开始菜单快捷方式没建好') } catch (e) { mlog('开始菜单快捷方式', e) }
+  if (desktop) { try { writeShortcut(s.desktop) } catch (e) { mlog('桌面快捷方式', e) } }
+}
+/** 安装后第一次运行：用户数据目录里还没有设置文件时从示例复制（模型地址、Key 在这里填） */
+function ensureLocalEnv() {
+  if (!P.installed || existsSync(P.localEnv) || !existsSync(P.localEnvExample)) return
+  try { mkdirSync(dirname(P.localEnv), { recursive: true }); copyFileSync(P.localEnvExample, P.localEnv); bootNotes.push(`已生成设置文件 ${P.localEnv}：填上部门模型的地址和 Key 后重启软件`) } catch (e) { mlog('local.env', e) }
+}
+// 安装 / 卸载脚本调用：只建（删）快捷方式，不开窗口
+if (SHORTCUTS_ONLY) {
+  app.whenReady().then(() => {
+    if (process.argv.includes('--remove-shortcuts')) { for (const f of Object.values(shortcutPaths())) rmSync(f, { force: true }) }
+    else ensureShortcuts({ desktop: true })
+    app.exit(0)
+  })
+} else app.whenReady().then(boot).catch((e) => {
   mlog('boot failed', e)
   dialog.showErrorBox('AstroLab 启动失败', e && e.stack ? e.stack : String(e))
   app.quit()

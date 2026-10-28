@@ -1,0 +1,135 @@
+{
+ "说明": "在参考实现上植入的典型错误。node evals/coding/mutants.mjs 检查每个变体都会被隐藏测试抓到。find 必须在参考实现中只出现一次。",
+ "mutants": [
+  {
+   "name": "累计计数而非连续（异常）",
+   "find": "        valid = 1U;\n        s->bad_cnt = 0U;",
+   "replace": "        valid = 1U;"
+  },
+  {
+   "name": "恢复计数不清零",
+   "find": "    else\n    {\n        s->good_cnt = 0U;\n        if (s->bad_cnt",
+   "replace": "    else\n    {\n        if (s->bad_cnt"
+  },
+  {
+   "name": "有效范围不含下端",
+   "find": "(raw >= ADC_MIN)",
+   "replace": "(raw > ADC_MIN)"
+  },
+  {
+   "name": "有效范围不含上端",
+   "find": "(raw <= ADC_MAX)",
+   "replace": "(raw < ADC_MAX)"
+  },
+  {
+   "name": "故障判定 2 次",
+   "find": "#define FAULT_ENTER      3U",
+   "replace": "#define FAULT_ENTER      2U"
+  },
+  {
+   "name": "恢复判定 3 次",
+   "find": "#define FAULT_LEAVE      5U",
+   "replace": "#define FAULT_LEAVE      3U"
+  },
+  {
+   "name": "回差下限用 <",
+   "find": "l->temp <= tl",
+   "replace": "l->temp < tl"
+  },
+  {
+   "name": "回差上限用 >",
+   "find": "l->temp >= th",
+   "replace": "l->temp > th"
+  },
+  {
+   "name": "按头文件注释用 ±60 ℃",
+   "find": "#define LIMIT_HIGH       500",
+   "replace": "#define LIMIT_HIGH       600"
+  },
+  {
+   "name": "范围检查先于参数检查",
+   "find": "    if (tl >= th) { return THM_ERR_PARAM; }\n    if ((tl < LIMIT_LOW) || (th > LIMIT_HIGH)) { return THM_ERR_RANGE; }",
+   "replace": "    if ((tl < LIMIT_LOW) || (th > LIMIT_HIGH)) { return THM_ERR_RANGE; }\n    if (tl >= th) { return THM_ERR_PARAM; }"
+  },
+  {
+   "name": "tl == th 被接受",
+   "find": "(tl >= th)",
+   "replace": "(tl > th)"
+  },
+  {
+   "name": "温度无效时关加热",
+   "find": "            else { /* 保持 */ }\n        }",
+   "replace": "            else { /* 保持 */ }\n        }\n        else { on = 0U; }"
+  },
+  {
+   "name": "两份无效时传感器置 0",
+   "find": "            l->temp = THM_TEMP_INVALID;\n        }",
+   "replace": "            l->temp = THM_TEMP_INVALID;\n            l->sensor = 0U;\n        }"
+  },
+  {
+   "name": "状态没变就不输出",
+   "find": "        l->heater = on;\n        thm_heater_out(ch, on);",
+   "replace": "        if (on != l->heater) { thm_heater_out(ch, on); }\n        l->heater = on;"
+  },
+  {
+   "name": "超时用 >",
+   "find": ">= HEAT_MAX_MS",
+   "replace": "> HEAT_MAX_MS"
+  },
+  {
+   "name": "超时不回绕安全",
+   "find": "((uint32_t)(thm_tick_ms() - l->heat_start) >= HEAT_MAX_MS)",
+   "replace": "(thm_tick_ms() >= (l->heat_start + HEAT_MAX_MS))"
+  },
+  {
+   "name": "超时后不锁定",
+   "find": "        if (timeout != 0U) { on = 0U; }\n",
+   "replace": ""
+  },
+  {
+   "name": "set_limits 不清超时",
+   "find": "    g_loop[ch].heat_timeout = 0U;\n",
+   "replace": ""
+  },
+  {
+   "name": "重新加热不重新计时",
+   "find": "            l->heat_start = thm_tick_ms();\n",
+   "replace": ""
+  },
+  {
+   "name": "set_limits 无临界区",
+   "find": "    key = thm_irq_save();\n    g_loop[ch].tl = tl;",
+   "replace": "    key = 0U;\n    g_loop[ch].tl = tl;"
+  },
+  {
+   "name": "get_status 先查空指针",
+   "find": "    if (ch >= THM_CH_NUM) { return THM_ERR_CH; }\n    if (st == NULL) { return THM_ERR_PARAM; }\n    l = &g_loop[ch];",
+   "replace": "    if (st == NULL) { return THM_ERR_PARAM; }\n    if (ch >= THM_CH_NUM) { return THM_ERR_CH; }\n    l = &g_loop[ch];"
+  },
+  {
+   "name": "遥测按头文件注释用异或",
+   "find": "sum = (uint8_t)(sum + buf[i]);",
+   "replace": "sum = (uint8_t)(sum ^ buf[i]);"
+  },
+  {
+   "name": "遥测小端",
+   "find": "buf[TM_TEMP_OFS + (TM_LOOP_BYTES * ch)] = (uint8_t)(t >> 8);\n        buf[TM_TEMP_OFS + 1U + (TM_LOOP_BYTES * ch)] = (uint8_t)(t & BYTE_MASK);",
+   "replace": "buf[TM_TEMP_OFS + 1U + (TM_LOOP_BYTES * ch)] = (uint8_t)(t >> 8);\n        buf[TM_TEMP_OFS + (TM_LOOP_BYTES * ch)] = (uint8_t)(t & BYTE_MASK);"
+  },
+  {
+   "name": "遥测先查长度",
+   "find": "    if (buf == NULL) { return THM_ERR_PARAM; }\n    if (len < THM_TM_LEN) { return THM_ERR_BUF; }",
+   "replace": "    if (len < THM_TM_LEN) { return THM_ERR_BUF; }\n    if (buf == NULL) { return THM_ERR_PARAM; }"
+  },
+  {
+   "name": "换算用 4095",
+   "find": "#define CONV_DIV         4096",
+   "replace": "#define CONV_DIV         4095"
+  },
+  {
+   "name": "初始化不输出",
+   "find": "        thm_heater_out(ch, 0U);\n    }\n}",
+   "replace": "    }\n}"
+  }
+ ]
+}

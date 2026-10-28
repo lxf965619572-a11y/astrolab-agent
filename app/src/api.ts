@@ -91,7 +91,7 @@ export interface CatalogItem {
   /** 我的库里的：和哪些共享库里的内容完全一样（不用再提交） */
   sameIn?: string[]
 }
-export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string }
+export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string; reason?: string; rejectedBy?: string; rejectedAt?: number }
 export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[]; superseded?: boolean }
 
 export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean }; mode?: 'task' | 'code' }
@@ -126,7 +126,7 @@ export interface AstroApi {
     catalog(): Promise<CatalogItem[]>; install(key: string): Promise<{ kind: string; name: string; restarted: boolean; skills?: SkillCard[] }>; uninstall(kind: string, name: string): Promise<{ restarted: boolean; skills?: SkillCard[] }>
     read(key: string): Promise<{ item: CatalogItem; text: string; readme: string }>; submit(key: string, target: string): Promise<{ branch: string }>
     submissions(): Promise<Submission[]>; pending(id: string): Promise<Pending[]>; pendingFile(id: string, ref: string, path: string): Promise<{ path: string; before: string | null; after: string | null }>
-    approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string): Promise<{ branch: string; title: string; rejected: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
+    approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string, reason?: string): Promise<{ branch: string; title: string; rejected: boolean; reasonSaved?: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
   }
   sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
 }

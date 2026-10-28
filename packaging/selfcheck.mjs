@@ -32,6 +32,15 @@ console.log(`安装目录：${resolve(APP, '..')}\n数据目录：${DATA}\n工�
 
 // 1 运行环境
 row('Node.js', process.versions.node.split('.')[0] >= 22 ? '通过' : '失败', `${process.version}（${process.execPath}）`)
+// 工作台（AstroLab.exe）：Electron 程序和它指向的界面代码都在
+{
+  const wb = join(APP, '..', 'workbench')
+  const exe = join(wb, process.platform === 'win32' ? 'AstroLab.exe' : 'AstroLab')
+  const main = join(APP, 'app', 'main', 'main.mjs')
+  const ui = join(APP, 'app', 'dist', 'index.html')
+  const missing = [exe, join(wb, 'resources', 'app', 'package.json'), main, ui].filter((f) => !existsSync(f))
+  row('工作台（AstroLab.exe）', missing.length ? '失败' : '通过', missing.length ? `缺少 ${missing.join('、')}` : exe)
+}
 const dv = run(process.execPath, [DSH_BIN, '--version'])
 row('DSH', dv.code === 0 ? '通过' : '失败', dv.code === 0 ? dv.out : tail(dv.out))
 const pw = run('where', ['pwsh'])

@@ -65,7 +65,7 @@ contextBridge.exposeInMainWorld('astro', {
     pending: (id) => invoke('lib:pending', id),
     pendingFile: (id, ref, path) => invoke('lib:pendingFile', id, ref, path),
     approve: (id, ref) => invoke('lib:approve', id, ref),
-    reject: (id, ref) => invoke('lib:reject', id, ref),
+    reject: (id, ref, reason) => invoke('lib:reject', id, ref, reason),
     create: (kind, prompt) => invoke('lib:create', kind, prompt),
   },
   sys: {

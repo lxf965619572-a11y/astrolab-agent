@@ -236,7 +236,14 @@ function Submissions() {
       {list.map((s) => (
         <div key={s.branch} className="lib-row">
           <span className={`pill sm ${s.status === '已通过' ? 'ok' : s.status === '待审核' ? 'run' : s.status === '已退回' ? 'err' : 'idle'}`}>{s.status}</span>
-          <span className="grow">{s.title}<span className="muted small block mono">{s.path}</span></span>
+          <span className="grow">{s.title}<span className="muted small block mono">{s.path}</span>
+            {s.status === '已退回' && (
+              <span className="reject-why">
+                {s.reason ? <><span className="strong">退回原因</span>{s.reason}</> : <span className="muted">审核人没有写原因</span>}
+                {s.rejectedBy && <span className="muted small block">{s.rejectedBy}{s.rejectedAt ? ` · ${new Date(s.rejectedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''} · 改好后重新提交即可</span>}
+              </span>
+            )}
+          </span>
           <span className="muted small">{s.library} · {new Date(s.at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
         </div>
       ))}
@@ -258,14 +265,17 @@ function Review({ sources }: { sources: LibSource[] }) {
   // 通过、退回：按钮显示进行中，完成后明确告诉结果，这一项从列表里移走
   const [deciding, setDeciding] = useState<{ ref: string; kind: 'approve' | 'reject' } | null>(null)
   const [done, setDone] = useState<{ title: string; kind: 'approve' | 'reject'; lib: string } | null>(null)
-  const decide = async (p: Pending, kind: 'approve' | 'reject') => {
+  // 退回要写原因（提交人在“我的提交”里看到）；先弹框写好再退
+  const [rejecting, setRejecting] = useState<Pending | null>(null)
+  const decide = async (p: Pending, kind: 'approve' | 'reject', reason = '') => {
     setDeciding({ ref: p.ref, kind })
-    const r = await run(async (api): Promise<{ title: string }> => (kind === 'approve' ? api.lib.approve(lib, p.ref) : api.lib.reject(lib, p.ref)), kind === 'approve' ? '合并失败' : '退回失败')
+    const r = await run(async (api): Promise<{ title: string; reasonSaved?: boolean }> => (kind === 'approve' ? api.lib.approve(lib, p.ref) : api.lib.reject(lib, p.ref, reason)), kind === 'approve' ? '合并失败' : '退回失败')
+    if (r && kind === 'reject' && r.reasonSaved === false) toast({ text: '已退回，但退回原因没能存到共享库（服务器不让推 rejected/ 分支），提交人只会看到“已退回”', tone: 'info' }, 8000)
     setDeciding(null)
     if (!r) return
     const libName = ready.find((s) => s.id === lib)?.name || lib
     play(kind === 'approve' ? 'commit' : 'tick')
-    toast({ text: kind === 'approve' ? `已通过“${p.title}”，合并进了${libName}，大家同步后就能看到` : `已退回“${p.title}”，提交人会看到“已退回”`, tone: kind === 'approve' ? 'ok' : 'info' }, 6000)
+    toast({ text: kind === 'approve' ? `已通过“${p.title}”，合并进了${libName}，大家同步后就能看到` : `已退回“${p.title}”，提交人会看到原因`, tone: kind === 'approve' ? 'ok' : 'info' }, 6000)
     setDone({ title: p.title, kind, lib: libName })
     setOpen(null)
     setFile(null)
@@ -280,7 +290,7 @@ function Review({ sources }: { sources: LibSource[] }) {
         <div className={`decided ${done.kind}`} role="status">
           <span className="decided-badge"><Icon name={done.kind === 'approve' ? 'check' : 'undo'} size={14} stroke={2.6} /></span>
           <span className="grow"><span className="strong">{done.kind === 'approve' ? '已通过' : '已退回'}</span>　{done.title}
-            <span className="muted small block">{done.kind === 'approve' ? `已合并进${done.lib}的主分支。大家打开工作台或点“同步共享库”后就能看到、安装` : '提交分支已删除，提交人在“我的提交”里会看到“已退回”'}</span></span>
+            <span className="muted small block">{done.kind === 'approve' ? `已合并进${done.lib}的主分支。大家打开工作台或点“同步共享库”后就能看到、安装` : '提交人在“我的提交”里会看到“已退回”和你写的原因；退回的内容留在共享库的 rejected/ 分支上'}</span></span>
           <Button className="chip-x" aria-label="关闭" onPress={() => setDone(null)}><Icon name="x" size={12} stroke={2.4} /></Button>
         </div>
       )}
@@ -295,13 +305,39 @@ function Review({ sources }: { sources: LibSource[] }) {
             {file && <div className="pend-diff"><Diff path={file.path} before={file.before ?? ''} after={file.after ?? ''} /></div>}
             <div className="modal-foot">
               <span className="muted small grow">插件的工具服务代码请逐行看过：会在每个安装的人电脑上运行</span>
-              <Key size="sm" isDisabled={!!deciding} onPress={() => void decide(p, 'reject')}>{deciding?.ref === p.ref && deciding.kind === 'reject' ? '退回中…' : '退回'}</Key>
+              <Key size="sm" isDisabled={!!deciding} onPress={() => setRejecting(p)}>{deciding?.ref === p.ref && deciding.kind === 'reject' ? '退回中…' : '退回…'}</Key>
               <Key size="sm" variant="primary" isDisabled={!!deciding} onPress={() => void decide(p, 'approve')}>{deciding?.ref === p.ref && deciding.kind === 'approve' ? '合并中…' : '通过'}</Key>
             </div>
           </div>)}
         </div>
       ))}
+      {rejecting && <RejectDialog item={rejecting} onCancel={() => setRejecting(null)} onConfirm={(why) => { const p = rejecting; setRejecting(null); void decide(p, 'reject', why) }} />}
     </div>
+  )
+}
+
+const REJECT_PRESETS = ['内容有误，请核对依据', '缺少适用范围或使用说明', '和已有的重复', '工具服务代码有风险（联网 / 执行外部命令 / 写项目外）', '请先补测试或示例']
+
+/** 退回原因：常用的点一下就填上，可以再改 */
+function RejectDialog({ item, onCancel, onConfirm }: { item: Pending; onCancel: () => void; onConfirm: (reason: string) => void }) {
+  const [why, setWhy] = useState(item.superseded ? '已有更新的提交，以最新的那次为准' : '')
+  return (
+    <ModalOverlay className="modal-scrim" isDismissable isOpen onOpenChange={(o) => { if (!o) onCancel() }}>
+      <Modal className="modal">
+        <Dialog className="modal-dialog" aria-label="退回原因">
+          <Heading slot="title" className="modal-title">退回“{item.title}”</Heading>
+          <p className="muted small">写清楚要改什么，提交人在“我的提交”里会看到（原因存在共享库里，换台电脑也看得到）。</p>
+          <div className="reject-presets">{REJECT_PRESETS.map((r) => <Button key={r} className="cat-chip" onPress={() => setWhy(why ? `${why}；${r}` : r)}>{r}</Button>)}</div>
+          <label className="sr-only" htmlFor="reject-why">退回原因</label>
+          <textarea id="reject-why" className="reject-input" rows={4} value={why} autoFocus placeholder="例如：第 3 步没有说明遇到 ICD 和任务书不一致时怎么办" onChange={(e) => setWhy(e.target.value)} />
+          <div className="modal-foot">
+            <span className="muted small grow">{why.trim() ? '' : '不写原因也能退回，但提交人不知道该改什么'}</span>
+            <Key size="sm" onPress={onCancel}>取消</Key>
+            <Key size="sm" variant="primary" onPress={() => onConfirm(why.trim())}>退回</Key>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
   )
 }
 

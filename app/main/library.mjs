@@ -268,6 +268,7 @@ export class Library {
     const out = []
     for (const s of subs) {
       let status = '未知'
+      const extra = {}
       try {
         const src = this.source(s.library)
         if (existsSync(join(src.dir, '.git'))) {
@@ -277,12 +278,27 @@ export class Library {
             await git(src.dir, ['fetch', '-q', 'origin', `+refs/heads/${src.branch}:refs/remotes/origin/${src.branch}`]).catch(() => {})
             const merged = (await git(src.dir, ['log', '-1', '--format=%H', `--grep=${s.branch}`, '--fixed-strings', `origin/${src.branch}`])).trim()
             status = merged ? '已通过' : '已退回'
+            if (!merged) Object.assign(extra, await this.rejection(src, s.branch))
           }
         }
       } catch { status = '查不到' }
-      out.push({ ...s, status })
+      out.push({ ...s, status, ...extra })
     }
     return out
+  }
+
+  /** 退回原因：rejected/… 分支顶上那个提交（谁、什么时候、为什么） */
+  async rejection(src, branch) {
+    const rb = rejectedBranch(branch)
+    try {
+      if (!(await git(src.dir, ['ls-remote', '--heads', 'origin', rb])).trim()) return {}
+      await git(src.dir, ['fetch', '-q', 'origin', `+refs/heads/${rb}:refs/remotes/origin/${rb}`])
+      const out = await git(src.dir, ['log', '-1', '--format=%an%x09%at%x09%B', `origin/${rb}`])
+      const [by, at, ...body] = out.split('\t')
+      const text = body.join('\t').trim()
+      const reason = text.replace(/^退回：[^\n]*\n*/, '').trim()
+      return { rejectedBy: by, rejectedAt: Number(at) * 1000, reason: reason === '（没有写原因）' ? '' : reason }
+    } catch { return {} }
   }
 
   // ---------- 审核（审核人用）----------
@@ -332,14 +348,28 @@ export class Library {
     return { branch, title: subject, merged: true }
   }
 
-  async reject(id, ref) {
+  /**
+   * 退回：提交分支 submit/<人>/<项>-<时间> 改存成 rejected/<人>/<项>-<时间>，顶上加一个空提交写退回原因
+   * （提交人：审核人；时间：退回时间）。原因跟着共享库走，提交人在自己电脑上的“我的提交”里就能看到，退回的内容也还在。
+   * 存不了（服务器不让推 rejected/ 分支）时照样退回，只是看不到原因，返回 reasonSaved: false。
+   */
+  async reject(id, ref, reason = '') {
     const s = this.source(id)
     const branch = ref.replace(/^origin\//, '')
     let title = branch
     try { title = (await git(s.dir, ['log', '-1', '--format=%s', ref])).trim() } catch { /* 分支已不在 */ }
+    const why = String(reason || '').trim().slice(0, 2000)
+    let reasonSaved = false
+    try {
+      const tree = (await git(s.dir, ['rev-parse', `${ref}^{tree}`])).trim()
+      const msg = `退回：${title}\n\n${why || '（没有写原因）'}`
+      const sha = (await git(s.dir, [...(await this.gitId()), 'commit-tree', tree, '-p', ref, '-m', msg])).trim()
+      await git(s.dir, ['push', '-q', 'origin', `${sha}:refs/heads/${rejectedBranch(branch)}`])
+      reasonSaved = true
+    } catch { /* 原因没存上：下面照样退回 */ }
     await git(s.dir, ['push', '-q', 'origin', '--delete', branch])
     await git(s.dir, ['fetch', '-q', '--prune', 'origin', '+refs/heads/submit/*:refs/remotes/origin/submit/*']).catch(() => {})
-    return { branch, title, rejected: true }
+    return { branch, title, rejected: true, reasonSaved }
   }
 
   // ---------- 技能与插件 ----------
@@ -515,6 +545,9 @@ export class Library {
 }
 
 export { isRepo }
+
+/** submit/<人>/<项>-<时间> → rejected/<人>/<项>-<时间> */
+export const rejectedBranch = (b) => b.replace(/^submit\//, 'rejected/')
 
 // ---------- 文件夹工具 ----------
 const SKIP = /^(node_modules|\.utest|\.git)$/
