@@ -62,7 +62,8 @@ function fenceRoots(env) {
   const up = (f, n) => { let d = f; for (let i = 0; i < n; i++) d = dirname(d); return d }
   const exe = (f, n) => (f && /[\\/]/.test(f) ? up(f, n) : null)
   return {
-    readRoots: lib.skillDirs(),
+    // 技能目录；utest 的测试框架头文件 utest.h（技能让智能体按 toolchain_info 给的路径去读）
+    readRoots: [...lib.skillDirs(), join(P.root, 'mcp', 'utest', 'harness')],
     toolRoots: [exe(P.nodePath, 1), exe(env.UTEST_CC, 2), exe(env.CPPCHECK_PATH, 1), P.tools, join(P.root, 'runtime', 'dsh')],
   }
 }

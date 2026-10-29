@@ -178,6 +178,8 @@
       config:
         readRoots:
           - !!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent').replace(/\\\\/g, '/') + '/skills'"
+          # utest 的测试框架头文件 utest.h（单元测试技能让智能体按 toolchain_info 给的路径去读）
+          - !!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent').replace(/\\\\/g, '/') + '/mcp/utest/harness'"
         toolRoots:
           - !!js "process.getBuiltinModule('node:path').dirname(process.execPath)"
           - !!js "process.env.UTEST_CC ? process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:path').dirname(process.env.UTEST_CC)) : ''"
