@@ -288,7 +288,11 @@ export class TaskController extends EventEmitter {
     }
     parts.push(`【要求】${t.prompt}`)
     if (t.files && t.files.length) parts.push(`【相关文件】\n${t.files.map((f) => `- ${f}`).join('\n')}`)
-    if (t.options && t.options.report === false && t.reportable !== false) parts.push('这次不需要生成 Word 报告。')
+    // 发起页的“生成 Word”开关：技能都写“用户要求时才生成 Word”，所以开着要明说；任务描述里自己提了 Word 的，以描述为准
+    if (t.options && t.reportable !== false && !/word|docx/i.test(t.prompt || '')) {
+      if (t.options.report === true) parts.push('完成后按部门模板生成 Word（先 mcp__docgen__list_templates 选模板，再 mcp__docgen__render_docx）。')
+      else if (t.options.report === false) parts.push('这次不需要生成 Word 报告。')
+    }
     return parts.join('\n\n')
   }
 

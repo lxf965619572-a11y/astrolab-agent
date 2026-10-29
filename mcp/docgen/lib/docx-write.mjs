@@ -172,7 +172,8 @@ function blockXml(blocks, ctx) {
         if (/^mermaid$/i.test(b.lang || '')) {
           // Mermaid 流程图 → Word 图形；不支持的写法退回为代码块
           const n = ++ctx.stats.flowcharts
-          const r = renderFlowchart(b.text, { maxWidthPt: ctx.textWidth / 20, ids: ctx.drawingIds, name: `流程图 ${n}` })
+          // 高度留出图题和前后段落的位置（约 90%）
+          const r = renderFlowchart(b.text, { maxWidthPt: ctx.textWidth / 20, maxHeightPt: (ctx.textHeight * 0.9) / 20, ids: ctx.drawingIds, name: `流程图 ${n}` })
           if (r.ok) {
             out += `<w:p>${pPr({ style: st.body, keepNext: true, spacing: SINGLE, ind: NO_INDENT, jc: 'center' })}<w:r>${r.xml}</w:r></w:p>`
             for (const w of r.warnings) ctx.flowWarnings.push(`第 ${n} 个流程图：${w}`)
@@ -409,6 +410,7 @@ export function renderDocx(templateBuf, markdown, opts = {}) {
     numbersMatch: true,
     missing: new Set(),
     textWidth: 8306,
+    textHeight: 13958, // A4 竖排、上下页边距各 2.54 cm；按模板的页面设置改
   }
   const notes = []
 
@@ -448,6 +450,9 @@ export function renderDocx(templateBuf, markdown, opts = {}) {
     const l = Number(mar?.attrs['w:left'])
     const r = Number(mar?.attrs['w:right'])
     if (w && !Number.isNaN(l) && !Number.isNaN(r)) ctx.textWidth = Math.max(3000, w - l - r - Number(mar?.attrs['w:gutter'] || 0))
+    const h = Number(pg?.attrs['w:h'])
+    const t = Math.abs(Number(mar?.attrs['w:top'])), bt = Math.abs(Number(mar?.attrs['w:bottom']))
+    if (h && !Number.isNaN(t) && !Number.isNaN(bt)) ctx.textHeight = Math.max(3000, h - t - bt)
   }
 
   const content = fragment(blockXml(blocks, ctx))

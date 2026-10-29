@@ -107,6 +107,13 @@ test('按技能发起：记下技能和类别；没选技能时让智能体自�
   assert.equal(b.mode, 'task', '文档与图属于任务模式')
   assert.doesNotMatch(b.firstMessage, /Word 报告/, '不出报告的技能不提报告')
   await until(() => ctl.status === 'done')
+  // “生成 Word”开关：开着要明说（技能都写“用户要求时才生成”）；任务描述里自己提了 Word 的以描述为准，开关不再加话
+  const r1 = await ctl.start({ skills: ['unit-test-design'], prompt: '测试 rt_reset', files: [], options: { report: true } })
+  assert.match(r1.firstMessage, /按部门模板生成 Word/)
+  await until(() => ctl.status === 'done')
+  const r2 = await ctl.start({ skills: ['unit-test-design'], prompt: '测试 rt_reset，并生成 Word', files: [], options: { report: false } })
+  assert.doesNotMatch(r2.firstMessage, /不需要生成 Word|按部门模板生成 Word/, '和任务描述冲突时不加')
+  await until(() => ctl.status === 'done')
   const c = await ctl.start({ prompt: '帮我看看这个工程', files: [], options: {}, mode: 'code' })
   assert.equal(c.mode, 'code', '在代码模式发起的通用任务属于代码模式')
   assert.equal(c.stage, 'general')

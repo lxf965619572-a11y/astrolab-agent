@@ -364,14 +364,16 @@ function para(text, sz) {
 
 /**
  * 返回放在 <w:r> 中的 XML（mc:AlternateContent 包裹的 w:drawing）。
- * maxWidthPt：页面可用宽度，超过时整体按比例缩小，文字同比缩小（最小 7 磅）。
+ * maxWidthPt：页面可用宽度；maxHeightPt：页面可用高度（不能跨页：一页放不下时 Word 会把图形挤出页面，
+ * LibreOffice 会把图框和文字分到两页）。超过任一项时整体按比例缩小，文字同比缩小（最小 7 磅）。
  * ids：{ next() } 生成文档内唯一的图形编号
  */
-export function flowchartToDrawing(layout, { maxWidthPt = 450, ids, name = '流程图' } = {}) {
+export function flowchartToDrawing(layout, { maxWidthPt = 450, maxHeightPt = 650, ids, name = '流程图' } = {}) {
   let seq = 0
   const nextId = () => (ids ? ids.next() : 1000 + ++seq)
   const { width: W, height: H } = layout
-  const scale = W > maxWidthPt ? maxWidthPt / W : 1
+  const scale = Math.min(1, maxWidthPt / W, maxHeightPt / H)
+  const byHeight = H * (maxWidthPt / W) > maxHeightPt && maxHeightPt / H < 1
   const fsz = Math.max(14, Math.round(FONT * 2 * scale))
   const lsz = Math.max(12, Math.round(16 * scale))
   const line = '<a:ln w="9525"><a:solidFill><a:srgbClr val="000000"/></a:solidFill></a:ln>'
@@ -408,7 +410,7 @@ export function flowchartToDrawing(layout, { maxWidthPt = 450, ids, name = '流�
     '<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.microsoft.com/office/word/2010/wordprocessingGroup">' +
     `<wpg:wgp><wpg:cNvGrpSpPr/><wpg:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/><a:chOff x="0" y="0"/><a:chExt cx="${emu(W)}" cy="${emu(H)}"/></a:xfrm></wpg:grpSpPr>${kids}</wpg:wgp>` +
     '</a:graphicData></a:graphic></wp:inline></w:drawing></mc:Choice></mc:AlternateContent>'
-  return { xml, scaled: scale < 1, scale, tooSmall: FONT * 2 * scale < 14 }
+  return { xml, scaled: scale < 1, scale, byHeight, tooSmall: FONT * 2 * scale < 14 }
 }
 
 // —— 输出 SVG（预览和检查用）——
@@ -452,7 +454,8 @@ export function renderFlowchart(src, opts) {
   if (!structural && noOut.length && !noOut.some((n) => n.shape === 'terminal')) warnings.push('没有“结束/返回”节点')
   const layout = layoutFlowchart(g)
   const v = flowchartToDrawing(layout, opts)
-  if (v.tooSmall && structural) warnings.push(`结构图（如调用关系图）宽度约为页面的 ${Math.round(100 / v.scale)}%，缩小后文字可能溢出图框；建议改用“调用者 | 被调用函数”表格，或按调用者拆成几张图`)
+  if (v.byHeight) warnings.push(`流程图高度超过一页，已整体缩小到 ${Math.round(v.scale * 100)}%${v.tooSmall ? '，文字可能溢出图框' : ''}；建议拆成几张图（如主循环按任务拆，每张图一个子流程），或把顺序执行的几步合成一个框`)
+  else if (v.tooSmall && structural) warnings.push(`结构图（如调用关系图）宽度约为页面的 ${Math.round(100 / v.scale)}%，缩小后文字可能溢出图框；建议改用“调用者 | 被调用函数”表格，或按调用者拆成几张图`)
   else if (v.tooSmall) warnings.push(`流程图宽度约为页面的 ${Math.round(100 / v.scale)}%，缩小后文字可能溢出图框；建议减少并列分支，或缩短框内文字`)
   else if (v.scaled) warnings.push(`流程图宽度超过页面，已整体缩小到 ${Math.round(v.scale * 100)}%（文字同比缩小）`)
   return { ok: true, xml: v.xml, svg: flowchartToSvg(layout), warnings, nodes: g.nodes.length, edges: g.edges.length }

@@ -291,7 +291,10 @@ function LiveRow() {
   const cur = ts.summary.current
   const text = ts.status === 'starting'
     ? (ts.engine?.state === 'starting' ? '正在启动引擎（加载工具服务和技能，第一次启动可能要一两分钟）。现在就可以在下面补充要求' : '正在把任务交给智能体')
-    : cur?.kind === 'thinking' ? '思考中' : nowLabel(cur) || '思考中'
+    : cur?.kind === 'thinking'
+      // 引擎（DSH sdk 模式）不逐字推送，模型一口气写长文档时这里只能看到“思考中”；超过 1 分钟时说明原因，免得以为卡住了
+      ? (now - cur.since > 60_000 ? '还在生成，可能在写较长的内容（这一步写完才能显示出来）' : '思考中')
+      : nowLabel(cur) || '思考中'
   return (
     <div className="act-row live">
       <span className="act-icon"><span className="led" /></span>
