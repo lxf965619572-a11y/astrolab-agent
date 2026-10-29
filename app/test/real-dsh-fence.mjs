@@ -67,7 +67,7 @@ const bridge = new EngineBridge()
 await bridge.listen()
 const patch = writeEnginePatch(join(home, 'engine'), { skillDirs: [skills], readFence: { readRoots: [skills], toolRoots: [dirname(process.execPath), dirname(DSH)], log: true } })
 const env = {
-  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', ASTROLAB_BRIDGE: bridge.path,
+  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_TELEMETRY_MODE: 'DISABLED', ASTROLAB_BRIDGE: bridge.path,
   DEPT_LLM_BASE_URL: `http://127.0.0.1:${llm.port}`, DEPT_LLM_API_KEY: 'fake', DEPT_LLM_MODEL: 'deepseek-flash',
   ASTROLAB_LIBRARIES: '[]', NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
 }

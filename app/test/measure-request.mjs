@@ -27,7 +27,7 @@ await bridge.listen()
 // ASTROLAB_TRIM=0 量精简前的样子
 const patch = writeEnginePatch(join(home, 'engine'), { skillDirs: [join(ROOT, 'skills')], trim: process.env.ASTROLAB_TRIM !== '0', readFence: { readRoots: [join(ROOT, 'skills')] } })
 const env = {
-  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', ASTROLAB_BRIDGE: bridge.path,
+  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_TELEMETRY_MODE: 'DISABLED', ASTROLAB_BRIDGE: bridge.path,
   DEPT_LLM_BASE_URL: `http://127.0.0.1:${llm.port}`, DEPT_LLM_API_KEY: 'fake', DEPT_LLM_MODEL: 'deepseek-flash',
   ASTROLAB_LIBRARIES: JSON.stringify([{ id: 'mine', name: '我的库', dir: libDir, writable: true }]),
   NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',

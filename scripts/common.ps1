@@ -55,3 +55,25 @@ function Remove-StaleSkillCopies {
         if (Test-Path $p) { Remove-Item -Recurse -Force $p; Write-Ok "已删除旧副本 runtime\dsh-home\skills\$($d.Name)" }
     }
 }
+
+# 不往外发数据（DSH 0.2.1 默认开的上传，见 dsh-dept\试点记录-20261029.md 第 3 节）。
+# 会话遥测认的是 DSH_TELEMETRY_MODE；DSH_TELEMETRY_DISABLED 它不认，留着无害。补丁里也关了（config\cordis.patch.yml.template）
+function Set-DshPrivacyEnv {
+    $env:DSH_TELEMETRY_MODE = 'DISABLED'
+    $env:DSH_TELEMETRY_DISABLED = '1'
+}
+
+# 网页界面的产品埋点：只在 web profile 里有，追加到它自己的用户层 runtime\dsh-home\profiles\web\cordis.patch.yml。
+# DSH 只在文件不存在时才生成用户层，先写好不影响它；文件里已有的内容（界面保存的设置）原样保留
+function Set-WebProfilePrivacy {
+    $dir = Join-Path $DshHome 'profiles\web'
+    $p = Join-Path $dir 'cordis.patch.yml'
+    $block = [IO.File]::ReadAllText((Join-Path $Root 'config\web-profile.patch.yml'), [Text.Encoding]::UTF8)
+    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    $cur = ''
+    if (Test-Path $p) { $cur = [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8) }
+    if ($cur -match '(?m)^- id: product-analytics\s*$') { return }
+    $cur = ($cur -replace '(?m)^\[\]\s*$', '').TrimEnd()
+    if ($cur) { $cur += "`n" }
+    [IO.File]::WriteAllText($p, $cur + $block, (New-Object Text.UTF8Encoding $false))
+}

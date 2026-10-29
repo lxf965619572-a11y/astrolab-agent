@@ -13,7 +13,8 @@ $Workspace = (Resolve-Path $Workspace).Path
 
 Import-LocalEnv
 $env:DSH_HOME = $DshHome
-$env:DSH_TELEMETRY_DISABLED = '1'
+Set-DshPrivacyEnv
+Set-WebProfilePrivacy
 if (-not $env:DEEPSEEK_API_KEY) { Write-Warn2 'config\local.env 中没有 DEEPSEEK_API_KEY，界面能打开但模型无法回答。' }
 if (-not $env:DEPT_LLM_API_KEY -and $env:DEEPSEEK_API_KEY) { $env:DEPT_LLM_API_KEY = $env:DEEPSEEK_API_KEY }
 if ($env:DEPT_LLM_BASE_URL) { Write-Ok "部门模型地址：$($env:DEPT_LLM_BASE_URL)" }

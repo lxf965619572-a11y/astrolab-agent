@@ -79,6 +79,7 @@ async function main() {
   loadLocalEnv()
   process.env.DSH_HOME = process.env.DSH_HOME || path.join(ROOT, 'runtime', 'dsh-home')
   process.env.DSH_TELEMETRY_DISABLED = '1'
+  process.env.DSH_TELEMETRY_MODE = 'DISABLED' // DSH 0.2.1 的会话遥测认这个
   opt.dshBin = process.env.DSH_BIN || path.join(ROOT, 'runtime', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
   if (!fs.existsSync(opt.dshBin)) { console.error(`找不到 DSH：${opt.dshBin}，请先运行 scripts\\setup.ps1`); process.exit(1) }
   if (!process.env.DEEPSEEK_API_KEY) { console.error('config\\local.env 中没有 DEEPSEEK_API_KEY'); process.exit(1) }

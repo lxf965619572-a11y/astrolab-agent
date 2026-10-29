@@ -17,6 +17,7 @@ $env:ASTROLAB_HOME = $Base
 $env:ASTROLAB_DATA = $Data
 $env:DSH_HOME = Join-Path $Data 'dsh-home'
 $env:DSH_TELEMETRY_DISABLED = '1'
+$env:DSH_TELEMETRY_MODE = 'DISABLED'   # session telemetry reads this one (DSH 0.2.1 ignores DSH_TELEMETRY_DISABLED)
 New-Item -ItemType Directory -Force -Path $env:DSH_HOME | Out-Null
 
 # Settings: %LOCALAPPDATA%\AstroLab\local.env (created from the example on first run)

@@ -55,7 +55,7 @@ else {
 Write-Step 'DSH 组合配置'
 if (Test-Path $DshBin) {
     $env:DSH_HOME = $DshHome
-    $env:DSH_TELEMETRY_DISABLED = '1'
+    Set-DshPrivacyEnv
     $dump = & node $DshBin --profile web --dump-config 2>$null | Out-String
     foreach ($id in @('mcp-cppcheck', 'mcp-docreader', 'mcp-docgen', 'mcp-utest')) {
         if ($dump -match "id: $id") { Write-Ok "已加载 $id" } else { Write-Fail "组合配置中没有 $id，重新运行 setup.ps1 或检查 runtime\dsh-home\cordis.patch.yml"; $bad++ }
@@ -71,6 +71,19 @@ if (Test-Path $DshBin) {
         $stale = Join-Path $DshHome "skills\$($d.Name)"
         if (Test-Path $stale) { Write-Warn2 "Skill：$($d.Name)（runtime\dsh-home\skills 下还有以前复制的旧副本，运行一次 setup.ps1 删除）" }
         else { Write-Ok "Skill：$($d.Name)" }
+    }
+    # 不往外发数据：DSH 默认开的几处上传都要关上（只看组合结果，不改配置）
+    $privacy = [ordered]@{
+        'product-analytics'         = 'disabled:\s*true'
+        'desktop-product-telemetry' = 'disabled:\s*true'
+        'session-telemetry-otel'    = 'mode:\s*DISABLED'
+        'session-log-deepseek'      = 'enabled:\s*false'
+    }
+    foreach ($id in $privacy.Keys) {
+        $m = [regex]::Match($dump, '(?ms)^- id: ' + [regex]::Escape($id) + '\s*$(.*?)(?=^- id: |^# ==|\z)')
+        if (-not $m.Success) { Write-Ok "不往外发：本配置没有 $id" }
+        elseif ($m.Groups[1].Value -match $privacy[$id]) { Write-Ok "不往外发：$id 已关" }
+        else { Write-Fail "不往外发：$id 没有关上，重新运行 setup.ps1"; $bad++ }
     }
 }
 

@@ -79,6 +79,21 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 
 （Linux 上量的，缺 cppcheck、docreader、docgen 三个工具服务；前后同一配置，差值可比。每一步都重发这些定义，越短越省上下文和预填充时间。）
 
+## Git 防护
+
+智能体不能自己提交、建分支或改引用；人照常用自己的 Git 工具或审核页提交。
+
+- 钩子 `git-hooks/reference-transaction`：在任何引用更新（提交、建分支、reset、stash 等）之前运行，`--no-verify` 跳不过。判断依据是 DSH 给智能体的每条命令行都设的 `DSH_SHELL=1`、`DSH_SESSION_ID`；工作台自己的 Git 操作带 `DEPT_UI_GIT=1` 放行。和 `dsh-dept` 共用同一份钩子（LF 换行，见 `.gitattributes`）。
+- 加入项目时安装（`main/git.mjs` 的 `installGuardHook`）；旧版本的钩子按内容摘要认出来自动升级。仓库已有别的同名钩子、或设了共用钩子目录 `core.hooksPath` 时不动，界面提示原因。
+- 防误操作，不防恶意：在命令里清掉这些变量就能绕过。钩子也挡不住 `reset --hard` 这类丢弃未提交改动的命令，所以每个任务前记快照。
+- 测试：`npm test` 里的 `git.test.mjs`（智能体提交和建分支被拦、人和界面的提交正常、旧钩子升级、别人的钩子不动）。
+
+## 不往外发数据
+
+- sdk 模式没有 DSH 的产品埋点插件。
+- 会话遥测（点赞、点踩时上传会话）：`paths.mjs` 设 `DSH_TELEMETRY_MODE=DISABLED`，引擎补丁里 `session-telemetry-otel` 也设 `mode: DISABLED`。
+- 官方 API 请求附带的会话日志（`session-log-deepseek`）：补丁里 `enabled: false`。只在走官方 DeepSeek 路由时才会发，工作台用 dept-llm，这是双保险。查过 AstroLab 的 10 个会话，没有发生过。
+
 ## 插话、停止和引擎启动
 
 - 插话：经引擎桥 steer，在智能体的下一步之前送到（sdk 的 session/prompt 要等整轮做完才看到）
@@ -86,8 +101,9 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 - 引擎：打开项目时在后台启动（冷启动要等工具服务和技能加载完，实测第一次超过 1 分钟），任务之间共用；状态栏显示引擎状态
 - 主进程日志 `logs\main.log` 记录引擎每次启动用时和引擎桥连接
 
-## 已知限制（M1）
+## 已知限制
 
-- 只有浅色主题；命令面板（Ctrl K）、`@` 引用文件的弹出提示还没做
-- 一次只运行一个任务（运行中可以切到其他环节，先写好下一个任务）；越界操作的“把该目录加入项目”按钮还没接
+- 命令面板（Ctrl K）、`@` 引用文件的弹出提示还没做
+- 一次只运行一个任务（运行中可以切到别处，先写好下一个任务）；越界操作提示里说的“把该目录加入项目”还没有按钮
 - 审核里的疑似缺陷清单需要技能输出结构化结果，现在显示智能体最后一条回复
+- 评测页、Word 模板配置、更新、诊断包（需求规格说明 G3、G4 的部分）还没做；整体进度见仓库根目录的 `项目上下文.md`

@@ -1,0 +1,7 @@
+# ── 不往外发数据：产品埋点（设备号、用户号、硬件信息）──
+# 这两个插件只在 web、desktop profile 里有，放进对所有 profile 生效的 cordis.patch.yml.template 会让命令行 profile 报 entry not found，
+# 所以由 scripts\common.ps1 的 Set-WebProfilePrivacy 追加到 runtime\dsh-home\profiles\web\cordis.patch.yml（网页界面自己的用户层）
+- id: product-analytics
+  disabled: true
+- id: desktop-product-telemetry
+  disabled: true

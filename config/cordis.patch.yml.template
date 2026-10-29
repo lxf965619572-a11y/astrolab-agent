@@ -94,3 +94,13 @@
             reasoningEfforts:
               'off':
               high: high
+
+# ── 不往外发数据：DSH 0.2.1 默认开、所有 profile 都有的两处（DSH 官方桌面端试点里核对过） ──
+# 会话遥测：默认 FEEDBACK_ONLY，点赞、点踩、评分时把截至那时的整段会话上传到 DeepSeek。DISABLED 不建任何传输
+- id: session-telemetry-otel
+  config:
+    mode: DISABLED
+# 用官方 DeepSeek 模型路由时，每次请求附带完整的会话事件记录（含读到的文件内容，每次最多 8 MiB）
+- id: session-log-deepseek
+  config:
+    enabled: false

@@ -54,7 +54,7 @@ const bridge = new EngineBridge()
 await bridge.listen()
 const patch = writeEnginePatch(join(home, 'engine'))
 const env = {
-  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DEPT_LLM_API_KEY: 'fake', ASTROLAB_BRIDGE: bridge.path,
+  ...process.env, DSH_HOME: home, DSH_TELEMETRY_DISABLED: '1', DSH_TELEMETRY_MODE: 'DISABLED', DEPT_LLM_API_KEY: 'fake', ASTROLAB_BRIDGE: bridge.path,
   NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
 }
 delete env.ELECTRON_RUN_AS_NODE

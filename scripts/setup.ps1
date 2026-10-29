@@ -51,7 +51,9 @@ New-Item -ItemType Directory -Force -Path $DshHome | Out-Null
 $rootFwd = $Root -replace '\\', '/'
 $tpl = Get-Content -Raw -Encoding UTF8 (Join-Path $Root 'config\cordis.patch.yml.template')
 [IO.File]::WriteAllText((Join-Path $DshHome 'cordis.patch.yml'), $tpl.Replace('__STARTER_DIR__', $rootFwd), (New-Object Text.UTF8Encoding $false))
-Write-Ok 'cordis.patch.yml（注册 cppcheck、docreader、docgen、utest 四个 MCP 服务；Skill 目录指向本工程的 skills）'
+Write-Ok 'cordis.patch.yml（注册 MCP 服务；Skill 目录指向本工程的 skills；关掉会话遥测和会话日志上传）'
+Set-WebProfilePrivacy
+Write-Ok 'profiles\web\cordis.patch.yml（关掉网页界面的产品埋点）'
 # 部门 Skills：DSH 通过 cordis.patch.yml 中的 customSkillDirs 直接读取本工程的 skills 目录，不再复制。
 # 以前版本复制到 runtime\dsh-home\skills 的旧副本会和工程中的同名 Skill 重复，这里删除（只删工程中有同名目录的）。
 Remove-StaleSkillCopies

@@ -1,5 +1,7 @@
 # 部门智能体入门工程（笔记本开发测试用）
 
+> **2026-10-29 起的读法：**部门用户用的是 **AstroLab 工作台**（`app/`，说明见 [app/README.md](app/README.md)），装在每台开发机上，离线安装包见 [packaging/README.md](packaging/README.md)。本文写的是工作台底下共用的那一层：技能、工具服务、示例和评测；“三步跑起来”的 DSH 网页界面路线现在只用来开发调试技能和工具服务。项目现状、关键决定和待办见 [项目上下文.md](项目上下文.md)。
+
 在一台 Windows 笔记本上把 DSH（DeepSeek Harness）跑起来，并接入部门工具（Cppcheck 静态分析、Word/Excel/PDF 文档读取、按 Word 模板生成文档、单元测试编译运行与覆盖率统计）和部门 Skill（代码走查、需求分析、概要设计、详细设计、单元测试设计）。这是《部门级智能体落地实施方案》中“领域能力层”的最小样板，以后的 Skill 和 MCP 服务都按同样的方式添加。
 
 > **注意：**现阶段接的是 DeepSeek 官方 API，代码会发送到云端。只能用 `sample` 里的示例代码或非敏感代码测试，**不要打开任何型号的真实代码**。以后切到内网模型只需改一行配置（见最后一节）。
@@ -8,7 +10,12 @@
 
 ```text
 astrolab-agent/
-├── scripts/            安装、自检、启动、评测脚本（PowerShell）
+├── app/                AstroLab 工作台（Electron + React，引擎是 DSH sdk 模式），见 app/README.md
+├── packaging/          离线安装包：打包、安装、自检、Windows 沙盒验证
+├── spike/sdk/          阶段 0 的 sdk 模式技术验证（最小界面、S1～S6 场景）
+├── dsh-dept/           DSH 官方桌面端的部门组合包（试点，并行维护，见其中的试点记录）
+├── 项目上下文.md        项目现状、关键决定、规矩、待办（接手先看这个）
+├── scripts/            安装、自检、启动、评测脚本（PowerShell；DSH 网页界面路线）
 ├── config/
 │   ├── local.env.example        本地环境变量模板（API Key 等）
 │   ├── cordis.patch.yml.template  DSH 部门补丁模板（注册 MCP 服务）
@@ -17,7 +24,10 @@ astrolab-agent/
 ├── mcp/docreader/      文档读取 MCP 服务：Word/Excel/PDF 转 Markdown（只读）
 ├── mcp/docgen/         文档生成 MCP 服务：Markdown 套 Word 模板生成 .docx，表格导出 .xlsx
 ├── mcp/utest/          单元测试 MCP 服务：主机上编译运行手写驱动/桩或 gtest，gcov 统计语句、分支、MC/DC 覆盖率
+├── mcp/knowledge/      知识库 MCP 服务：在我的库和共享库里检索、读取经验条目，记经验草稿（工作台用）
 ├── mcp/common/         上面几个服务共用的 ZIP/XML/路径模块（只用 Node 自带模块）
+├── skills/coding/               编码 Skill（按详细设计写代码、提出矛盾、编译和静态检查、编码说明，含自查脚本）
+├── skills/skill-authoring/、plugin-authoring/  和用户一起做技能、做插件（工作台的“创作”用）
 ├── skills/code-walkthrough/     代码走查 Skill（含检查表）
 ├── skills/requirements-analysis/ 需求分析 Skill（检查表、质量规则、报告格式、GJB 438B SRS 章节要求）
 ├── skills/preliminary-design/   概要设计 Skill（文档结构、体系结构检查表、时序分析方法、流程图写法、检查脚本）
@@ -27,7 +37,9 @@ astrolab-agent/
 ├── sample/docs/        示例软件研制任务书（虚构，.docx 由同名 .md 生成），埋了 20 个需求问题
 ├── sample/design/      设计示例（虚构）：tcu 热控单元软件（概要设计的输入）；oc_ctrl OC 指令输出（详细设计的输入）
 ├── sample/utest/       单元测试示例模块（虚构）：cmd_check 指令检查（6 个缺陷）、uart_drv 串口驱动（7 个缺陷）、rt1553 1553B RT 通信（两个单元，9 个缺陷），各含详细设计
+├── sample/coding/      编码示例（虚构）：thm_ctrl 加热回路控制的详细设计和头文件（头文件里埋了与设计矛盾的地方）
 ├── evals/              代码走查评测集（8 个用例、29 个缺陷）与自动打分
+│   ├── coding/                 编码评测：隐藏测试、参考实现、变体、答案表、评分脚本
 │   ├── requirements-analysis/  示例任务书的埋入问题对照表（人工对照用）
 │   ├── preliminary-design/     概要设计评测：答案表、参考概要设计
 │   ├── detailed-design/        详细设计评测：答案表、逆向模式用的代码、参考详细设计
@@ -63,6 +75,8 @@ powershell -ExecutionPolicy Bypass -File scripts\start-web.ps1
 ```
 
 自检全部 `[OK]` 后再启动。启动窗口不要关，关掉即停止服务。
+
+启动脚本会关掉 DSH 默认的数据上传：产品埋点（设备号、用户号、硬件信息）、会话遥测（点赞、点踩时上传会话）、用官方模型时附带的会话日志；`check.ps1` 的“DSH 组合配置”一步逐项检查。**对话内容本身仍然发给云端模型，所以照样只能用示例代码。**
 
 ## 试一试
 
@@ -265,7 +279,7 @@ powershell -ExecutionPolicy Bypass -File scripts\run-evals.ps1 -Parallel 2 -Labe
 
 在界面左侧添加另一个文件夹作为工作区即可。工作区是智能体可以**写**的目录（默认沙箱模式：只能写工作区，越界写入会弹出审批）。
 
-> **注意：读取不受工作区限制。**DSH 的沙箱只限制写入，不限制读取：智能体可以列出和读取当前 Windows 用户能访问的任何文件（第一次测试中它就列出了“文档”“桌面”“下载”和 D 盘的目录）。使用云端 API 时，这些内容会随对话发送到云端。所以笔记本上有敏感资料时不要用云端 API 测试；正式部署时靠“一用户一容器、只挂载授权目录”来限制读取范围。
+> **注意：读取不受工作区限制。**DSH 的沙箱只限制写入，不限制读取：智能体可以列出和读取当前 Windows 用户能访问的任何文件（第一次测试中它就列出了“文档”“桌面”“下载”和 D 盘的目录）。使用云端 API 时，这些内容会随对话发送到云端。所以笔记本上有敏感资料时不要用云端 API 测试。AstroLab 工作台加了读取围栏（只读得到工作区、技能目录、临时目录和工具链目录，见 [app/README.md](app/README.md) 的“读取范围和精简”），网页界面路线没有。
 
 ## 怎么扩展
 
@@ -305,7 +319,9 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 模型说“工作区下没有 src”，然后到处找文件 | 会话开在了默认工作区。在界面左侧添加 `sample` 文件夹作为工作区，在其中新建会话 |
 | 想清空所有会话重新开始 | 停止服务后删除 `runtime\dsh-home\sessions` |
 
-## 当前进度（2026-10-25）
+## 当前进度（2026-10-29）
+
+按需求规格说明关口的整体进度和待办见 [项目上下文.md](项目上下文.md) 第 7、8 节。下表是各环节技能的情况。
 
 | 环节 | Skill | 工具 | 示例和评测 | 状态 |
 |---|---|---|---|---|
@@ -313,9 +329,10 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 概要设计 | preliminary-design（正向） | docgen（Mermaid 流程图转 Word 图形） | tcu（热控单元软件） | 已评测：F 5/5、G 10/10、0 误报，检查脚本 check-hld.mjs；用其输出跑 htr_out 详细设计，两个 Skill 能衔接 |
 | 详细设计 | detailed-design（正向、逆向） | docgen（Mermaid 流程图转 Word 图形） | oc_ctrl（OC 指令输出） | 正向已评测；逆向需在修复 prepare.mjs 后重测一次 |
 | 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC；同目录头文件替换；地址映射 ut_map.h） | cmd_check、uart_drv、rt1553（多单元） | cmd_check、uart_drv、rt1553 已评测（智能体均达到参考测试水平）；评分脚本 score.mjs 支持多单元 |
+| 编码 | coding | utest（编译）、cppcheck；自查脚本 check-code.mjs | thm_ctrl（加热回路控制，隐藏测试 16 个、变体 26 个） | 第 1 次已评测（10-28）；加了读取围栏和精简后待重跑，补测 Q2 |
 | 代码走查 | code-walkthrough | cppcheck | 8 个评测用例 | 已有基线 |
 
-待办：地址映射、工具热更新在 Windows 上确认（运行 check.ps1）；用部门历史问题单改编更难的单元测试示例；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
+技能方面的待办：编码评测重跑；地址映射、工具热更新在 Windows 上确认（运行 check.ps1）；用部门历史问题单改编更难的单元测试示例；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
 
 ## 版本说明
 
