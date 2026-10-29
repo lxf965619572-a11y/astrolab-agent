@@ -105,22 +105,43 @@ test('git 失败原因只写在标准输出时，错误信息里也带上', asyn
   await assert.rejects(g.git(d, ['commit', '-q', '-m', '空提交']), /nothing to commit|无文件要提交|nothing added/)
 })
 
-test('防护钩子：无标记的提交被拦住，界面的提交和快照照常', async () => {
+test('防护钩子：智能体命令行里的提交被拦住；人自己的提交、界面的提交和快照照常', async () => {
   const d = await repo()
   const r = await g.installGuardHook(d, HOOK)
   assert.equal(r.ok, true)
   assert.equal(r.installed, true)
   assert.equal((await g.installGuardHook(d, HOOK)).installed, false)
+  const plain = { ...process.env }
+  for (const k of ['DEPT_UI_GIT', 'DSH_SHELL', 'DSH_SESSION_ID']) delete plain[k]
   writeFileSync(join(d, 'n.txt'), 'n\n')
   execFileSync('git', ['add', '-A'], { cwd: d })
-  const env = { ...process.env }
-  delete env.DEPT_UI_GIT
-  assert.throws(() => execFileSync('git', ['commit', '-q', '--no-verify', '-m', 'agent'], { cwd: d, env, stdio: 'pipe' }))
+  // 智能体：DSH 给每条命令行设 DSH_SHELL=1、DSH_SESSION_ID；--no-verify 也跳不过 reference-transaction
+  assert.throws(() => execFileSync('git', ['commit', '-q', '--no-verify', '-m', 'agent'], { cwd: d, env: { ...plain, DSH_SHELL: '1' }, stdio: 'pipe' }))
+  assert.throws(() => execFileSync('git', ['branch', 'x'], { cwd: d, env: { ...plain, DSH_SESSION_ID: 's1' }, stdio: 'pipe' }))
   assert.deepEqual(log(d), ['初始版本'])
+  // 人用自己的 Git 工具：没有这些变量，照常提交
+  execFileSync('git', ['commit', '-q', '-m', '人提交'], { cwd: d, env: plain })
+  assert.equal(log(d)[0], '人提交')
   const snap = await g.snapshot(d, 't3')
   assert.ok(snap.commit)
-  await g.commit(d, '界面提交', ['n.txt'])
+  writeFileSync(join(d, 'm.txt'), 'm\n')
+  await g.commit(d, '界面提交', ['m.txt'])
   assert.equal(log(d)[0], '界面提交')
+})
+
+test('防护钩子：旧版（连人自己提交也拦）自动升级成新版；别人的钩子不覆盖', async () => {
+  const d = await repo()
+  const dst = join(d, '.git', 'hooks', 'reference-transaction')
+  mkdirSync(dirname(dst), { recursive: true })
+  writeFileSync(dst, readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'reference-transaction.v1'), 'utf8').replace(/\n/g, '\r\n'))
+  const r = await g.installGuardHook(d, HOOK)
+  assert.equal(r.ok, true)
+  assert.equal(r.upgraded, true)
+  assert.equal(readFileSync(dst, 'utf8'), readFileSync(HOOK, 'utf8'))
+  writeFileSync(dst, '#!/bin/sh\nexit 0\n')
+  const r2 = await g.installGuardHook(d, HOOK)
+  assert.equal(r2.ok, false)
+  assert.match(r2.reason, /没有覆盖/)
 })
 
 test('路径越出项目时拒绝', async () => {

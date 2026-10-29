@@ -1,0 +1,11 @@
+#!/bin/sh
+# 部门 Git 防护：智能体不能自己提交、建分支或改引用；人照常用自己的 Git 工具提交。
+# 判断依据：DSH 给智能体的每条命令行（bash、pwsh）都设 DSH_SHELL=1 和 DSH_SESSION_ID，人的 Git 工具没有。
+# AstroLab 工作台界面自己的 Git 操作带 DEPT_UI_GIT=1，放行。
+# reference-transaction 钩子在任何引用更新（提交、建分支、reset、stash 等）之前运行，不能用 --no-verify 跳过。
+# 这是防误操作，不是防恶意：在命令里清掉这些变量就能绕过。AstroLab 和 DSH 桌面端的部门组合包共用这一份。
+if [ "$1" = "prepared" ] && [ "$DEPT_UI_GIT" != "1" ] && { [ -n "$DSH_SHELL" ] || [ -n "$DSH_SESSION_ID" ]; }; then
+  echo "部门规定：智能体不能提交、建分支或改动引用；改动请用户审核后自己提交。" >&2
+  exit 1
+fi
+exit 0

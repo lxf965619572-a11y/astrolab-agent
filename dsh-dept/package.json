@@ -1,0 +1,19 @@
+{
+  "name": "@astrolab/dsh-dept",
+  "description": "部门组合包：内网开关（埋点、会话遥测、反馈、联网工具、内置浏览器关掉）、工具精简、读取围栏、部门模型路由、部门技能和工具服务",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "dsh": "0.2.1-rc.2 || 0.2.1-rc.3" },
+  "exports": {
+    "./read-fence": "./lib/read-fence.mjs",
+    "./conventions": "./lib/conventions.mjs",
+    "./git-guard": "./lib/git-guard.mjs",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": { "patch": "./cordis.patch.yml" }
+  }
+}

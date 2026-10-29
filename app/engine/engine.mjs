@@ -328,6 +328,9 @@ export function writeEnginePatch(dir, { ask = true, disableWeb = true, skillDirs
   const lines = ['# 由 AstroLab 生成，每次启动引擎时重写']
   if (disableWeb) lines.push('- id: tool-web', '  disabled: true')
   if (trim) for (const [id] of TRIMMED_PLUGINS) lines.push(`- id: ${id}`, '  disabled: true')
+  // 不往外发：会话遥测（默认 FEEDBACK_ONLY，有人点赞点踩时上传会话记录）、官方 API 的会话日志附带上传
+  // （session-log-deepseek，默认开，只在用官方 deepseek 路由时生效；我们用 dept-llm，这里关掉作双保险）
+  lines.push('- id: session-telemetry-otel', '  config:', '    mode: DISABLED', '- id: session-log-deepseek', '  config:', '    enabled: false')
   if (skillDirs && skillDirs.length) {
     lines.push('- id: skill-filesystem', '  disabled: false', '  config:', '    providerName: dept-skills', '    includeDefaultRoots: false',
       `    customSkillDirs: [${skillDirs.map((d) => q(d.replace(/\\/g, '/'))).join(', ')}]`)

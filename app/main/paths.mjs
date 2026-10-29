@@ -80,6 +80,7 @@ export function engineEnv(p, base = process.env) {
   }
   env.DSH_HOME = p.dshHome
   env.DSH_TELEMETRY_DISABLED = '1'
+  env.DSH_TELEMETRY_MODE = 'DISABLED' // dsh-base 的会话遥测读这个（DSH_TELEMETRY_DISABLED 它不认）
   delete env.ELECTRON_RUN_AS_NODE
   return env
 }

@@ -1,0 +1,228 @@
+# 部门组合包（@astrolab/dsh-dept）：列在 profile 的 dsh.profile.bundles 里、排在 dsh-base、dsh-web-app 之后。
+# 适用 DSH 0.2.1-rc.3（官方桌面端）。注意：按 id 打补丁会替换整个 config（已用 --dump-config 验证），
+# 所以要改哪个插件的配置就写完整；预设（preset）改不了单项，只能整份换成部门预设。
+# 仓库位置由环境变量 ASTROLAB_ROOT 给出（start-desktop-trial.cmd 设置）。
+
+# ── 1 内网：什么都不发出去 ────────────────────────────────────────────────
+# 产品埋点（桌面端默认开，设备号、用户号、硬件信息）
+- id: product-analytics
+  disabled: true
+- id: desktop-product-telemetry
+  disabled: true
+# 会话遥测：默认 FEEDBACK_ONLY，用户点赞、点踩、评分、备注时把截至那时的会话记录（含上下文）上传到 DeepSeek。
+# DISABLED 不构造任何传输
+- id: session-telemetry-otel
+  config:
+    mode: DISABLED
+# 反馈按钮（没有遥测时只在本地记，留着只会让人以为反馈有人看）
+- id: message-feedback
+  disabled: true
+- id: ui-message-feedback
+  disabled: true
+# 联网搜索、抓网页、内置浏览器
+- id: web-search-deepseek
+  disabled: true
+- id: web-deepseek-api
+  disabled: true
+- id: web-fetch-http
+  disabled: true
+- id: ui-settings-web-search
+  disabled: true
+- id: ui-sidebar-browser
+  disabled: true
+# 官方 DeepSeek 模型路由：内网用不上。它还连着 session-log-deepseek（默认开）：每次请求官方 API 都附上
+# dsh_session_log 字段，把会话的完整事件记录（含工具结果，也就是读到的文件内容，每次最多 8 MiB）一并上传。
+# 桌面试用中真的发生过（delivery-accepted 5 次）。路由关掉，日志上传也关掉（双保险）
+- id: llm-deepseek
+  disabled: true
+- id: llm-deepseek-account
+  disabled: true
+- id: session-log-deepseek
+  config:
+    enabled: false
+# DeepSeek 账号平台（deepseek-account、account-controller、ui-settings-account）不能关：桌面端启动页要向它查账号状态，
+# 关掉后启动失败（“desktop welcome: Web request failed”，试点第 2 轮）。没有官方模型路由时它只用于启动页；
+# 内网连不上 DeepSeek 平台时启动页走 API Key 分支（已有 completion: api-key）。
+# MCP 资源工具（list_mcp_resources 等 3 个）挂在全局、不在预设里：我们的工具服务只提供工具
+- id: mcp-resources
+  disabled: true
+
+# ── 2 部门模型 ─────────────────────────────────────────────────────────────
+# OpenAI 兼容接口（内网 vLLM；外网试用时连 DeepSeek 官方的兼容接口）。地址、模型、Key 从环境变量读（启动脚本读 config\local.env）
+- id: llm-pi-ai
+  config:
+    providers:
+      dept-llm:
+        displayName: 部门模型
+        api: openai-completions
+        baseURL: !!js "process.env.DEPT_LLM_BASE_URL || 'https://api.deepseek.com'"
+        apiKeyEnv: DEPT_LLM_API_KEY
+        compat:
+          thinkingFormat: !!js "process.env.DEPT_LLM_THINKING_FORMAT || 'deepseek'"
+        models:
+          - id: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
+            name: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
+            contextWindow: !!js "Number(process.env.DEPT_LLM_CONTEXT_WINDOW || 1048576)"
+            maxTokens: !!js "Number(process.env.DEPT_LLM_MAX_TOKENS || 65536)"
+            reasoningEfforts:
+              'off':
+              high: high
+- id: agent-default-model
+  config:
+    provider: dept-llm
+    model: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
+    reasoningEffort: high
+
+# ── 3 部门预设：取代官方的 standard / ptc / minimal / cordis 四个预设 ───────────────
+# 由 DSH 0.2.1-rc.3 的 dsh-web-app/presets/standard.patch.yml 照抄，去掉：
+#   command-goal、tool-goal（目标）、planning（计划模式）、tool-subagent-list-agents、tool-subagent-fork、
+#   workflow-ptc、tool-workflow（脚本编排）、tool-web（联网）、tool-schedule（定时）、tool-plugin-manager、tool-plugin-market
+# 保留 tool-subagent-control：subagent 的说明要子智能体用 send_message 报告结果。
+# 升级 DSH 时要对照新版 standard 预设更新这一份。
+- id: preset-standard
+  disabled: true
+- id: preset-ptc
+  disabled: true
+- id: preset-minimal
+  disabled: true
+- id: preset-cordis
+  disabled: true
+- id: agent-preset-registry
+  config:
+    default: dept
+- insert:
+    - id: preset-dept
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: dept
+        order: 0
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: You are a coding agent powered by the {{model}} model.
+          - id: agent-instructions
+            name: '@deepseek-ai/dsh-agent-instructions'
+            config:
+              maxBytes: 65536
+          - id: time-context
+            name: '@deepseek-ai/dsh-time-context'
+          - id: tool-bash
+            name: '@deepseek-ai/dsh-tool-bash'
+            disabled: !!js process.platform === 'win32'
+          - id: tool-pwsh
+            name: '@deepseek-ai/dsh-tool-pwsh'
+            disabled: !!js process.platform !== 'win32'
+          - id: tool-fs
+            name: '@deepseek-ai/dsh-tool-fs'
+          - id: tool-fs-search
+            name: '@deepseek-ai/dsh-tool-fs-search'
+            config:
+              sampleOverCapGlobResults: false
+          - id: tool-jobs
+            name: '@deepseek-ai/dsh-tool-jobs'
+          - id: skill-filesystem
+            name: '@deepseek-ai/dsh-skill-filesystem'
+            config:
+              providerName: dept-skills
+              includeDefaultRoots: false
+              customSkillDirs:
+                - !!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent').replace(/\\\\/g, '/') + '/skills'"
+          - id: tool-skill
+            name: '@deepseek-ai/dsh-tool-skill'
+          - id: compaction
+            name: cordis:group
+            group: true
+            isolate:
+              compaction: true
+              toolResultPruner: true
+            config:
+              - id: compaction-basic
+                name: '@deepseek-ai/dsh-compaction-basic'
+              - id: command-compact
+                name: '@deepseek-ai/dsh-command-compact'
+              - id: tool-result-pruner
+                name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+                config:
+                  thresholdChars: 8192
+                  headChars: 4096
+                  tailChars: 1024
+          - id: delegation
+            name: cordis:group
+            group: true
+            isolate:
+              workflowEngine: true
+            config:
+              - id: tool-subagent-control
+                name: '@deepseek-ai/dsh-tool-subagent-control'
+              - id: tool-subagent
+                name: '@deepseek-ai/dsh-tool-subagent'
+                config:
+                  provider: spawn
+                  toolName: subagent
+                  modelSelectionSettings: true
+          - id: tool-ask-user
+            name: '@deepseek-ai/dsh-tool-ask-user'
+          - id: tool-todo
+            name: '@deepseek-ai/dsh-tool-todo'
+            config:
+              allowParallelInProgress: true
+          - id: present
+            name: '@deepseek-ai/dsh-tool-present'
+
+# ── 4 部门插件：读取围栏、部门约定；部门工具服务 ─────────────────────────────────
+- insert:
+    # 读取围栏：只读得到工作区、技能目录、临时目录和工具链目录（见 lib/read-fence.mjs）
+    - id: astrolab-read-fence
+      name: '@astrolab/dsh-dept/read-fence'
+      config:
+        readRoots:
+          - !!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent').replace(/\\\\/g, '/') + '/skills'"
+        toolRoots:
+          - !!js "process.getBuiltinModule('node:path').dirname(process.execPath)"
+          - !!js "process.env.UTEST_CC ? process.getBuiltinModule('node:path').dirname(process.getBuiltinModule('node:path').dirname(process.env.UTEST_CC)) : ''"
+          - !!js "process.env.CPPCHECK_PATH ? process.getBuiltinModule('node:path').dirname(process.env.CPPCHECK_PATH) : ''"
+    # 部门约定：系统提示里的一节（中文、提问、不提交 Git、只读写工作区）
+    - id: astrolab-conventions
+      name: '@astrolab/dsh-dept/conventions'
+    # Git 防护：给工作区的仓库装钩子，智能体的命令行不能提交、建分支、改引用；人用自己的 Git 工具照常提交
+    - id: astrolab-git-guard
+      name: '@astrolab/dsh-dept/git-guard'
+
+    # 工具服务（stdio）：用桌面端自己的可执行文件当 node 跑（ELECTRON_RUN_AS_NODE），内网机器不用另装 Node
+    - id: mcp-cppcheck
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: cppcheck
+        transport: stdio
+        command: !!js process.execPath
+        args: [!!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent') + '/mcp/cppcheck/server.mjs'"]
+        env: { ELECTRON_RUN_AS_NODE: '1' }
+        toolCallTimeoutMs: 600000
+    - id: mcp-docreader
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docreader
+        transport: stdio
+        command: !!js process.execPath
+        args: [!!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent') + '/mcp/docreader/server.mjs'"]
+        env: { ELECTRON_RUN_AS_NODE: '1' }
+        toolCallTimeoutMs: 120000
+    - id: mcp-docgen
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: docgen
+        transport: stdio
+        command: !!js process.execPath
+        args: [!!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent') + '/mcp/docgen/server.mjs'"]
+        env: { ELECTRON_RUN_AS_NODE: '1' }
+        toolCallTimeoutMs: 120000
+    - id: mcp-utest
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: utest
+        transport: stdio
+        command: !!js process.execPath
+        args: [!!js "(process.env.ASTROLAB_ROOT || 'D:/lixf/astrolab-agent') + '/mcp/utest/server.mjs'"]
+        env: { ELECTRON_RUN_AS_NODE: '1' }
+        toolCallTimeoutMs: 600000

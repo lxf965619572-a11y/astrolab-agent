@@ -1,0 +1,4 @@
+# 钩子是 sh 脚本：Windows 上 core.autocrlf=true 检出成 CRLF 会坏掉（then\r），固定 LF
+app/git-hooks/* text eol=lf
+dsh-dept/hooks/* text eol=lf
+dsh-dept/trial/*.cmd text eol=crlf

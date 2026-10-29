@@ -6,6 +6,7 @@
 // 只用 Node 内置模块和系统的 git。
 
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmdirSync, statSync, unlinkSync, chmodSync } from 'node:fs'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 
@@ -196,6 +197,12 @@ export async function undoCommit(cwd, sha) {
   await git(cwd, ['reset', '-q', '--', '.'])
 }
 
+// 防护钩子的旧版本（换行统一成 LF 后的 SHA-256），认出来就升级成新版
+const OLD_GUARD_HOOKS = new Set([
+  '2379e7a011946f4cb033ce5897dd0bcadaa79a5301c73297998d4655506132b1', // 2026-10 之前：只放行 DEPT_UI_GIT=1，人用自己的 Git 工具也会被拦
+])
+const hookDigest = (text) => createHash('sha256').update(String(text).replace(/\r\n/g, '\n')).digest('hex')
+
 /**
  * 安装防护钩子 reference-transaction：仓库用默认钩子目录时复制进去；
  * 设置了 core.hooksPath（多个仓库共用钩子）或已有同名钩子时不动，返回原因由界面提示。
@@ -213,8 +220,13 @@ export async function installGuardHook(cwd, hookSrc) {
   }
   const dst = join(info.gitDir, 'hooks', 'reference-transaction')
   if (existsSync(dst)) {
-    if (readFileSync(dst, 'utf8') === ours) return { ok: true, installed: false }
-    return { ok: false, reason: '仓库已有 reference-transaction 钩子，没有覆盖' }
+    const cur = readFileSync(dst, 'utf8')
+    if (cur === ours) return { ok: true, installed: false }
+    // 我们自己的旧版钩子（只放行界面操作，连人自己提交也拦）：换成新版
+    if (!OLD_GUARD_HOOKS.has(hookDigest(cur))) return { ok: false, reason: '仓库已有 reference-transaction 钩子，没有覆盖' }
+    copyFileSync(hookSrc, dst)
+    try { chmodSync(dst, 0o755) } catch { /* Windows 不需要 */ }
+    return { ok: true, installed: true, upgraded: true }
   }
   mkdirSync(dirname(dst), { recursive: true })
   copyFileSync(hookSrc, dst)
