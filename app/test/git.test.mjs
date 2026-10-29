@@ -160,6 +160,41 @@ test('示例工程在另一个仓库目录里时，建成独立仓库', async ()
   assert.deepEqual(log(outer), ['初始版本'])
 })
 
+test('示例工程更新：只补新增的示例文件，不覆盖改过的、不恢复删掉的；旧版本没有清单时按第一次提交判断', async () => {
+  const { ensureSample, updateSample } = await import('../main/projects.mjs')
+  const outer = await repo()
+  const src = join(outer, 'sample-src')
+  const put = (root, f, text) => { mkdirSync(dirname(join(root, f)), { recursive: true }); writeFileSync(join(root, f), text) }
+  put(src, 'utest/a.c', 'int a;\n')
+  put(src, 'utest/b.c', 'int b;\n')
+  const P = { data: join(outer, 'runtime', 'app-data'), sampleSrc: src, root: join(outer, 'not-a-repo') }
+  const dir = await ensureSample(P)
+  assert.ok(existsSync(join(P.data, 'workspace', '.sample-seeded.json')), '首次运行写清单')
+  assert.deepEqual(await updateSample(P, dir), [], '没有新文件时什么都不做')
+
+  unlinkSync(join(dir, 'utest', 'a.c'))              // 用户删掉
+  writeFileSync(join(dir, 'utest', 'b.c'), 'int b2;\n') // 用户改过
+  put(src, 'coding/m/doc/d.md', '设计\n')            // 新版本新增
+  put(src, 'utest/b.c', 'int b_new;\n')              // 新版本改了已有文件
+  put(src, 'coding/m/include/m.h', '/* 新 */\n')
+  put(dir, 'coding/m/include/m.h', '/* 已经有了 */\n') // 新增的文件工作区里已经有（任务放进来的）
+  const added = await updateSample(P, dir)
+  assert.deepEqual(added, ['coding/m/doc/d.md'])
+  assert.ok(!existsSync(join(dir, 'utest', 'a.c')), '不恢复删掉的')
+  assert.equal(readFileSync(join(dir, 'utest', 'b.c'), 'utf8'), 'int b2;\n', '不覆盖改过的')
+  assert.equal(readFileSync(join(dir, 'coding', 'm', 'include', 'm.h'), 'utf8'), '/* 已经有了 */\n', '不覆盖已有的')
+  assert.equal(log(dir)[0], '示例工程更新：新增 1 个示例文件')
+  assert.equal(execFileSync('git', ['status', '--porcelain', '--', 'coding/m/doc'], { cwd: dir, encoding: 'utf8' }), '', '补进来的文件已提交')
+  assert.deepEqual(await updateSample(P, dir), [], '再启动一次不重复')
+
+  // 旧版本建的示例工程：没有清单。第一次提交里有 a.c（用户删了）→ 不恢复；e.c 是新的 → 补
+  unlinkSync(join(P.data, 'workspace', '.sample-seeded.json'))
+  put(src, 'utest/e.c', 'int e;\n')
+  assert.deepEqual(await updateSample(P, dir), ['utest/e.c'])
+  assert.ok(!existsSync(join(dir, 'utest', 'a.c')))
+  assert.deepEqual(log(outer), ['初始版本'], '不碰外面的仓库')
+})
+
 test('任务描述里提到的文件：按文件名识别，同名的列出全部，不误配', async () => {
   const { findMentions } = await import('../main/projects.mjs')
   const d = await repo()

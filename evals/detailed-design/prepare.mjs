@@ -7,6 +7,7 @@
 import { cpSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { announce } from '../sample-ws.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
@@ -14,7 +15,7 @@ const mode = process.argv[2]
 const name = process.argv[3] || 'oc_ctrl'
 if (!['forward', 'reverse'].includes(mode)) { console.error('用法：node evals/detailed-design/prepare.mjs forward|reverse [用例名，默认 oc_ctrl]'); process.exit(2) }
 
-const ws = join(ROOT, 'sample', 'design', name)
+const ws = join(announce().dir, 'design', name) // AstroLab 示例工程里的副本，见 ../sample-ws.mjs
 const code = join(HERE, name, 'src')
 const out = join(ws, 'doc')
 // 上一次的输出（doc，以及旧版本脚本留下的 doc-<时间> 备份）移出工作区，放到 evals/detailed-design/results/，

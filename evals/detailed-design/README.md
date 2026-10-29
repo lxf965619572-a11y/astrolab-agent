@@ -11,6 +11,8 @@
 | `oc_ctrl/reference/` | 人工编写的参考详细设计（正向模式），用于验证检查脚本和 Word 转换 |
 | `prepare.mjs` | 准备工作区 |
 
+**示例工程**：AstroLab 第一次运行时把仓库的 `sample` 复制到数据目录的 `workspace\sample`，智能体读写的是这份副本（开发环境 `runtime\app-data\workspace\sample`，安装后 `%LOCALAPPDATA%\AstroLab\workspace\sample`）。评测脚本自动找到它并在开头打印路径；下面命令里的 `$S` 是它的位置，先在 PowerShell 里运行 `$S = node evals\sample-ws.mjs`。仓库里的 `sample` 只是种子，新版本新增的示例文件由应用启动时补进示例工程。
+
 ## 正向模式
 
 1. `node evals\detailed-design\prepare.mjs forward`（删除工作区中的代码，上一次的输出移到 `evals\detailed-design\results\`）
@@ -20,7 +22,7 @@
    按 design\oc_ctrl\docs 下的需求规格说明、概要设计说明和 OC 输出控制器接口说明，编写 oc_ctrl 模块的详细设计说明，正向设计，目标平台 BM3803，保存到 design\oc_ctrl\doc，并生成 Word。
    ```
 
-3. 检查：`node skills\detailed-design\scripts\check-design.mjs sample\design\oc_ctrl\doc\详细设计说明-oc_ctrl-<日期>.md`
+3. 检查：`node skills\detailed-design\scripts\check-design.mjs $S\design\oc_ctrl\doc\详细设计说明-oc_ctrl-<日期>.md`
 4. 对照 `oc_ctrl\答案表.md` 第 1 节评分：
    - 必须提出的问题 F1～F4（4 个）提出了几个，有没有不加说明地选择其中一方；
    - 必须正确处理的 F5～F11（7 个）处理了几个；
@@ -31,14 +33,14 @@
 
 ## 逆向模式
 
-1. `node evals\detailed-design\prepare.mjs reverse`（把代码复制到 `sample\design\oc_ctrl\src`、`include`）
+1. `node evals\detailed-design\prepare.mjs reverse`（把代码复制到示例工程的 `design\oc_ctrl\src`、`include`）
 2. **新建会话**，输入：
 
    ```text
    design\oc_ctrl 下已有代码（src、include），请按 docs 下的需求规格说明、概要设计说明和 OC 输出控制器接口说明，为 oc_ctrl 补写详细设计说明，逆向设计，目标平台 BM3803，保存到 design\oc_ctrl\doc。
    ```
 
-3. 检查：`node skills\detailed-design\scripts\check-design.mjs sample\design\oc_ctrl\doc\详细设计说明-oc_ctrl-<日期>.md --code sample\design\oc_ctrl`
+3. 检查：`node skills\detailed-design\scripts\check-design.mjs sample\design\oc_ctrl\doc\详细设计说明-oc_ctrl-<日期>.md --code $S\design\oc_ctrl`
 4. 对照答案表第 2 节：R1～R9（9 处）在不一致清单中列出了几处；有没有把代码行为写成设计（如“脉宽下限 10 ms”而不提 SRS 的 20 ms）。
 
 两种模式之间要新建会话，并重新运行 `prepare.mjs`。

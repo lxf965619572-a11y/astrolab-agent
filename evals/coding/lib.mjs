@@ -1,6 +1,6 @@
 // 编码评测公用函数：用 utest 的编译器设置（UTEST_CC）编译“被测代码 + 隐藏测试 + 硬件桩”并运行
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
+import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -16,21 +16,9 @@ export { loadLocalEnv } from '../unit-test/lib.mjs'
 
 export const caseDir = (name) => join(HERE, name)
 
-/**
- * AstroLab 里“示例工程”的实际目录。应用首次运行时把仓库的 sample 复制到数据目录的 workspace/sample，
- * 之后智能体读写的是那份副本，不是仓库里的 sample。按应用的规则找数据目录（app/main/paths.mjs）：
- * ASTROLAB_DATA → 开发时的 runtime/app-data → %LOCALAPPDATA%\AstroLab（安装后）→ ~/.local/share/AstroLab；
- * 都没有示例工程时退回仓库的 sample。返回 { dir, from }
- */
-export function sampleWorkspace() {
-  const cands = [
-    [process.env.ASTROLAB_DATA, 'ASTROLAB_DATA'],
-    [join(ROOT, 'runtime', 'app-data'), '开发环境数据目录'],
-    [process.platform === 'win32' ? join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'AstroLab') : join(homedir(), '.local', 'share', 'AstroLab'), '安装后的数据目录'],
-  ]
-  for (const [d, from] of cands) if (d && existsSync(join(d, 'workspace', 'sample'))) return { dir: join(d, 'workspace', 'sample'), from }
-  return { dir: join(ROOT, 'sample'), from: '仓库（还没有运行过 AstroLab）' }
-}
+// 示例工程的实际目录（AstroLab 数据目录里的副本），见 ../sample-ws.mjs
+export { sampleWorkspace } from '../sample-ws.mjs'
+
 export const tmp = (p) => mkdtempSync(join(tmpdir(), p))
 
 /** 编译并运行隐藏测试。cFiles 是被测 .c（绝对路径）；incDirs 是被测代码的头文件目录。返回 { ok, compileError, results:[{id,pass,why}], pass, fail, log } */

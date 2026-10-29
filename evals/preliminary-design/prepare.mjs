@@ -6,11 +6,12 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { announce } from '../sample-ws.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
 const name = process.argv[2] || 'tcu'
-const ws = join(ROOT, 'sample', 'design', name)
+const ws = join(announce().dir, 'design', name) // AstroLab 示例工程里的副本，见 ../sample-ws.mjs
 if (!existsSync(join(ws, 'docs'))) { console.error(`工作区 ${ws} 中没有 docs/（输入文件），检查用例名`); process.exit(2) }
 
 const stamp = new Date().toISOString().replace(/[-:]/g, '').slice(0, 15)

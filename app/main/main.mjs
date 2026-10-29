@@ -6,7 +6,7 @@ import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSy
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
-import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile } from './projects.mjs'
+import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
 import { STAGES, TaskController } from './task.mjs'
 import { Library } from './library.mjs'
 import { buildIndex, readEntry, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
@@ -339,6 +339,16 @@ async function boot() {
       const sample = await ensureSample(P)
       if (sample) store.add(sample, { sample: true, name: '示例工程' })
     } catch (e) { notes.push(`示例工程没有准备好：${e.message}`) }
+  }
+  // 新版本带来的示例文件补进已有的示例工程（不覆盖、不恢复用户删掉的）
+  for (const p of store.list().filter((x) => x.sample)) {
+    try {
+      const added = await updateSample(P, p.path)
+      if (added.length) {
+        const groups = [...new Set(added.map((f) => f.split('/').slice(0, 2).join('/')))]
+        bootNotes.push(`示例工程新增了 ${added.length} 个示例文件：${groups.slice(0, 4).join('、')}${groups.length > 4 ? ' 等' : ''}`)
+      }
+    } catch (e) { mlog('sample update', e) }
   }
   const last = store.list()[0]
   if (last) {

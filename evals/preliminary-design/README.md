@@ -12,6 +12,8 @@
 | `评估记录-tcu-20261025.md` | 第 1 次评估记录 |
 | `评估记录-概要到详细衔接-htr_out-20261025.md` | 用概要设计的输出跑 htr_out 详细设计，检验两个 Skill 的衔接 |
 
+**示例工程**：AstroLab 第一次运行时把仓库的 `sample` 复制到数据目录的 `workspace\sample`，智能体读写的是这份副本（开发环境 `runtime\app-data\workspace\sample`，安装后 `%LOCALAPPDATA%\AstroLab\workspace\sample`）。评测脚本自动找到它并在开头打印路径；下面命令里的 `$S` 是它的位置，先在 PowerShell 里运行 `$S = node evals\sample-ws.mjs`。仓库里的 `sample` 只是种子，新版本新增的示例文件由应用启动时补进示例工程。
+
 ## 步骤
 
 1. `node evals\preliminary-design\prepare.mjs`
@@ -24,7 +26,7 @@
 3. 检查：
 
    ```powershell
-   node skills\preliminary-design\scripts\check-hld.mjs sample\design\tcu\doc\概要设计说明-TCUS-<日期>.md --srs sample\design\tcu\docs\TCUS软件需求规格说明.docx
+   node skills\preliminary-design\scripts\check-hld.mjs $S\design\tcu\doc\概要设计说明-TCUS-<日期>.md --srs $S\design\tcu\docs\TCUS软件需求规格说明.docx
    ```
 
 4. 对照 `tcu\答案表.md` 评分（第 5 节有评分方法），另外记录：检查脚本第一次运行的结果、需求追溯是否完整、时序分析的计算是否正确、有没有编造的数值。

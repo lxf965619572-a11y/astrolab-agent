@@ -13,13 +13,15 @@ import { tmpdir } from 'node:os'
 import { basename, dirname, join, posix, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { applyPatches, buildSample, loadCase, loadLocalEnv, patchFile } from './lib.mjs'
+import { announce, samplePath } from '../sample-ws.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const ROOT = resolve(HERE, '..', '..')
 // 用法：score.mjs [用例名] [测试目录] [--run <last-run.json>]…；--run 时沿用智能体运行时的宏定义和编译选项（多个测试程序时可以写多个 --run）
 const argv = process.argv.slice(2)
 const runRecs = []
-for (let k = argv.indexOf('--run'); k >= 0; k = argv.indexOf('--run')) { runRecs.push(JSON.parse(readFileSync(argv[k + 1], 'utf8'))); argv.splice(k, 2) }
+// --run 和测试目录写成 sample\... 时指 AstroLab 示例工程里的副本（samplePath）
+for (let k = argv.indexOf('--run'); k >= 0; k = argv.indexOf('--run')) { runRecs.push(JSON.parse(readFileSync(samplePath(argv[k + 1]), 'utf8'))); argv.splice(k, 2) }
 const uniq = (a) => [...new Set(a)]
 // 每个测试程序沿用被测文件相同的那份运行记录的宏定义和编译选项（不同测试程序的选项不能混用，如只属于 rt_drv 的 -include）。
 // 选项中指向智能体测试目录、被测文件目录的绝对路径，换成评分时复制出的对应目录
@@ -46,7 +48,8 @@ const name = argv[0] || 'cmd_check'
 const caseDir = join(HERE, name)
 if (!existsSync(join(caseDir, 'case.json'))) { console.error(`没有评测用例 ${name}（可选：${readdirSync(HERE, { withFileTypes: true }).filter((e) => e.isDirectory() && existsSync(join(HERE, e.name, 'case.json'))).map((e) => e.name).join('、')}）`); process.exit(2) }
 const cfg = loadCase(caseDir)
-const testDir = resolve(argv[1] || join(ROOT, cfg.sampleTestDir))
+announce() // 用例配置里的 sample/... 指 AstroLab 示例工程里的副本，见 ../sample-ws.mjs
+const testDir = samplePath(argv[1] || cfg.sampleTestDir)
 if (!existsSync(testDir)) { console.error(`测试目录不存在：${testDir}`); process.exit(2) }
 const isTestSrc = (f) => /\.(c|cpp|cc)$/i.test(f)
 
@@ -69,7 +72,7 @@ const defects = JSON.parse(readFileSync(join(caseDir, 'defects.json'), 'utf8')).
 const mutants = JSON.parse(readFileSync(join(caseDir, 'mutants.json'), 'utf8')).mutants
 // 工作区中的被测代码应与“参考版 + 埋入缺陷”完全一致；不一致说明测试过程中修改了被测代码
 const modifiedFiles = cfg.files.filter((f) => {
-  const p = join(ROOT, f.sample)
+  const p = samplePath(f.sample)
   return existsSync(p) && readFileSync(p, 'utf8').replace(/\r\n/g, '\n') !== buildSample(f.text, defects.filter((d) => patchFile(cfg, d) === f.name)).replace(/\r\n/g, '\n')
 }).map((f) => f.sample)
 const sampleModified = modifiedFiles.length > 0
@@ -94,8 +97,8 @@ function headerDirs(root) {
 let seq = 0
 async function runVariant(sources, label) {
   const dir = join(work, `v${++seq}`)
-  cpSync(join(ROOT, cfg.sampleSrcDir), join(dir, 'src'), { recursive: true })
-  cpSync(join(ROOT, cfg.sampleInclude), join(dir, 'include'), { recursive: true })
+  cpSync(samplePath(cfg.sampleSrcDir), join(dir, 'src'), { recursive: true })
+  cpSync(samplePath(cfg.sampleInclude), join(dir, 'include'), { recursive: true })
   cpSync(testDir, join(dir, 'test'), { recursive: true })
   for (const [n, text] of Object.entries(sources)) writeFileSync(join(dir, 'src', n), text)
   const res = { buildFailed: false, error: '', crashed: false, timedOut: false, failed: new Set(), cases: [], coverage: [], failures: [] }

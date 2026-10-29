@@ -23,6 +23,8 @@
 | `score.mjs` | 评分脚本 |
 | `build-sample.mjs` | 由参考版和缺陷重新生成工作区源码（源码被改坏时用来恢复）：`node evals\unit-test\build-sample.mjs <用例>` |
 
+**示例工程**：AstroLab 第一次运行时把仓库的 `sample` 复制到数据目录的 `workspace\sample`，智能体读写的是这份副本（开发环境 `runtime\app-data\workspace\sample`，安装后 `%LOCALAPPDATA%\AstroLab\workspace\sample`）。评测脚本自动找到它并在开头打印路径；下面命令里的 `$S` 是它的位置，先在 PowerShell 里运行 `$S = node evals\sample-ws.mjs`。仓库里的 `sample` 只是种子，新版本新增的示例文件由应用启动时补进示例工程。
+
 ## 2 怎么测
 
 1. 在 DSH 中**新建会话**（Skill 改动后不用重新运行 setup.ps1，但要新建会话）。会话要开在 `sample` 工作区中，下面的路径都相对于 `sample`。
@@ -52,19 +54,19 @@
 
    多单元用例按 `case.json` 的 `programs`：测试目录下有 `rt_drv\`、`rt_msg\` 子目录时，每个子目录是一个测试程序，只编译对应的被测文件；没有这些子目录时，整个测试目录当作一个测试程序，编译全部被测文件。缺少某个单元的子目录时，结果中会注明该单元没有测试。
 
-   默认评 `sample\utest\<用例>\test`，评其他目录时把目录写在用例名后面。`--run` 指定智能体的运行记录，评分时沿用它用的宏定义和编译选项（智能体用了 `defines` 时必须加）。测试目录中含 `.h` 的子目录（如替换寄存器头文件的 `hw\`）会自动放在 `include` 之前。
+   默认评示例工程的 `utest\<用例>\test`（`--run` 和测试目录写成 `sample\...` 时都指示例工程里的副本），评其他目录时把目录写在用例名后面。`--run` 指定智能体的运行记录，评分时沿用它用的宏定义和编译选项（智能体用了 `defines` 时必须加）。测试目录中含 `.h` 的子目录（如替换寄存器头文件的 `hw\`）会自动放在 `include` 之前。
 
    结果写在 `evals\unit-test\results\<时间>-<用例>-test\summary.md`。
 
 4. 检查报告：
 
    ```
-   node skills\unit-test-design\scripts\check-ut.mjs sample\utest\<用例>\test\单元测试报告-<用例>-<日期>.md --run sample\.utest\<用例>\last-run.json
+   node skills\unit-test-design\scripts\check-ut.mjs $S\utest\<用例>\test\单元测试报告-<用例>-<日期>.md --run $S\.utest\<用例>\last-run.json
    ```
 
    运行记录的目录名是智能体调用 `run_unit_tests` 时的 `name`（默认取被测文件名），以智能体回复中的“运行记录”为准。
 
-5. 下次重测前，把 `sample\utest\<用例>\test` 改名或移走，并新建会话，否则智能体会在旧测试上修补。
+5. 下次重测前，把示例工程的 `utest\<用例>\test` 改名或移走，并新建会话，否则智能体会在旧测试上修补。
 
 ## 3 评分指标
 
