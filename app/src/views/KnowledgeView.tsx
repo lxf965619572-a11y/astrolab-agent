@@ -1,5 +1,5 @@
 // 知识库：检索个人库、部门通用库、型号库里的经验、好的设计和代码；看条目；在我的库里新建、编辑、确认草稿；提交到共享库审核。
-// 智能体在任务中也会检索（知识库工具服务），并把值得留下的经验记成我的库里的草稿，在这里确认。
+// 智能体在任务中会检索（知识库工具服务）；用户在对话里要求“记到知识库”时，它把内容记成我的库里的草稿，在这里确认。
 
 import { useEffect, useMemo, useState } from 'react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'

@@ -210,7 +210,13 @@ export class Library {
   /** 我的库：把某些路径的改动提交（界面上的保存、删除、确认草稿） */
   async commitMine(paths, message) {
     const dir = await this.ensureMine()
-    await git(dir, ['add', '-A', '--', ...paths])
+    // 没提交过就删掉的（智能体记的草稿只写了文件），git add 会报 pathspec 不匹配：这种路径跳过
+    const keep = []
+    for (const p of paths) {
+      if (existsSync(join(dir, p)) || (await git(dir, ['ls-files', '--', p])).trim()) keep.push(p)
+    }
+    if (!keep.length) return null
+    await git(dir, ['add', '-A', '--', ...keep])
     const staged = (await git(dir, ['diff', '--cached', '--name-only'])).trim()
     if (!staged) return null
     await git(dir, [...(await this.gitId()), 'commit', '-q', '-m', message])

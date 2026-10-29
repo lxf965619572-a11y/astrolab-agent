@@ -268,7 +268,7 @@ export class TaskController extends EventEmitter {
     const d = new Date()
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
-    const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处；做完后，有值得留下的经验或踩过的坑，用 mcp__knowledge__propose_knowledge 记一条草稿。' : ''
+    const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处。不要主动往知识库里记东西：只有我明确说“记到知识库”“入库”时，才用 mcp__knowledge__propose_knowledge 按我说的内容记一条草稿。' : ''
     const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。${kb}`]
     const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
     if (skills.length) {

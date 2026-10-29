@@ -3,7 +3,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { Library } from '../main/library.mjs'
@@ -65,6 +65,19 @@ test('同步共享库、目录、安装技能和插件', async () => {
   await assert.rejects(lib.install('builtin:skill:coding'), /没有这个库/)
   lib.uninstall('plugin', 'crc-tools')
   assert.equal(lib.mcpServers('/n').length, 0)
+})
+
+test('删掉没提交过的草稿（智能体只写了文件）：不报 pathspec 错误', async () => {
+  const { lib } = setup()
+  const mine = await lib.ensureMine()
+  const rel = writeEntry(mine, { title: '双传感器失效时“保持”要单独确认', kind: '经验', status: '草稿' }, '正文')
+  rmSync(join(mine, rel), { force: true })
+  assert.equal(await lib.commitMine([rel], '知识库：删除'), null)
+  // 提交过的再删：照常提交删除
+  const rel2 = writeEntry(mine, { title: '已提交的条目', kind: '经验' }, '正文')
+  assert.ok(await lib.commitMine([rel2], '知识库：新建'))
+  rmSync(join(mine, rel2), { force: true })
+  assert.ok(await lib.commitMine([rel2], '知识库：删除'))
 })
 
 test('提交审核：分支推到服务器，审核人通过后进主分支；退回的看得到状态', async () => {
