@@ -189,7 +189,7 @@ function registerIpc() {
   handle('project:tree', () => (ctl.project ? listFiles(ctl.project.path, '', 5000) : []))
   handle('project:read', (rel) => { if (!ctl.project) throw new Error('还没有打开项目'); return readProjectFile(ctl.project.path, rel) })
   handle('task:start', (input) => ctl.start(input))
-  handle('task:send', (text) => ctl.send(text))
+  handle('task:send', (text, extra) => ctl.send(text, extra))
   handle('task:stop', () => ctl.stop())
   handle('task:resume', (text) => ctl.resume(text))
   handle('task:answer', (id, answers) => ctl.answer(id, answers))

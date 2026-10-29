@@ -39,6 +39,26 @@ const MAX_SKILLS = 3
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
 
+/**
+ * 追问带的技能和文件：拼在用户写的话后面交给智能体。插话经引擎桥送到，DSH 不会像第一条消息那样展开“/技能名”，
+ * 所以写成“先用 skill 工具加载”。对话里只显示用户写的那句和一行说明（followUpDisplay）
+ */
+export function composeFollowUp(text, { skills = [], files = [] } = {}, titleOf = (n) => n) {
+  const parts = [text]
+  if (skills.length) parts.push(`【技能】${skills.map(titleOf).join(' + ')}\n这次请先用 skill 工具加载技能 ${skills.join('、')}，再按技能的步骤做。`)
+  if (files.length) parts.push(`【相关文件】\n${files.map((f) => `- ${f}`).join('\n')}`)
+  return parts.join('\n\n')
+}
+export function followUpDisplay(t) {
+  const i = t.search(/\n\n【(技能|相关文件)】/)
+  if (i < 0) return t
+  const sk = /\n\n【技能】([^\n]*)/.exec(t)
+  const fi = t.indexOf('\n\n【相关文件】')
+  const files = fi < 0 ? [] : t.slice(fi).split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2))
+  const note = [sk ? `技能：${sk[1]}` : '', files.length ? `文件：${files.join('、')}` : ''].filter(Boolean).join('；')
+  return `${t.slice(0, i)}\n（${note}）`
+}
+
 function stamp() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
@@ -88,7 +108,7 @@ export class TaskController extends EventEmitter {
       engine: { state: this.engineState, error: this.engineError },
       summary: summarize(this.activity),
       questions: [...this.questions.values()],
-      queued: this.queued.map((q) => ({ id: q.id, text: q.text, at: q.at })),
+      queued: this.queued.map((q) => ({ id: q.id, text: followUpDisplay(q.text), at: q.at })),
     }
   }
 
@@ -219,6 +239,7 @@ export class TaskController extends EventEmitter {
     for (const it of changed) {
       if (it.kind === 'user' && this.task.firstMessage && it.text.trim() === this.task.firstMessage.trim()) it.text = this.task.prompt
       else if (it.kind === 'user' && it.text === RESUME_TEXT) it.text = '继续'
+      else if (it.kind === 'user') it.text = followUpDisplay(it.text)
     }
     if (changed.length) this.emit('activity', changed.map(plainItem))
     if (['turn/start', 'step/start', 'tool/call', 'tool/result', 'turn/end', 'user/message'].includes(ev.type)) {
@@ -384,22 +405,31 @@ export class TaskController extends EventEmitter {
   }
 
   /** 插话或追问：运行中下一步之前送到；已停止或出错时接着做 */
-  async send(text) {
+  async send(text, extra = {}) {
     text = String(text || '').trim()
     if (!text || !this.task) return
+    // 追问选了技能、带了文件：拼进发给智能体的话；技能记到任务上（历史里显示用到的技能）
+    const raw = text
+    const skills = (Array.isArray(extra.skills) ? extra.skills : []).filter((n) => typeof n === 'string' && this.knownSkill(n))
+    const files = (Array.isArray(extra.files) ? extra.files : []).filter((f) => typeof f === 'string' && f)
+    if (skills.length || files.length) {
+      const cards = new Map((this.o.skillCards ? this.o.skillCards() : []).map((c) => [c.name, c]))
+      text = composeFollowUp(text, { skills, files }, (n) => (cards.get(n) && cards.get(n).title) || n)
+      if (skills.length) { this.task.skills = [...new Set([...(this.task.skills || []), ...skills])]; this.save() }
+    }
     if (this.status === 'starting' && !this.task.firstSent) {
-      const q = { id: `q${Date.now()}`, messageId: null, text, at: Date.now() }
+      const q = { id: `q${Date.now()}`, messageId: null, text, raw, at: Date.now() }
       this.queued.push(q)
       ;(this.early ||= []).push(q)
-      this.emit('queued', { id: q.id, text })
+      this.emit('queued', { id: q.id, text: followUpDisplay(text) })
       this.emit('state', this.snapshotState())
       return
     }
     if (!this.busy) return this.resume(text)
     const r = await this.deliver(text)
-    const q = { id: `q${Date.now()}`, messageId: r && r.messageId, text, at: Date.now() }
+    const q = { id: `q${Date.now()}`, messageId: r && r.messageId, text, raw, at: Date.now() }
     this.queued.push(q)
-    this.emit('queued', { id: q.id, text })
+    this.emit('queued', { id: q.id, text: followUpDisplay(text) })
     this.emit('state', this.snapshotState())
   }
 
@@ -407,7 +437,7 @@ export class TaskController extends EventEmitter {
   async stop() {
     if (!this.task || !this.busy) return { ms: 0, unsent: [] }
     const t0 = Date.now()
-    const unsent = this.queued.map((q) => q.text)
+    const unsent = this.queued.map((q) => q.raw || q.text) // 放回输入框的是用户自己写的那句（技能和文件要重新选）
     this.stopping = true
     try {
       const eng = this.engine

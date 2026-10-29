@@ -618,6 +618,9 @@ body.resizing .resizer:not(:hover)::after { background: transparent; }
 .conv-foot { flex: none; padding: 0 28px 16px; }
 .conv-foot .tc-ask { max-width: 860px; margin: 0 auto 8px; }
 .conv-composer { max-width: 860px; margin: 8px auto 0; }
+/* 追问也能选技能、带文件：已选的和两个按钮排在输入框下面；“/”菜单在输入框上面（对话页底部，往上展开） */
+.conv-composer .conv-chips { margin: 2px 0 4px; gap: 6px; }
+.conv-composer .conv-slash { margin: 0 0 8px; max-height: 280px; }
 
 /* ---------- 代码模式：中间对话，右边代码面板（文件树 + 代码 + 提交） ---------- */
 .code-center { flex: 1; min-width: 380px; display: flex; min-height: 0; }

@@ -25,7 +25,7 @@ contextBridge.exposeInMainWorld('astro', {
   },
   task: {
     start: (input) => invoke('task:start', input),
-    send: (text) => invoke('task:send', text),
+    send: (text, extra) => invoke('task:send', text, extra),
     stop: () => invoke('task:stop'),
     resume: (text) => invoke('task:resume', text),
     answer: (id, answers) => invoke('task:answer', id, answers),

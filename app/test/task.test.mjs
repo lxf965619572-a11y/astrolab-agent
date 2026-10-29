@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge } from '../engine/engine.mjs'
-import { TaskController } from '../main/task.mjs'
+import { TaskController, composeFollowUp, followUpDisplay } from '../main/task.mjs'
 import * as git from '../main/git.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -175,6 +175,24 @@ test('运行中插话：下一步之前送到（同一轮），接收后移出�
   const users = ctl.activity.items.filter((i) => i.kind === 'user')
   assert.equal(users.length, 2)
   assert.equal(ctl.activity.items.filter((i) => i.kind === 'turn-end').length, 1)
+})
+
+test('追问带技能和文件：拼进发给智能体的话，对话里只显示写的那句和一行说明', async (t) => {
+  const msg = composeFollowUp('补测复位超时', { skills: ['unit-test-design'], files: ['utest/rt1553/src/rt_drv.c'] }, () => '单元测试')
+  assert.match(msg, /【技能】单元测试\n这次请先用 skill 工具加载技能 unit-test-design/)
+  assert.match(msg, /【相关文件】\n- utest\/rt1553\/src\/rt_drv\.c/)
+  assert.equal(followUpDisplay(msg), '补测复位超时\n（技能：单元测试；文件：utest/rt1553/src/rt_drv.c）')
+  assert.equal(followUpDisplay('普通的一句\n- 列表'), '普通的一句\n- 列表', '没带技能和文件的原样显示')
+  const cards = [{ name: 'unit-test-design', title: '单元测试', category: '测试' }]
+  const { ctl } = await setup(t, { skillCards: () => cards })
+  await ctl.start({ stage: 'utest', prompt: '做单元测试' })
+  await until(() => ctl.status === 'done')
+  await ctl.send('补测复位超时', { skills: ['unit-test-design', 'no-such-skill'], files: ['utest/rt1553/src/rt_drv.c'] })
+  await until(() => ctl.status === 'done' && ctl.activity.items.filter((i) => i.kind === 'user').length === 2)
+  const users = ctl.activity.items.filter((i) => i.kind === 'user').map((i) => i.text)
+  assert.equal(users[1], '补测复位超时\n（技能：单元测试；文件：utest/rt1553/src/rt_drv.c）')
+  assert.ok(ctl.task.skills.includes('unit-test-design'), '追问用到的技能记到任务上')
+  assert.ok(!ctl.task.skills.includes('no-such-skill'), '不认识的技能不带')
 })
 
 test('启动中插话：等第一条被接收后再送，顺序不乱', async (t) => {

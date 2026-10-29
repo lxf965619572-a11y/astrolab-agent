@@ -14,6 +14,9 @@ import { QuestionCard } from '../components/QuestionCard'
 import { baseName, clock, duration, elapsed, nowLabel, toolsTitle } from '../format'
 import { play } from '../sound'
 import { TaskSide } from './TaskSide'
+import { FilePicker, MAX_SKILLS, SkillPickerButton, filterSkills } from '../components/Pickers'
+import { categoryOf, skillIcon } from '../skills'
+import type { SkillCard } from '../api'
 
 export function useNow(active: boolean, ms = 1000) {
   const [now, setNow] = useState(Date.now())
@@ -330,27 +333,89 @@ function Composer({ inputRef, pendingQuestion }: { inputRef: React.RefObject<HTM
   const ts = useStore((s) => s.ts)!
   const app = useStore((s) => s.app)
   const run = useStore((s) => s.run)
+  const toast = useStore((s) => s.toast)
   const text = useStore((s) => s.chatDraft)
   const setText = useStore((s) => s.setChatDraft)
   const live = LIVE.includes(ts.status)
+  // 追问也能带技能和文件（和发起页一样：输入 / 选技能、“技能”按钮、“添加文件”）
+  const allSkills = useMemo(() => app?.skills || [], [app?.skills])
+  const byName = useMemo(() => new Map(allSkills.map((s) => [s.name, s])), [allSkills])
+  const [picked, setPicked] = useState<string[]>([])
+  const [files, setFiles] = useState<string[]>([])
+  const chosen = picked.map((n) => byName.get(n)).filter(Boolean) as SkillCard[]
+  const slash = text.startsWith('/') ? text.slice(1).split(/\s/)[0] : null
+  const slashList = useMemo(() => (slash === null ? [] : filterSkills(allSkills, slash).filter((s) => !picked.includes(s.name))), [slash, allSkills, picked])
+  const [slashSel, setSlashSel] = useState(0)
+  useEffect(() => { setSlashSel(0) }, [slash])
+  const pick = (name: string) => {
+    if (picked.includes(name)) return
+    if (picked.length >= MAX_SKILLS) { toast({ text: `一次最多选 ${MAX_SKILLS} 个技能`, tone: 'info' }); return }
+    setPicked([...picked, name])
+    if (text.startsWith('/')) setText(text.replace(/^\/\S*\s?/, ''))
+    play('tick')
+    setTimeout(() => inputRef.current?.focus(), 0)
+  }
   const send = async () => {
     const t = text.trim()
-    if (!t) return
+    if (!t || t.startsWith('/')) return
+    const extra = { skills: picked, files }
     setText('')
+    setPicked([])
+    setFiles([])
     play('send')
-    await run((api) => api.task.send(t), '没有发出去')
+    await run((api) => api.task.send(t, extra), '没有发出去')
+  }
+  const onKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (slash !== null && slashList.length) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSel((i) => Math.min(slashList.length - 1, i + 1)); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSel((i) => Math.max(0, i - 1)); return }
+      if (e.key === 'Enter' && !e.ctrlKey) { e.preventDefault(); pick(slashList[slashSel].name); return }
+      if (e.key === 'Tab') { e.preventDefault(); pick(slashList[slashSel].name); return }
+    }
+    if (slash !== null && e.key === 'Escape') { e.preventDefault(); setText(''); return }
+    if (e.key === 'Backspace' && !text && picked.length) { e.preventDefault(); setPicked(picked.slice(0, -1)); return }
+    if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void send() }
   }
   return (
     <div className="conv-foot">
       {pendingQuestion && <div className="tc-ask"><span className="led ask" />有问题等你回答，任务暂停中<Key size="sm" variant="primary" onPress={pendingQuestion}>回答</Key></div>}
       <div className="composer conv-composer">
+        {slash !== null && (
+          <div className="slash-menu conv-slash" role="listbox" aria-label="选技能">
+            <div className="slash-head muted small">选技能 · ↑↓ 选择，Enter 确定，Esc 取消</div>
+            {slashList.slice(0, 8).map((s, i) => (
+              <Button key={s.name} className={`slash-opt ${i === slashSel ? 'on' : ''}`} onPress={() => pick(s.name)} onHoverStart={() => setSlashSel(i)}>
+                <Icon name={skillIcon(s)} size={16} stroke={1.7} />
+                <span className="slash-name">{s.title}<span className="muted small"> /{s.name}</span></span>
+                <span className="slash-desc">{s.description}</span>
+                <span className="pill sm idle">{categoryOf(s).name}</span>
+              </Button>
+            ))}
+            {!slashList.length && <div className="pad muted small">没有匹配的技能</div>}
+          </div>
+        )}
         <label className="sr-only" htmlFor="chat-input">补充要求</label>
         <textarea id="chat-input" ref={inputRef} rows={2} value={text}
-          placeholder={ts.status === 'stopped' ? '补一句纠正说明，发送后接着做' : live ? '补充要求，下一步生效（不用等它做完）' : '追问或提出修改'}
-          onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void send() } }} />
+          placeholder={ts.status === 'stopped' ? '补一句纠正说明，发送后接着做' : live ? '补充要求，下一步生效（不用等它做完）。输入 / 选技能' : '追问或提出修改。输入 / 选技能'}
+          onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
+        <div className="chips conv-chips">
+          {chosen.map((s) => (
+            <span key={s.name} className="chip skill" title={s.description}>
+              <Icon name={skillIcon(s)} size={13} stroke={1.8} /><span>{s.title}</span>
+              <Button className="chip-x" aria-label={`不用 ${s.title}`} onPress={() => setPicked(picked.filter((n) => n !== s.name))}><Icon name="x" size={11} stroke={2.4} /></Button>
+            </span>
+          ))}
+          {files.map((f) => (
+            <span key={f} className="chip"><Icon name="file" size={13} /><span className="mono">{f}</span>
+              <Button className="chip-x" aria-label={`移除 ${f}`} onPress={() => setFiles(files.filter((x) => x !== f))}><Icon name="x" size={11} stroke={2.4} /></Button>
+            </span>
+          ))}
+          <SkillPickerButton skills={allSkills} picked={picked} onPick={pick} placement="top start" />
+          <FilePicker placement="top start" onPick={(f) => { if (!files.includes(f)) setFiles([...files, f]) }} />
+        </div>
         <div className="composer-bar">
           <span className="grow mono small muted">Ctrl Enter 发送 · {app?.mock ? '模拟引擎' : `部门模型 ${app?.model.model}`}</span>
-          <Key variant="primary" className="send" aria-label="发送" isDisabled={!text.trim()} onPress={() => void send()}><Icon name="send" size={16} stroke={2.2} /></Key>
+          <Key variant="primary" className="send" aria-label="发送" isDisabled={!text.trim() || text.startsWith('/')} onPress={() => void send()}><Icon name="send" size={16} stroke={2.2} /></Key>
         </div>
       </div>
     </div>

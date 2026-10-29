@@ -107,7 +107,7 @@ export interface AstroApi {
     mentions(text: string): Promise<Mention[]>
   }
   task: {
-    start(input: StartInput): Promise<Task>; send(text: string): Promise<void>; stop(): Promise<{ ms: number; unsent: string[] }>; resume(text?: string): Promise<void>
+    start(input: StartInput): Promise<Task>; send(text: string, extra?: { skills?: string[]; files?: string[] }): Promise<void>; stop(): Promise<{ ms: number; unsent: string[] }>; resume(text?: string): Promise<void>
     answer(id: string, answers: Answer[]): Promise<boolean>; reset(): Promise<void>
     open(id: string): Promise<{ task: Task; items: Item[] }>; history(): Promise<Task[]>
   }

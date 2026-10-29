@@ -512,7 +512,10 @@ export function createMockApi(): AstroApi {
         void drive(r, input.prompt)
         return task
       },
-      async send(text) {
+      async send(text, extra) {
+        // 模拟引擎：追问带的技能和文件只在显示上体现
+        const note = [extra?.skills?.length ? `技能：${extra.skills.join(' + ')}` : '', extra?.files?.length ? `文件：${extra.files.join('、')}` : ''].filter(Boolean).join('；')
+        if (note) text = `${text}\n（${note}）`
         if (status === 'running' || status === 'asking') {
           const q = { id: `u${Date.now()}`, text, at: Date.now() }
           queued.push(q)
