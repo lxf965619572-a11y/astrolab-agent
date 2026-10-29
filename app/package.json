@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test test/engine.test.mjs test/git.test.mjs test/task.test.mjs test/library.test.mjs test/kb.test.mjs",
+    "test": "node --test test/engine.test.mjs test/git.test.mjs test/task.test.mjs test/library.test.mjs test/kb.test.mjs test/read-fence.test.mjs",
     "start": "electron ."
   },
   "devDependencies": {

@@ -13,7 +13,8 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 
 | 目录或文件 | 作用 |
 |---|---|
-| `engine/engine.mjs` | 引擎进程（JSON-RPC over stdio）、引擎桥的管道服务端、引擎启动补丁（提问工具、引擎桥，关掉联网工具） |
+| `engine/engine.mjs` | 引擎进程（JSON-RPC over stdio）、引擎桥的管道服务端、引擎启动补丁（提问工具、引擎桥、读取围栏，关掉联网工具和用不上的插件 `TRIMMED_PLUGINS`） |
+| `engine/read-fence.mjs` | 运行在 DSH 进程里的读取围栏插件：智能体只读得到工作区、技能目录、临时目录和工具链目录 |
 | `engine/bridge.mjs` | 运行在 DSH 进程里的引擎桥插件：提问转给工作台；插话在下一步之前送到（steer）；停止只中止当前轮（cancel） |
 | `engine/activity.mjs` | 把会话事件整理成活动记录（同类合并、思考用时、越界标出、写文件统计、计划进度） |
 | `engine/mock-dsh.mjs` | 模拟引擎：按 sdk 协议回放剧本，测试和看界面用 |
@@ -24,7 +25,7 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 | `main/library.mjs` | 库：我的库、共享库（内网 Git）的同步，提交审核、通过、退回，技能和插件的目录、安装、卸载 |
 | `main/paths.mjs` | 开发与安装两种布局、用户数据目录、设置文件、DSH 数据目录补丁 |
 | `src/` | 界面（React + TypeScript）：发起、进行中、审核、历史、知识库、技能与插件；提问卡片、提示条、声音、三套皮肤（浅紫、奶油、陶土） |
-| `test/` | `npm test`：引擎层、引擎桥、Git、任务控制器、库（本机裸仓库当 Git 服务器）、知识检索、编码自查脚本，共 35 项；`node app/test/real-dsh.mjs`：在真实 DSH 上验证插话、停止、继续、提问、知识库工具、安装的技能和插件（假的模型服务，不花模型调用） |
+| `test/` | `npm test`：引擎层、引擎桥、Git、任务控制器、库（本机裸仓库当 Git 服务器）、知识检索、编码自查脚本、读取围栏；`node app/test/real-dsh.mjs`：在真实 DSH 上验证插话、停止、继续、提问、知识库工具、安装的技能和插件（假的模型服务，不花模型调用）；`real-dsh-fence.mjs`：读取围栏；`measure-request.mjs`：量第一个请求 |
 
 ## 数据放在哪
 
@@ -56,6 +57,27 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 - **安装**：技能和插件复制到 `<数据目录>\installed`，引擎重新加载后生效（任务进行中会等它结束）。插件的工具服务只能用 node 运行插件目录里的脚本
 - **创作**：“做一个技能 / 做一个插件”会把我的库当作项目打开，用内置的 `skill-authoring`、`plugin-authoring` 技能和你一起写，写完照常审核、提交到我的库；试用满意再提交到共享库
 - **共享库的初始化**：在 Git 服务器上建一个空仓库（主分支 `main`），推一个只有 `README.md` 的初始提交即可，目录由工作台按需创建
+
+## 读取范围和精简（harness）
+
+**读取围栏**。DSH 的沙箱只管写（文件工具“reads pass through”，Windows ACL 沙箱也只限制写），智能体原本读得到电脑上的任何文件：别的工程、`config\local.env`、`evals\`。编码评测里真的发生过：工作区缺输入时，智能体去仓库根目录找了。`read-fence.mjs` 挂在 DSH 工具流水线的 guard 上（单调：拒绝了谁也改不回），每次工具调用（含嵌套调用）先检查：
+
+- 文件工具（read、grep、glob、read_image、working_directory、subagent 的 cwd、写和改）和 MCP 工具名字像路径的参数、cflags 里的 `-I`：展开联接和符号链接后，必须在工作区、技能目录或临时目录里
+- 命令行（pwsh、bash）：命令里的绝对路径、跳出工作区的 `..`、`~`、`$env:USERPROFILE` 一类变量、网络路径，必须在上面的目录或工具链目录（node、gcc、Cppcheck、系统目录、Program Files）里
+- 拒绝时告诉智能体用 ask_user_question 请用户把文件放进工作区；任务的第一条消息里也写了这条约定
+
+局限：命令行检查看的是命令文本，挡得住正常的“去别处找找”，挡不住刻意在运行时拼出来的路径；工具服务进程自己读文件不经过它（我们的服务各自限制目录）。内核级的读隔离要 AppContainer，DSH 目前没有。验证：`node app/test/real-dsh-fence.mjs`（真实 DSH，7 项）。
+
+**精简**。关掉部门用不上的 DSH 插件（`engine.mjs` 的 `TRIMMED_PLUGINS`，每项写了理由）：workflow、目标（goal）、计划模式、MCP 资源、list_agents、subagent_fork。`send_message`、`interrupt_agent` 保留——subagent 的说明要子智能体用它报告结果。量法：`node app/test/measure-request.mjs <标签>`（真实 DSH + 假模型，不花模型调用）。
+
+| | 精简前 | 精简后 |
+|---|---|---|
+| 工具 | 35 个 | 25 个 |
+| 工具定义 | 27,294 字 | 18,450 字（−32%） |
+| 系统提示 | 2,578 字 | 1,499 字（计划模式、目标的说明随插件去掉） |
+| 第一个请求 | 37,747 字节 | 27,774 字节（−26%） |
+
+（Linux 上量的，缺 cppcheck、docreader、docgen 三个工具服务；前后同一配置，差值可比。每一步都重发这些定义，越短越省上下文和预填充时间。）
 
 ## 插话、停止和引擎启动
 

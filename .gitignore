@@ -31,3 +31,4 @@ app/node_modules/
 app/dist/
 sample/coding/*/src/
 sample/coding/*/doc/编码说明-*
+.fence-test-*/

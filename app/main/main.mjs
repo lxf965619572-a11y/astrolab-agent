@@ -53,6 +53,20 @@ function send(type, payload) {
 }
 
 // 每个项目一个引擎进程，任务之间共用；收发记录先写 engine-<时间>.jsonl，发起任务后改写到 <任务>.jsonl
+/**
+ * 读取围栏允许的目录（工作区由 DSH 按会话给出，不在这里）：
+ *   readRoots  技能目录（仓库的、已安装的、插件带的）——智能体要读技能的参考文件、运行技能的检查脚本
+ *   toolRoots  命令里可以出现的工具链目录：node、gcc（到 ucrt64 一级）、Cppcheck、安装包的 tools、DSH 自己
+ */
+function fenceRoots(env) {
+  const up = (f, n) => { let d = f; for (let i = 0; i < n; i++) d = dirname(d); return d }
+  const exe = (f, n) => (f && /[\\/]/.test(f) ? up(f, n) : null)
+  return {
+    readRoots: lib.skillDirs(),
+    toolRoots: [exe(P.nodePath, 1), exe(env.UTEST_CC, 2), exe(env.CPPCHECK_PATH, 1), P.tools, join(P.root, 'runtime', 'dsh')],
+  }
+}
+
 function makeEngine(project) {
   const env = engineEnv(P)
   env.ASTROLAB_BRIDGE = bridge.path
@@ -64,7 +78,7 @@ function makeEngine(project) {
     dshBin: P.dshBin, nodePath: P.nodePath, cwd: project.path, env,
     logFile: join(P.logs, `engine-${new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)}.jsonl`),
     provider: m.provider, model: m.model, reasoningEffort: m.reasoningEffort,
-    patches: P.mock ? [] : [writeEnginePatch(P.engineDir, { skillDirs: lib.skillDirs(), mcpServers: lib.mcpServers(P.nodePath) })],
+    patches: P.mock ? [] : [writeEnginePatch(P.engineDir, { skillDirs: lib.skillDirs(), mcpServers: lib.mcpServers(P.nodePath), readFence: fenceRoots(env) })],
   })
 }
 

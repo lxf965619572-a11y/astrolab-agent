@@ -308,11 +308,26 @@ export class EngineBridge extends EventEmitter {
  *   - mcpServers：插件带的工具服务 [{ id, name, command, args, env, cwd, toolCallTimeoutMs }]
  * 提问工具用我们自己的条目 id；DSH 以后若在 sdk 中默认挂上提问工具，会出现两个同名工具，升级 DSH 时检查。
  */
-export function writeEnginePatch(dir, { ask = true, disableWeb = true, skillDirs = null, mcpServers = [] } = {}) {
+// 精简：关掉部门用不上的 DSH 插件，少发给模型的工具定义（第一个请求约少 1 万字，见 app/test/measure-request.mjs）。
+// 每项写明为什么用不上；要恢复哪个，从这里删掉即可。
+export const TRIMMED_PLUGINS = [
+  ['tool-workflow', 'workflow：脚本编排多个智能体；部门任务是一个智能体按技能做完'],
+  ['workflow-ptc', 'workflow 的执行器'],
+  ['tool-goal', 'create_goal / update_goal / get_goal：任务状态由工作台管'],
+  ['command-goal', '/goal 命令：sdk 模式没有命令行'],
+  ['plan-mode', 'exit_plan_mode：工作台不用计划模式'],
+  ['mcp-resources', 'list_mcp_resources 等 3 个：我们的工具服务只提供工具，不提供资源'],
+  // tool-subagent-control（send_message、interrupt_agent）不能关：subagent 的说明要子智能体用 send_message 报告结果
+  ['tool-subagent-list-agents', 'list_agents：列出后台智能体；subagent 返回了编号，用不上'],
+  ['tool-subagent-fork', 'subagent_fork：保留 subagent 一个委派工具就够'],
+]
+
+export function writeEnginePatch(dir, { ask = true, disableWeb = true, skillDirs = null, mcpServers = [], readFence = null, trim = true } = {}) {
   mkdirSync(dir, { recursive: true })
   const q = (v) => JSON.stringify(String(v)) // YAML 的双引号字符串与 JSON 转义兼容
   const lines = ['# 由 AstroLab 生成，每次启动引擎时重写']
   if (disableWeb) lines.push('- id: tool-web', '  disabled: true')
+  if (trim) for (const [id] of TRIMMED_PLUGINS) lines.push(`- id: ${id}`, '  disabled: true')
   if (skillDirs && skillDirs.length) {
     lines.push('- id: skill-filesystem', '  disabled: false', '  config:', '    providerName: dept-skills', '    includeDefaultRoots: false',
       `    customSkillDirs: [${skillDirs.map((d) => q(d.replace(/\\/g, '/'))).join(', ')}]`)
@@ -321,6 +336,13 @@ export function writeEnginePatch(dir, { ask = true, disableWeb = true, skillDirs
   if (ask) {
     const url = pathToFileURL(join(HERE, 'bridge.mjs')).href
     inserts.push('    - id: astrolab-tool-ask-user', "      name: '@deepseek-ai/dsh-tool-ask-user'", '    - id: astrolab-bridge', `      name: ${q(url)}`)
+  }
+  // 读取围栏（read-fence.mjs）：只读得到工作区、技能目录、临时目录和工具链目录
+  if (readFence) {
+    const url = pathToFileURL(join(HERE, 'read-fence.mjs')).href
+    const list = (a) => `[${(a || []).filter(Boolean).map((d) => q(String(d).replace(/\\/g, '/'))).join(', ')}]`
+    inserts.push('    - id: astrolab-read-fence', `      name: ${q(url)}`, '      config:', `        readRoots: ${list(readFence.readRoots)}`, `        toolRoots: ${list(readFence.toolRoots)}`)
+    if (readFence.log) inserts.push('        log: true')
   }
   for (const m of mcpServers) {
     inserts.push(`    - id: ${q(m.id)}`, "      name: '@deepseek-ai/dsh-mcp-client'", '      config:', `        serverName: ${q(m.name)}`, '        transport: stdio',
