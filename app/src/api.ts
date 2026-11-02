@@ -61,6 +61,7 @@ export interface AppState {
   platform: string; mock: boolean; installed: boolean
   model: { provider: string; model: string; baseURL: string; hasKey: boolean; contextWindow?: number }
   engineReady: boolean; projects: Project[]; stages: Stage[]; skills?: SkillCard[]; notes: string[]; libraryDir?: string
+  update?: UpdateState | null
   task: TaskState; items: Item[]
 }
 
@@ -76,6 +77,17 @@ export type AstroEvent =
   | { type: 'notify'; payload: { level: number; kind: 'done' | 'ask' | 'error'; title: string; body: string } }
   | { type: 'warn'; payload: string }
   | { type: 'library'; payload: LibSource[] }
+  | { type: 'update'; payload: UpdateState }
+
+/** 软件更新（main/update.mjs 的 state()） */
+export interface UpdateState {
+  version: string; installed: boolean; dir: string; configured: boolean
+  working: 'check' | 'stage' | 'apply' | null
+  check: { at: number; available: boolean; latest: { version: string; date: string; notes: string } | null; error: string | null } | null
+  staged: { version: string; changed: number; removed: number; bytes: number; notes: string } | null
+  progress: { files: number; total: number; bytes: number; totalBytes: number } | null
+  last: { ok: boolean; from: string | null; to: string; error?: string } | null
+}
 
 export interface Mention { name: string; paths: string[] }
 
@@ -84,6 +96,10 @@ export type KbKind = '经验' | '设计' | '代码' | '问题'
 export interface KbMeta { title: string; kind: KbKind; model?: string; tags: string[]; author?: string; date?: string; source?: string; status?: string }
 export interface KbHit { id: string; title: string; kind: KbKind; model: string; tags: string[]; lib: string; libName: string; writable: boolean; path: string; date: string; author: string; status: string; source: string; score: number; snippet: string }
 export interface KbEntry { id: string; lib: string; libName: string; writable: boolean; path: string; meta: KbMeta; body: string }
+/** 待整理：知识整理写的候选（我的库的 待整理/，不进检索），采纳后才进 knowledge/ */
+export interface InboxItem { path: string; meta: KbMeta; body: string; problems: string[] }
+export interface InboxReport { path: string; title: string; date: string; body: string }
+export interface Inbox { dir: string; items: InboxItem[]; reports: InboxReport[]; distill: { lastRun: number; pending: number; skipped: number; scope: 'sample' | 'all'; mine: string } }
 export interface LibSource { id: string; name: string; url: string; branch: string; model: string; preset: boolean; local: boolean; writable: boolean; cloned: boolean; syncing: boolean; lastSync: number | null; error: string }
 export interface CatalogItem {
   key: string; kind: 'skill' | 'plugin'; name: string; title: string; description: string; version?: string; source: string; sourceName: string; path: string
@@ -118,8 +134,12 @@ export interface AstroApi {
   kb: {
     search(q: string, f?: { kind?: string; model?: string; lib?: string }): Promise<KbHit[]>; read(id: string): Promise<KbEntry>
     save(e: { id?: string; meta: KbMeta; body: string }): Promise<string>; remove(id: string): Promise<void>; publish(id: string, target: string): Promise<{ branch: string }>
+    inbox(): Promise<Inbox>; accept(path: string): Promise<string>; discard(path: string): Promise<void>; distill(): Promise<Task>
+    /** 在 Obsidian 里打开我的库（给了路径就打开那个文件）；Obsidian 还不认识这个库时 opened 为 false */
+    obsidian(path?: string): Promise<{ opened: boolean; installed: boolean; dir: string }>; openMine(): Promise<void>
   }
   skills: { list(): Promise<SkillCard[]>; pin(name: string, on: boolean): Promise<SkillCard[]> }
+  update: { state(): Promise<UpdateState>; check(): Promise<UpdateState>; stage(): Promise<UpdateState>; apply(): Promise<boolean> }
   lib: {
     state(): Promise<{ sources: LibSource[]; mine: string }>; sync(id?: string): Promise<LibSource[]>
     addSource(s: { name: string; url: string; branch?: string; model?: string }): Promise<LibSource[]>; removeSource(id: string): Promise<LibSource[]>
@@ -128,7 +148,7 @@ export interface AstroApi {
     submissions(): Promise<Submission[]>; pending(id: string): Promise<Pending[]>; pendingFile(id: string, ref: string, path: string): Promise<{ path: string; before: string | null; after: string | null }>
     approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string, reason?: string): Promise<{ branch: string; title: string; rejected: boolean; reasonSaved?: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
   }
-  sys: { openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
+  sys: { copy?(text: string): Promise<void>; openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
 }
 
 declare global { interface Window { astro?: AstroApi } }

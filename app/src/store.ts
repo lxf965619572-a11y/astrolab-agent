@@ -208,6 +208,7 @@ function onEvent(e: AstroEvent) {
     }
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break
     case 'library': useStore.setState({ libraries: e.payload, kbVersion: st.kbVersion + 1 }); break
+    case 'update': if (st.app) useStore.setState({ app: { ...st.app, update: e.payload } }); break
   }
 }
 

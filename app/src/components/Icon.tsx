@@ -44,6 +44,7 @@ const P: Record<string, string> = {
   newTask: 'M12 20h8M4 20h2l11-11a2.1 2.1 0 0 0-3-3L3 17v3z',
   book: 'M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 19V5M8 7h7M8 11h5',
   puzzle: 'M10 4h4v3a2 2 0 1 0 4 0V4h2v6h-3a2 2 0 1 0 0 4h3v6h-6v-3a2 2 0 1 0-4 0v3H4v-6h3a2 2 0 1 0 0-4H4V4z',
+  download: 'M12 4v12M7 11l5 5 5-5M5 20h14',
   upload: 'M12 16V4M7 9l5-5 5 5M5 20h14',
   refresh: 'M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',

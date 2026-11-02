@@ -27,6 +27,8 @@ export const STAGES = [
   // 在“技能与插件”里发起，工作区是“我的库”
   { id: 'skill', name: '技能创作', skill: 'skill-authoring', hidden: true },
   { id: 'plugin', name: '插件创作', skill: 'plugin-authoring', hidden: true },
+  // 在“知识库”里发起，工作区是“我的库”；候选写到 待整理/
+  { id: 'distill', name: '知识整理', skill: 'knowledge-distill', hidden: true },
 ]
 // 研制环节现在是技能的类别（发起页按技能选，任务历史按类别筛）；老的环节 id 换算成类别
 /** 代码模式的类别（编码、测试、走查在项目代码上做）；其余（需求、设计、文档与图……）是任务模式 */
@@ -34,7 +36,7 @@ export const CODE_CATEGORIES = ['编码', '测试', '走查']
 export const modeOf = (t) => (t && (t.mode === 'code' || t.mode === 'task') ? t.mode : CODE_CATEGORIES.includes(t && t.category) ? 'code' : 'task')
 /** DSH 识别的“直接调用技能”写法（dsh-tool-skill 的 SKILL_GESTURE）：小写字母、数字和连字符 */
 const SKILL_GESTURE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/
-export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设计', coding: '编码', utest: '测试', review: '走查', skill: '创作', plugin: '创作' }
+export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设计', coding: '编码', utest: '测试', review: '走查', skill: '创作', plugin: '创作', distill: '整理' }
 const MAX_SKILLS = 3
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
@@ -106,7 +108,8 @@ export class TaskController extends EventEmitter {
       error: this.error,
       task: this.task && { ...this.task },
       engine: { state: this.engineState, error: this.engineError },
-      summary: summarize(this.activity),
+      // 改动统计：做完一轮后按快照算（含工具服务生成的 Word、Excel），比按写文件调用数准；进行中仍用活动里的数
+      summary: this.withChangeStat(summarize(this.activity)),
       questions: [...this.questions.values()],
       queued: this.queued.map((q) => ({ id: q.id, text: followUpDisplay(q.text), at: q.at })),
     }
@@ -230,6 +233,8 @@ export class TaskController extends EventEmitter {
     if (ev.type === 'user/message' && ev.data && ev.data.source && ev.data.source.kind === 'user') {
       // 插话被智能体接收：从“已排队”移到对话里
       const id = ev.data.id
+      // 引擎桥的回复和会话事件走两条通道，先后不定：接收先到时记下，send() 拿到 messageId 后就不再排队
+      if (id) { (this.accepted ||= new Set()).add(id); if (this.accepted.size > 200) this.accepted = new Set([id]) }
       this.queued = this.queued.filter((q) => q.messageId !== id)
       // 第一条被接收后，再送启动中写下的插话（太早送会排在第一条前面）
       if (id && id === this.task.firstMessageId) this.flushEarly()
@@ -257,6 +262,7 @@ export class TaskController extends EventEmitter {
       this.task.endedAt = Date.now()
       this.setStatus('done')
       this.save()
+      void this.refreshChangeStat({ end: true }).then(() => this.emit('task-done', this.task))
       if (this.restartPending) this.requestRestart()
       this.emit('notify', { level: 2, kind: 'done', title: `${this.task.stage === 'general' ? '任务' : this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120) })
     }
@@ -290,7 +296,7 @@ export class TaskController extends EventEmitter {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
     const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处。不要主动往知识库里记东西：只有我明确说“记到知识库”“入库”时，才用 mcp__knowledge__propose_knowledge 按我说的内容记一条草稿。' : ''
-    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。${kb}`]
+    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。命令和工具调用的说明（description）也用中文写，我在界面上看得懂。${kb}`]
     const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
     if (skills.length) {
       // 写成 /技能名：DSH 在第一步之前就把技能内容附到对话里（和 skill 工具返回的一样），
@@ -428,6 +434,7 @@ export class TaskController extends EventEmitter {
     if (!this.busy) return this.resume(text)
     const r = await this.deliver(text)
     const q = { id: `q${Date.now()}`, messageId: r && r.messageId, text, raw, at: Date.now() }
+    if (q.messageId && this.accepted && this.accepted.has(q.messageId)) { this.emit('state', this.snapshotState()); return } // 已被接收
     this.queued.push(q)
     this.emit('queued', { id: q.id, text: followUpDisplay(text) })
     this.emit('state', this.snapshotState())
@@ -530,6 +537,30 @@ export class TaskController extends EventEmitter {
   }
 
   // ---------- 审核 ----------
+  withChangeStat(sum) {
+    const c = this.task && this.task.changeStat
+    if (!c || this.busy) return sum
+    return { ...sum, files: c.files, added: c.added, removed: c.removed }
+  }
+
+  /** 按任务前快照统计改动（不动 this.listed：那是“用户看过的列表”，提交前要核对） */
+  async refreshChangeStat({ end = false } = {}) {
+    const task = this.task
+    if (!task || !task.snapshot || !this.project) return
+    try {
+      const out = {}
+      const list = await git.changes(this.project.path, task.snapshot.tree, out)
+      if (this.task !== task) return
+      // 智能体交出来的版本（每一轮结束都更新）：和最后提交的比，就是人改了什么
+      if (end && out.tree) {
+        try { task.end = { tree: out.tree, commit: await git.markEnd(this.project.path, task.id, out.tree, task.snapshot.commit), at: Date.now() } } catch { /* 记不下不影响任务 */ }
+      }
+      task.changeStat = { files: list.length, added: list.reduce((n, c) => n + (c.added || 0), 0), removed: list.reduce((n, c) => n + (c.removed || 0), 0), at: Date.now() }
+      this.save()
+      this.emit('state', this.snapshotState())
+    } catch { /* 统计不了就沿用活动里的数 */ }
+  }
+
   async changes() {
     if (!this.task || !this.task.snapshot) return []
     const out = {}
@@ -550,6 +581,7 @@ export class TaskController extends EventEmitter {
     this.task.restoredAt = Date.now()
     this.save()
     this.emit('state', this.snapshotState())
+    void this.refreshChangeStat()
     return n
   }
 
@@ -566,10 +598,18 @@ export class TaskController extends EventEmitter {
     }
     const list = paths && paths.length ? paths : (await this.changes()).map((c) => c.path)
     const sha = await git.commit(this.project.path, message, list)
-    this.task.commit = { sha, message, at: Date.now(), files: list.length }
+    this.task.commit = { sha, message, at: Date.now(), files: list.length, paths: list.slice(0, 500) }
     this.save()
     this.emit('state', this.snapshotState())
     return sha
+  }
+
+  /** 工作台替任务做的提交（知识整理的候选由工作台提交，不走审核页） */
+  markCommitted(sha, message, paths) {
+    if (!this.task || !sha) return
+    this.task.commit = { sha, message, at: Date.now(), files: paths.length, paths: paths.slice(0, 500), auto: true }
+    this.save()
+    this.emit('state', this.snapshotState())
   }
 
   async undoCommit() {

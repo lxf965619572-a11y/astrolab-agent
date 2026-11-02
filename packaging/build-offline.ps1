@@ -1,12 +1,15 @@
 # Build the offline package on this (online) machine: stage-2 workbench (AstroLab.exe) + engine + tools. ASCII only (PowerShell 5.1).
 # Usage (from the repo root):
-#   powershell -ExecutionPolicy Bypass -File packaging\build-offline.ps1 [-Out <dir>, default runtime\dist] [-Ucrt64 C:\msys64\ucrt64] [-Cppcheck <dir>] [-IncludeGit]
-# Result: <Out>\AstroLab (the package) and two Windows Sandbox files: sandbox-offline.wsb, sandbox-online.wsb
+#   powershell -ExecutionPolicy Bypass -File packaging\build-offline.ps1 [-Out <dir>, default runtime\dist] [-Ucrt64 C:\msys64\ucrt64] [-Cppcheck <dir>] [-IncludeGit] [-UpdateDir \\server\share\release]
+# Result: <Out>\AstroLab (the package, with manifest.json for updates) and two Windows Sandbox files: sandbox-offline.wsb, sandbox-online.wsb
+# -UpdateDir: the department update location written into app\config\update.json (users can override it with ASTROLAB_UPDATE_DIR in local.env)
+# Publish an update afterwards: node packaging\release.mjs publish <Out>\AstroLab <update location> --notes "..."
 param(
     [string]$Out = '',
     [string]$Ucrt64 = 'C:\msys64\ucrt64',
     [string]$Cppcheck = '',
-    [switch]$IncludeGit
+    [switch]$IncludeGit,
+    [string]$UpdateDir = ''
 )
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
@@ -43,6 +46,11 @@ foreach ($f in $list) {
     [IO.File]::Copy($src, $dst, $true); $n++
 }
 Say "   $n files"
+if ($UpdateDir) {
+    $uj = '{ "dir": ' + (ConvertTo-Json $UpdateDir) + ' }'
+    [IO.File]::WriteAllText((Join-Path $Dist 'app\config\update.json'), $uj, (New-Object Text.UTF8Encoding $false))
+    Say "   update location: $UpdateDir"
+}
 
 # 2. Workbench (stage 2, Electron): build the UI, copy the app code, turn electron.exe into AstroLab.exe with our icon.
 #    Layout: workbench\AstroLab.exe (+ Electron runtime), workbench\resources\app\package.json points at app\app\main\main.mjs.
@@ -172,6 +180,12 @@ Say ("   {0,-30} {1,8}" -f 'TOTAL', $total)
 $commit = (& git -C $Root rev-parse --short HEAD)
 Say "Built from commit $commit at $(Get-Date -Format s)"
 [IO.File]::WriteAllLines((Join-Path $Dist 'manifest.txt'), $log)
+# Update manifest (version from app\package.json, sha256 of every file); written last so it covers everything above
+[Console]::OutputEncoding = [Text.Encoding]::UTF8   # release.mjs prints Chinese
+$o = & node (Join-Path $Root 'packaging\release.mjs') manifest $Dist --commit $commit 2>&1
+[Console]::OutputEncoding = $old
+if ($LASTEXITCODE -ne 0) { throw "release.mjs manifest failed: $($o -join ' ')" }
+Say "   $o"
 [IO.File]::WriteAllLines((Join-Path $results 'build.log'), $log)
 Say "Package: $Dist"
 Say "Sandbox: double-click $Out\sandbox-offline.wsb, then run Desktop\AstroLab\install.cmd; start AstroLab from the Start menu or desktop"

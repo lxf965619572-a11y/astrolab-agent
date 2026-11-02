@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react'
 import { Button, Dialog, DialogTrigger, Menu, MenuItem, MenuTrigger, Popover, Separator } from 'react-aria-components'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore, type Theme } from '../store'
-import type { Task } from '../api'
+import type { Task, UpdateState } from '../api'
 import { AppIcon, Icon } from './Icon'
 import { play } from '../sound'
 import { modeOf } from '../modes'
 import { CollapseButton, SideResizer } from './Panels'
+import { Key } from './Keys'
+import { clock } from '../format'
 
 export function TitleBar() {
   const app = useStore((s) => s.app)
@@ -49,6 +51,7 @@ export function TitleBar() {
       </MenuTrigger>
       <div className="tb-drag" />
       <ModelStatus />
+      <UpdateButton />
       <ThemePicker />
       <SoundToggle />
       <div className="tb-controls-space" />
@@ -62,6 +65,87 @@ function ModelStatus() {
   const ok = app.engineReady && (app.mock || app.model.hasKey)
   const text = app.mock ? '模拟引擎（不调用模型）' : !app.engineReady ? '引擎未安装' : !app.model.hasKey ? '模型未配置' : `部门模型 · ${app.model.model}`
   return <span className={`tb-model ${ok ? 'ok' : 'bad'}`} title={app.model.baseURL}><span className="dot" />{text}</span>
+}
+
+const mb = (n: number) => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`
+
+/** 软件更新：平时是个图标（看版本、检查更新）；有新版本或已准备好时变成带字的提示 */
+function UpdateButton() {
+  const up = useStore((s) => s.app?.update)
+  const ts = useStore((s) => s.ts)
+  if (!up) return null
+  const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
+  const next = up.staged?.version || (up.check?.available ? up.check.latest?.version : '')
+  return (
+    <DialogTrigger>
+      {next
+        ? <Button className="tb-update-pill" aria-label={up.staged ? `新版本 ${next} 已准备好` : `有新版本 ${next}`}><Icon name={up.staged ? 'refresh' : 'download'} size={14} stroke={2} />{up.staged ? '重启更新' : `新版本 ${next}`}</Button>
+        : <Button className="tb-icon" aria-label={`版本 ${up.version}，检查更新`}><Icon name="download" size={17} /></Button>}
+      <Popover className="pop up-pop" placement="bottom end">
+        <Dialog className="up-dialog" aria-label="软件更新"><UpdatePanel up={up} busy={busy} /></Dialog>
+      </Popover>
+    </DialogTrigger>
+  )
+}
+
+function UpdatePanel({ up, busy }: { up: UpdateState; busy: boolean }) {
+  const [err, setErr] = useState('')
+  const act = async (f: (api: NonNullable<ReturnType<typeof useStore.getState>['api']>) => Promise<unknown>) => {
+    const api = useStore.getState().api
+    if (!api) return
+    setErr('')
+    try { await f(api) } catch (e) { setErr(e instanceof Error ? e.message : String(e)); play('error') }
+  }
+  const c = up.check
+  const p = up.progress
+  return (
+    <>
+      <div className="up-head"><span className="strong">AstroLab</span><span className="mono muted">{up.version}</span></div>
+      {up.configured
+        ? <div className="up-dir muted small">更新位置 <span className="mono">{up.dir}</span></div>
+        : <div className="up-dir muted small">还没有配置更新位置：在设置文件 local.env 里填 <span className="mono">ASTROLAB_UPDATE_DIR</span>（部门的共享文件夹），填好后点“检查更新”。</div>}
+      {up.last && !up.last.ok && <div className="badge-warn up-note"><Icon name="warn" size={14} />上次更新到 {up.last.to} 没有成功，已经换回原来的版本：{up.last.error}</div>}
+
+      <div className="up-body">
+        {up.working === 'check' && <div className="muted">正在检查…</div>}
+        {up.working === 'stage' && (
+          <div className="up-progress">
+            <div className="up-bar"><i style={{ width: `${p && p.totalBytes ? Math.round((100 * p.bytes) / p.totalBytes) : p && p.total ? Math.round((100 * p.files) / p.total) : 3}%` }} /></div>
+            <div className="muted small">{p ? `正在复制 ${p.files}/${p.total} 个文件（${mb(p.bytes)} / ${mb(p.totalBytes)}）` : '正在比较两个版本…'}</div>
+          </div>
+        )}
+        {up.working === 'apply' && <div className="muted">正在退出并更新，换完文件会自动重新打开</div>}
+        {!up.working && up.staged && (
+          <>
+            <div><span className="strong">{up.staged.version} 已准备好</span><span className="muted small">　换 {up.staged.changed} 个文件{up.staged.removed ? `，删 ${up.staged.removed} 个` : ''}</span></div>
+            {up.staged.notes && <div className="up-notes">{up.staged.notes}</div>}
+            <div className="muted small">更新时软件会关闭再打开。你的任务记录、设置和技能库不受影响。</div>
+            <div className="up-actions">
+              <Key size="sm" variant="primary" isDisabled={busy} onPress={() => void act((api) => api.update.apply())}><Icon name="refresh" size={14} stroke={2} />重启并更新</Key>
+              {busy && <span className="muted small">任务还在进行，结束或停止后再更新</span>}
+            </div>
+          </>
+        )}
+        {!up.working && !up.staged && c?.available && c.latest && (
+          <>
+            <div><span className="strong">新版本 {c.latest.version}</span>{c.latest.date && <span className="muted small">　{c.latest.date.slice(0, 10)}</span>}</div>
+            {c.latest.notes && <div className="up-notes">{c.latest.notes}</div>}
+            <div className="up-actions">
+              <Key size="sm" variant="primary" isDisabled={!up.installed} onPress={() => void act((api) => api.update.stage())}><Icon name="download" size={14} stroke={2} />下载更新</Key>
+              {!up.installed && <span className="muted small">开发环境用 git pull 更新</span>}
+            </div>
+          </>
+        )}
+        {!up.working && !up.staged && c && !c.available && (c.error
+          ? <div className="muted small">上次检查没有成功：{c.error}</div>
+          : <div className="muted small"><Icon name="check" size={13} stroke={2.4} className="ok-ink" /> 已是最新版本 · {clock(c.at)} 检查</div>)}
+        {err && <div className="up-err small">{err}</div>}
+      </div>
+      <div className="up-foot">
+        <Key size="sm" isDisabled={!!up.working || !up.configured} onPress={() => void act((api) => api.update.check())}>检查更新</Key>
+      </div>
+    </>
+  )
 }
 
 const THEMES: { id: Theme; name: string; desc: string; sw: [string, string, string] }[] = [

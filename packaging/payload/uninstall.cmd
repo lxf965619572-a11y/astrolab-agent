@@ -1,6 +1,6 @@
 @echo off
 rem Uninstall AstroLab: remove the shortcuts and %LOCALAPPDATA%\Programs\AstroLab.
-rem Your settings, tasks and libraries in %LOCALAPPDATA%\AstroLab are kept (delete that folder yourself to remove them too).
+rem Asks whether to also delete your data in %LOCALAPPDATA%\AstroLab (settings, tasks, libraries); default is to keep it.
 setlocal
 set "DEST=%LOCALAPPDATA%\Programs\AstroLab"
 rem Run from a temporary copy, so the program folder (where this script lives) can be removed
@@ -9,5 +9,13 @@ tasklist /FI "IMAGENAME eq AstroLab.exe" 2>nul | find /i "AstroLab.exe" >nul && 
 if exist "%DEST%\workbench\AstroLab.exe" "%DEST%\workbench\AstroLab.exe" --remove-shortcuts
 if exist "%DEST%" rmdir /s /q "%DEST%"
 echo Removed %DEST%.
-echo Kept your data in %LOCALAPPDATA%\AstroLab.
+set "DATA=%LOCALAPPDATA%\AstroLab"
+if not exist "%DATA%" goto done
+echo.
+echo Your data is in %DATA%: settings (local.env), task history, workspace copies, skill and knowledge libraries.
+choice /C KD /N /M "Keep it [K] or delete it [D]? "
+if errorlevel 2 ( rmdir /s /q "%DATA%" & echo Deleted %DATA%. & goto done )
+if exist "%DATA%\update" rmdir /s /q "%DATA%\update"
+echo Kept your data in %DATA%.
+:done
 pause

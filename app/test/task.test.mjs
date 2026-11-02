@@ -2,7 +2,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -58,12 +58,24 @@ test('发起任务 → 完成 → 审核改动 → 只提交任务改动', async
   assert.ok([...items.values()].some((i) => i.kind === 'assistant'))
   const ch = await ctl.changes()
   assert.deepEqual(ch.map((c) => c.path).sort(), ['utest/rt1553/test/stub_hw.c', 'utest/rt1553/test/test_rt_drv.c', 'utest/rt1553/test/单元测试报告-rt_drv.md'])
+  // 改动统计按快照算：工具服务生成的文件（不经过 write）也算进去
+  await until(() => ctl.task.changeStat)
+  assert.equal(ctl.snapshotState().summary.files, 3)
+  // 智能体交出的版本记成 refs/astrolab/ends/<任务>（知识整理拿它和提交的版本比）
+  await until(() => ctl.task.end)
+  assert.equal((await git.git(ws, ['rev-parse', `refs/astrolab/ends/${ctl.task.id}^{tree}`])).trim(), ctl.task.end.tree)
+  writeFileSync(join(ws, 'utest', 'rt1553', 'test', '单元测试报告-rt_drv.docx'), 'docx')
+  await ctl.refreshChangeStat()
+  assert.equal(ctl.snapshotState().summary.files, 4, '工具服务写的 Word 也算')
+  rmSync(join(ws, 'utest', 'rt1553', 'test', '单元测试报告-rt_drv.docx'))
+  await ctl.refreshChangeStat()
   const v = await ctl.fileVersions('utest/rt1553/test/test_rt_drv.c')
   assert.equal(v.before, null)
   assert.match(v.after, /TC-RT-DRV-007/)
   const sha = await ctl.commit('单元测试：rt_drv')
   assert.ok(sha)
   assert.equal(ctl.task.commit.files, 3)
+  assert.equal(ctl.task.commit.paths.length, 3)
   // 审核始终相对任务前的快照：提交后列表不变，界面按 task.commit 显示“已提交”
   assert.equal((await ctl.changes()).length, 3)
 })
@@ -168,7 +180,7 @@ test('运行中插话：下一步之前送到（同一轮），接收后移出�
   await ctl.start({ stage: 'utest', prompt: '做单元测试' })
   await until(() => ctl.activity.steps >= 2)
   await ctl.send('复位超时的边界多测一个 9 tick')
-  assert.equal(queued.length, 1)
+  assert.ok(queued.length <= 1, '最多排队一次（接收比桥的回复先到时不进队列）')
   await until(() => ctl.queued.length === 0)
   assert.equal(ctl.status, 'running', '插话在这一轮中途被接收，任务还没结束')
   await until(() => ctl.status === 'done')

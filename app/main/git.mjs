@@ -81,6 +81,16 @@ export async function snapshot(cwd, taskId) {
   return { commit, tree, ref, at: Date.now() }
 }
 
+/** 任务结束时工作区的样子（智能体交出来的版本）：记成提交挂在 refs/astrolab/ends/<任务> 下，不被 gc 清掉。
+ *  和最后提交的版本比，就是人在审核时改了什么（知识整理用） */
+export async function markEnd(cwd, taskId, tree, parent) {
+  const args = ['commit-tree', tree, '-m', `AstroLab 任务结束 ${taskId}`]
+  if (parent) args.splice(2, 0, '-p', parent)
+  const commit = (await git(cwd, args, { env: { GIT_AUTHOR_NAME: 'AstroLab', GIT_AUTHOR_EMAIL: 'astrolab@localhost', GIT_COMMITTER_NAME: 'AstroLab', GIT_COMMITTER_EMAIL: 'astrolab@localhost' } })).trim()
+  await git(cwd, ['update-ref', `refs/astrolab/ends/${taskId}`, commit])
+  return commit
+}
+
 function parseNameStatus(out) {
   const parts = out.split('\0').filter((x, i, a) => !(x === '' && i === a.length - 1))
   const res = []

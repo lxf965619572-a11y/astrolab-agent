@@ -89,7 +89,8 @@ function ConvHead({ inCode }: { inCode: boolean }) {
   const setView = useStore((s) => s.setView)
   const hasDraft = useStore((s) => !!s.chatDraft.trim())
   const task = ts.task!
-  const st = STATUS[ts.status] || STATUS.idle
+  // 提交后标题也要跟着变（左栏、历史早就显示“已提交”）
+  const st = ts.status === 'done' && task.commit ? { label: '已提交', cls: 'ok' } : STATUS[ts.status] || STATUS.idle
   const live = LIVE.includes(ts.status)
   const now = useNow(live)
   const used = elapsed((live ? now : task.endedAt || ts.summary.endedAt || now) - task.startedAt)
@@ -314,14 +315,16 @@ function StatusRow({ inCode }: { inCode: boolean }) {
   const toggle = useToggle()
   const hasDraft = useStore((s) => !!s.chatDraft.trim())
   // 代码模式里不写文件数：右边面板按快照算的才准（这里的数是写文件的次数）
-  const text = ts.status === 'done' ? (ts.summary.files ? (inCode ? '做完了，等你审核后提交' : `做完了：改动 ${ts.summary.files} 个文件，等你审核后提交`) : '做完了')
+  const commit = ts.task?.commit
+  const text = ts.status === 'done' && commit ? `做完了，已提交 ${commit.sha.slice(0, 7)}（${commit.files} 个文件）`
+    : ts.status === 'done' ? (ts.summary.files ? (inCode ? '做完了，等你审核后提交' : `做完了：改动 ${ts.summary.files} 个文件，等你审核后提交`) : '做完了')
     : ts.status === 'stopped' ? '已停止。对话和已写的文件都保留，点“继续”接着做，也可以先在下面补一句纠正说明'
       : ts.error || '引擎出错'
   return (
     <div className={`tc-now conv-status ${ts.status}`}>
       <Icon name={ts.status === 'error' ? 'warn' : ts.status === 'done' ? 'check' : 'terminal'} size={16} />
       <span className="grow">{text}</span>
-      {ts.status === 'done' && !!ts.summary.files && (panel
+      {ts.status === 'done' && !commit && !!ts.summary.files && (panel
         ? <span className="muted small">{inCode ? '在右边看改动，满意就提交' : '在右边“产出”里预览，满意就提交'}</span>
         : <Key size="sm" variant="primary" onPress={() => setSettings({ panel: true })}>{inCode ? '看改动' : '看产出'}<Icon name="arrow" size={14} stroke={2} /></Key>)}
       {(ts.status === 'stopped' || ts.status === 'error') && <Key size="sm" variant="primary" onPress={() => void toggle()}><Icon name="play" size={14} />{hasDraft ? '发送并继续' : '继续'}</Key>}

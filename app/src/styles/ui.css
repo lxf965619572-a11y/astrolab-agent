@@ -742,3 +742,28 @@ button.ts-chip.link, .ts-chip.link { cursor: pointer; color: var(--accent-text);
 .reject-why .strong { margin-right: 8px; color: var(--err-text); }
 .reject-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .reject-input { width: 100%; padding: 10px 12px; border: 0; border-radius: var(--r); background: var(--key-base); box-shadow: var(--inset); outline: none; resize: vertical; line-height: 1.6; }
+
+/* 软件更新（标题栏）：平时一个图标；有新版本时是浅色胶囊 */
+.tb-update-pill { height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: 999px; background: var(--accent-soft); color: var(--accent-deep); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+.tb-update-pill:hover { filter: brightness(.97); }
+.tb-update-pill[data-focus-visible] { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+.up-pop { width: 340px; }
+.up-dialog { outline: none; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 8px; }
+.up-head { display: flex; align-items: baseline; gap: 8px; }
+.up-dir { line-height: 1.5; overflow-wrap: anywhere; }
+.up-note { align-items: flex-start; line-height: 1.5; }
+.up-body { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 2px; border-top: 1px solid var(--line); }
+.up-body:empty { display: none; }
+.up-notes { white-space: pre-wrap; font-size: 12.5px; line-height: 1.6; color: var(--ink-2); max-height: 160px; overflow: auto; background: var(--surface-2); border-radius: var(--r-sm); padding: 8px 10px; }
+.up-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.up-progress { display: grid; gap: 6px; }
+.up-bar { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.up-bar > i { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .25s ease; }
+.up-err { color: var(--err-text); line-height: 1.5; }
+.up-foot { display: flex; justify-content: flex-end; }
+
+/* 知识库：待整理（知识整理的候选）和 Obsidian */
+.seg-count { margin-left: 6px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-deep); font-size: 11px; line-height: 18px; display: inline-block; text-align: center; }
+.inbox-head { display: flex; align-items: center; gap: 12px; justify-content: space-between; padding: 12px 14px; border-bottom: 1px solid var(--line-soft); line-height: 1.6; }
+.inbox-problems { margin-top: 10px; align-items: flex-start; line-height: 1.5; }
+.obs-dir { padding: 8px 10px; border-radius: var(--r-sm); background: var(--surface-2); overflow-wrap: anywhere; margin: 4px 0 10px; }

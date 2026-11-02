@@ -1,14 +1,17 @@
 // AstroLab 主进程（Electron）：窗口、项目、任务控制器、与界面之间的接口（IPC）、系统通知。
 // 界面进程不接触 Node：contextIsolation + sandbox，只能调用 preload.cjs 暴露的接口；不加载任何网络内容。
 
-import { app, BrowserWindow, dialog, ipcMain, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, protocol, shell } from 'electron'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
-import { engineEnv, modelConfig, prepareDshHome, resolvePaths } from './paths.mjs'
+import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
+import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
 import { STAGES, TaskController } from './task.mjs'
-import { Library } from './library.mjs'
+import { INBOX, Library } from './library.mjs'
+import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
+import { git } from './git.mjs'
 import { buildIndex, readEntry, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
 
 const P = resolvePaths()
@@ -44,6 +47,7 @@ let bridge = null
 let store = null
 let ctl = null
 let lib = null
+let updates = null
 let notes = []
 /** 启动时的提醒（打开项目时 notes 会换成项目的，这些不跟着换） */
 const bootNotes = []
@@ -97,6 +101,7 @@ function appState() {
     skills: lib.skillCards(),
     libraryDir: lib.sources()[0].dir,
     notes: [...bootNotes, ...notes],
+    update: updates ? updates.state() : null,
     task: ctl.snapshotState(),
     items: ctl.items(),
   }
@@ -159,6 +164,81 @@ async function createInLibrary(kind, prompt) {
   await openProject(p.id)
   return ctl.start({ stage: kind === 'plugin' ? 'plugin' : 'skill', prompt, files: [], options: { report: false } })
 }
+// ---------- 知识整理（蒸馏）和 Obsidian ----------
+function distillContext() {
+  const env = engineEnv(P)
+  const scope = distillScope(env, modelConfig(env).baseURL)
+  const mine = mineLib().dir
+  const st = readState(mine)
+  return { scope, mine, st }
+}
+function distillInfo() {
+  const { scope, mine, st } = distillContext()
+  const { tasks, skipped, more } = pendingTasks({ dataDir: P.data, projects: store.list(), since: st.lastRun || 0, scope })
+  return { lastRun: st.lastRun || 0, pending: tasks.length + more, skipped, scope, mine }
+}
+/** 整理最近的任务：生成素材，在我的库里发起“知识整理”任务（技能 knowledge-distill）；候选写到 待整理/ */
+async function distillNow() {
+  if (ctl.busy) throw new Error('当前有任务在进行，结束后再整理')
+  const mine = await lib.ensureMine()
+  const { scope, st } = distillContext()
+  const known = buildIndex(kbLibs()).docs.map((d) => `${d.title}（${d.libName}）`)
+  const at = Date.now()
+  const m = await buildMaterial({ dataDir: P.data, projects: store.list(), mineDir: mine, since: st.lastRun || 0, scope, known, now: at })
+  if (!m.count) {
+    throw new Error(scope === 'sample' && m.skipped
+      ? `现在用的是公网接口，只整理示例工程的任务；上次整理之后有 ${m.skipped} 个其他工程的任务，换成部门模型后再整理`
+      : '上次整理之后没有新结束的任务')
+  }
+  const p = store.findByPath(mine) || store.add(mine, { name: '我的库', library: true })
+  await openProject(p.id)
+  const date = new Date(at).toISOString().slice(0, 10)
+  const t = await ctl.start({ stage: 'distill', prompt: distillPrompt({ rel: m.rel, count: m.count, date }), files: [], options: { report: false } })
+  t.distill = { at, tasks: m.tasks, material: m.rel, scope }
+  ctl.save()
+  return t
+}
+/** 整理任务做完：工作台提交 待整理/ 的候选（不走审核页），记下这次整理到哪里 */
+async function afterDistill(task) {
+  try {
+    const sha = await lib.commitMine([INBOX], `知识整理：${task.distill ? task.distill.tasks.length : ''} 个任务的候选`)
+    if (sha && ctl.task === task) {
+      const paths = (await git(mineLib().dir, ['show', '--name-only', '--pretty=format:', sha])).split(/\r?\n/).filter(Boolean)
+      ctl.markCommitted(sha, '知识整理的候选（工作台提交）', paths)
+    }
+    if (task.distill) {
+      const st = readState(mineLib().dir)
+      writeState(mineLib().dir, { lastRun: Math.max(st.lastRun || 0, task.distill.at), runs: [...(st.runs || []), { at: task.distill.at, taskId: task.id, tasks: task.distill.tasks.length, commit: sha || null }].slice(-30) })
+    }
+    send('library', lib.states())
+  } catch (e) { mlog('distill finish', e) }
+}
+/** 在 Obsidian 里改的知识条目：定时提交进我的库（我的库里有任务在跑时等它结束） */
+async function commitExternalEdits() {
+  if (!lib || (ctl && ctl.busy && ctl.project && ctl.project.library)) return
+  try { if (await lib.commitExternal()) send('library', lib.states()) } catch (e) { mlog('commit external', e) }
+}
+/** Obsidian 记着的库：%APPDATA%\obsidian\obsidian.json 的 vaults。没装或没打开过返回 null */
+function obsidianVaults() {
+  try {
+    const j = JSON.parse(readFileSync(join(app.getPath('appData'), 'obsidian', 'obsidian.json'), 'utf8'))
+    return Object.entries(j.vaults || {}).map(([id, v]) => ({ id, path: v && v.path })).filter((v) => v.path)
+  } catch { return null }
+}
+/** 在 Obsidian 里打开我的库（rel 给了就打开那个文件）。返回 { opened, installed, dir } */
+async function openInObsidian(rel) {
+  const mine = await lib.ensureMine()
+  const target = rel ? resolve(mine, rel) : mine
+  if (relative(mine, target).startsWith('..') || isAbsolute(relative(mine, target))) throw new Error('只能打开我的库里的文件')
+  const vaults = obsidianVaults()
+  const norm = (x) => resolve(x).toLowerCase().replace(/[\\/]+$/, '')
+  const t = norm(target)
+  const v = (vaults || []).filter((x) => t === norm(x.path) || t.startsWith(norm(x.path) + sep)).sort((a, b) => b.path.length - a.path.length)[0]
+  if (!v) return { opened: false, installed: vaults !== null, dir: mine }
+  await shell.openExternal(rel ? `obsidian://open?path=${encodeURIComponent(target)}` : `obsidian://open?vault=${encodeURIComponent(v.id)}`)
+  return { opened: true, installed: true, dir: mine }
+}
+
 /**
  * 换技能或插件前先关引擎：引擎监视着技能目录，插件的工具服务是它的子进程，在 Windows 上这些都占着文件夹，
  * 不关就删不掉、换不了（“重新试用”报 EPERM，还会删掉一半）。装完 afterInstall 会在后台重启引擎。
@@ -205,6 +285,13 @@ function registerIpc() {
   handle('kb:read', (id) => readEntry(kbLibs(), id))
   handle('kb:save', (e) => kbSave(e))
   handle('kb:delete', (id) => kbDelete(id))
+  handle('kb:inbox', async () => { await commitExternalEdits(); return { ...lib.inbox(), distill: distillInfo() } })
+  handle('kb:accept', (rel) => lib.acceptCandidate(String(rel)))
+  handle('kb:discard', (rel) => lib.discardCandidate(String(rel)))
+  handle('kb:distill', () => distillNow())
+  handle('kb:obsidian', (rel) => openInObsidian(rel ? String(rel) : ''))
+  handle('kb:openMine', async () => { const err = await shell.openPath(await lib.ensureMine()); if (err) throw new Error(err) })
+  handle('sys:copy', (text) => { clipboard.writeText(String(text || '')) })
   handle('kb:publish', async (id, target) => { const e = readEntry(kbLibs(), id); return lib.submit(target, mineEntryPath(id), `知识：${e.meta.title || e.path}`) })
   handle('lib:state', () => ({ sources: lib.states(), mine: mineLib().dir }))
   handle('lib:sync', async (id) => { if (id) await lib.sync(id); else await lib.syncAll(); return lib.states() })
@@ -236,6 +323,10 @@ function registerIpc() {
   handle('lib:reject', (id, ref, reason) => lib.reject(id, ref, reason))
   handle('lib:create', (kind, prompt) => createInLibrary(kind, prompt))
   handle('skills:list', () => lib.skillCards())
+  handle('update:state', () => updates.state())
+  handle('update:check', () => updates.runCheck())
+  handle('update:stage', () => updates.runStage())
+  handle('update:apply', () => updates.apply())
   handle('skills:pin', (name, on) => lib.setPinned(String(name), !!on))
   handle('sys:openPath', async (rel) => { const err = await shell.openPath(projectPath(rel)); if (err) throw new Error(err) })
   handle('sys:showItem', (rel) => shell.showItemInFolder(projectPath(rel)))
@@ -253,6 +344,7 @@ function wireController() {
   ctl.on('question-closed', (c) => send('question-closed', c))
   ctl.on('queued', (q) => send('queued', q))
   ctl.on('warn', (w) => { mlog('warn', w); send('warn', w) })
+  ctl.on('task-done', (t) => { if (t && t.stage === 'distill') void afterDistill(t) })
   ctl.on('state', (s) => { if (s.status === 'error') mlog('task error', s.error) })
   let engineSince = 0
   ctl.on('engine', (e) => {
@@ -348,6 +440,25 @@ async function boot() {
   try { await lib.ensureMine() } catch (e) { notes.push(`我的库没有建好：${e.message}`) }
   ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
   wireController()
+  // 软件更新：更新位置是部门的共享文件夹；装好的软件才换文件（开发时只显示版本、可以检查）
+  updates = new UpdateService({
+    installRoot: P.installed ? resolve(P.root, '..') : null,
+    stageRoot: join(P.data, 'update'),
+    appVersion: app.getVersion(),
+    updateDir: () => updateDirOf(readLocalEnv(P.localEnv), join(P.root, 'config', 'update.json')),
+    nodeExe: P.nodePath,
+    relaunchExe: P.installed ? process.execPath : '',
+    isBusy: () => !!(ctl && ctl.busy),
+    beforeQuit: async () => {
+      try { if (ctl) await ctl.dispose() } catch (e) { mlog('update dispose', e) }
+      try { if (bridge) await bridge.close() } catch { /* 退出前尽力而为 */ }
+    },
+    quit: () => app.quit(),
+    onState: (s) => send('update', s),
+    log: mlog,
+  })
+  const upNote = updates.boot()
+  if (upNote) bootNotes.push(upNote)
   registerIpc()
   if (!store.list().length) {
     try {
@@ -370,6 +481,11 @@ async function boot() {
     try { await openProject(last.id) } catch (e) { notes.push(e.message) }
   }
   await createWindow()
+  // 在 Obsidian 里改的知识条目：启动时和每 3 分钟提交一次
+  void commitExternalEdits()
+  setInterval(() => { void commitExternalEdits() }, 3 * 60 * 1000)
+  // 启动后安静地检查一次更新（共享文件夹连不上不提示，点“检查更新”时才报错）
+  setTimeout(() => { void updates.runCheck({ quiet: true }).catch((e) => mlog('update check', e)) }, 4000)
   // 共享库在后台同步（连不上内网 Git 服务器也不影响使用，状态在“知识库”和“技能与插件”里显示）
   void lib.syncAll().then(() => send('library', lib.states())).catch((e) => mlog('library sync', e))
 }

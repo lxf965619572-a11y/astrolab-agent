@@ -46,6 +46,18 @@ contextBridge.exposeInMainWorld('astro', {
     save: (e) => invoke('kb:save', e),
     remove: (id) => invoke('kb:delete', id),
     publish: (id, target) => invoke('kb:publish', id, target),
+    inbox: () => invoke('kb:inbox'),
+    accept: (path) => invoke('kb:accept', path),
+    discard: (path) => invoke('kb:discard', path),
+    distill: () => invoke('kb:distill'),
+    obsidian: (path) => invoke('kb:obsidian', path),
+    openMine: () => invoke('kb:openMine'),
+  },
+  update: {
+    state: () => invoke('update:state'),
+    check: () => invoke('update:check'),
+    stage: () => invoke('update:stage'),
+    apply: () => invoke('update:apply'),
   },
   skills: {
     list: () => invoke('skills:list'),
@@ -69,6 +81,7 @@ contextBridge.exposeInMainWorld('astro', {
     create: (kind, prompt) => invoke('lib:create', kind, prompt),
   },
   sys: {
+    copy: (text) => invoke('sys:copy', text),
     titlebar: (c) => invoke('sys:titlebar', c),
     openPath: (rel) => invoke('sys:openPath', rel),
     /** 项目里 HTML 文件的预览地址（主进程的 astro-preview: 协议，带自己的 CSP） */

@@ -28,14 +28,23 @@ export function parseEntry(text) {
   const m = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/.exec(text)
   if (m) {
     body = text.slice(m[0].length)
+    // 一行写完的 key: value、tags: [a, b]，也认 Obsidian 属性面板写的多行列表（key: 下面一行一个 - 值）
+    const unq = (x) => x.trim().replace(/^"(.*)"$|^'(.*)'$/, (_, a, b) => a ?? b)
+    let listKey = null
     for (const line of m[1].split(/\r?\n/)) {
-      const kv = /^([A-Za-z_]+)\s*:\s*(.*)$/.exec(line)
+      const item = /^\s+-\s*(.*)$/.exec(line) || /^-\s+(.*)$/.exec(line)
+      if (item && listKey) { const x = unq(item[1]); if (x) meta[listKey].push(x); continue }
+      const kv = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line)
+      listKey = null
       if (!kv) continue
       let v = kv[2].trim()
-      if (/^".*"$|^'.*'$/.test(v)) v = v.slice(1, -1)
-      if (kv[1] === 'tags') v = v.replace(/^\[|\]$/g, '').split(/[,，]/).map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean)
+      if (v === '') { meta[kv[1]] = []; listKey = kv[1]; continue }
+      if (/^\[.*\]$/.test(v) || kv[1] === 'tags') v = v.replace(/^\[|\]$/g, '').split(/[,，]/).map(unq).filter(Boolean)
+      else v = unq(v)
       meta[kv[1]] = v
     }
+    // 空的多行列表（key: 后面什么都没有）：tags 以外的当空字符串
+    for (const [k, v] of Object.entries(meta)) if (k !== 'tags' && Array.isArray(v) && !v.length) meta[k] = ''
   }
   if (!Array.isArray(meta.tags)) meta.tags = meta.tags ? [String(meta.tags)] : []
   return { meta, body: body.replace(/^\s+/, '') }

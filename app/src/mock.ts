@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState } from './api'
+import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import { categoryMode } from './modes'
@@ -435,15 +435,26 @@ export function createMockApi(): AstroApi {
     } catch { /* 停止 */ }
   }
 
+  // 软件更新（浏览器里看界面用）：检查发现 0.2.0，准备时模拟复制进度
+  let up: UpdateState = { version: '0.1.0', installed: true, dir: '\\\\fileserver\\astrolab\\release', configured: true, working: null, check: null, staged: null, progress: null, last: null }
+  const upEmit = () => emitUi({ type: 'update', payload: { ...up } })
+  const LATEST = { version: '0.2.0', date: '2026-10-29T09:00:00Z', notes: '- 提交后页头显示“已提交”\n- 产出文件数按实际改动计\n- 命令说明用中文' }
   function appState(): AppState {
     return {
       platform: 'win32', mock: true, installed: false,
       model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 },
-      engineReady: true, projects: [project], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem),
+      engineReady: true, projects: [project], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem), update: { ...up },
     }
   }
 
   // 知识库和技能库（浏览器里看界面用）
+  let inbox: InboxItem[] = [
+    { path: '待整理/2026-11-01/复位等待按大于或等于判超时.md', problems: [], meta: { title: '复位等待按“大于或等于”判超时，边界取 N-1、N、N+1', kind: '经验', tags: ['复位', '超时', '边界值'], source: '任务 t-20261029-0932（示例工程）；提交 3f2a91c', status: '候选' }, body: '## 结论\n设计写“≥ N tick 视为超时”时，代码用 `>=`，单元测试取 N-1、N、N+1 三个点。\n\n## 依据\n智能体把判断写成 `elapsed > 10`，审核时人改成 `>=`，并补了第 10 tick 的用例。\n\n## 怎么用\n凡是设计里写“达到/超过”的阈值，先确认是否包含等号，再定代码和用例。' },
+    { path: '待整理/2026-11-01/gcc 不在 PATH 时先用 UTEST_CC.md', problems: ['缺来源（依据哪个任务、哪次提交或哪本书的哪一节）'], meta: { title: '编译单元测试前先确认 UTEST_CC，不要直接调 gcc', kind: '问题', tags: ['单元测试', '编译', '环境'], status: '候选' }, body: '## 结论\n命令行里直接调 gcc 会因为 PATH 不同失败（出现 2 次），先用 utest 工具服务，它按 UTEST_CC 找编译器。' },
+  ]
+  let reports: InboxReport[] = [
+    { path: '待整理/2026-11-01-整理报告.md', title: '知识整理报告 2026-11-01', date: '2026-11-01', body: '## 概况\n看了 4 个任务（示例工程），出了 2 条候选。\n\n## 候选\n- 复位等待按“大于或等于”判超时 —— 审核时人改了判断 —— 把握：高\n- 编译单元测试前先确认 UTEST_CC —— 同一错误出现 2 次 —— 把握：中\n\n## 已有条目的建议\n- 无\n\n## 没有记的\n- 需求分析时人补了一条“上电自检”的需求，只出现一次，等再出现。' },
+  ]
   const mkEntry = (lib: string, libName: string, meta: KbMeta, body: string): KbEntry => ({ id: `${lib}:knowledge/${meta.kind}/${meta.title}.md`, lib, libName, writable: lib === 'mine', path: `knowledge/${meta.kind}/${meta.title}.md`, meta, body })
   let kbEntries: KbEntry[] = [
     mkEntry('mine', '我的库', { title: '复位等待用“大于或等于”判就绪', kind: '经验', tags: ['1553B', '复位', '超时'], date: '2026-10-27', author: '智能体', status: '草稿', source: '单元测试任务 · rt_drv.c' }, 'rt_drv 的复位等待，设计 4.2.3 规定 **elapsed ≥ 10 tick** 视为超时。代码用了 `>`，第 10 tick 就绪时仍报超时。\n\n```c\nif (elapsed >= RT_RESET_TMO_TICKS) {\n    return RT_ERR_TIMEOUT;\n}\n```'),
@@ -601,6 +612,21 @@ export function createMockApi(): AstroApi {
       async restore() { const n = files.size; files = new Map(); if (task) task.restoredAt = Date.now(); pushState(); return n },
     },
     kb: {
+      async inbox() { return { dir: 'C:\\Users\\lixf\\AppData\\Local\\AstroLab\\library\\mine\\待整理', items: inbox.map((x) => ({ ...x })), reports: reports.map((x) => ({ ...x })), distill: { lastRun: Date.now() - 6 * 86400000, pending: 4, skipped: 0, scope: 'sample' as const, mine: 'C:\\Users\\lixf\\AppData\\Local\\AstroLab\\library\\mine' } } },
+      async accept(path: string) {
+        const i = inbox.findIndex((x) => x.path === path)
+        if (i < 0) throw new Error('这个候选已经不在了')
+        if (inbox[i].problems.length) throw new Error(`先改一下再采纳：${inbox[i].problems.join('；')}`)
+        const [c] = inbox.splice(i, 1)
+        const meta = { ...c.meta }; delete meta.status
+        const e: KbEntry = { id: `mine:knowledge/${meta.kind}/${Date.now()}.md`, lib: 'mine', libName: '我的库', writable: true, path: '', meta, body: c.body }
+        kbEntries.unshift(e)
+        return e.id
+      },
+      async discard(path: string) { inbox = inbox.filter((x) => x.path !== path); reports = reports.filter((x) => x.path !== path) },
+      async distill() { throw new Error('浏览器预览里不能整理（要在工作台里运行）') },
+      async obsidian() { return { opened: false, installed: true, dir: 'C:\\Users\\lixf\\AppData\\Local\\AstroLab\\library\\mine' } },
+      async openMine() {},
       async search(q, f) {
         const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
         return kbEntries.filter((e) => (!f?.kind || e.meta.kind === f.kind) && (!f?.lib || e.lib === f.lib) && terms.every((t) => `${e.meta.title} ${e.meta.tags.join(' ')} ${e.body}`.toLowerCase().includes(t)))
@@ -616,6 +642,16 @@ export function createMockApi(): AstroApi {
       },
       async remove(id) { kbEntries = kbEntries.filter((x) => x.id !== id) },
       async publish() { await wait(300); return { branch: 'submit/lixf/x-20261027' } },
+    },
+    update: {
+      async state() { return { ...up } },
+      async check() { up = { ...up, working: 'check' }; upEmit(); await sleep(700); up = { ...up, working: null, check: { at: Date.now(), available: true, latest: LATEST, error: null } }; upEmit(); return { ...up } },
+      async stage() {
+        const total = 23, totalBytes = 4_800_000
+        for (let i = 1; i <= total; i++) { up = { ...up, working: 'stage', progress: { files: i, total, bytes: Math.round(totalBytes * i / total), totalBytes } }; upEmit(); await sleep(60) }
+        up = { ...up, working: null, progress: null, staged: { version: '0.2.0', changed: total, removed: 2, bytes: totalBytes, notes: LATEST.notes } }; upEmit(); return { ...up }
+      },
+      async apply() { up = { ...up, working: 'apply' }; upEmit(); return true },
     },
     skills: {
       async list() { return SKILLS },
@@ -638,7 +674,7 @@ export function createMockApi(): AstroApi {
       async reject(_id, ref) { await wait(600); return { branch: ref, title: '插件：crc-tools', rejected: true, reasonSaved: true } },
       async create(kind, prompt) { return api.task.start({ stage: kind, prompt, files: [], options: { report: false } }) },
     },
-    sys: { async openPath() {}, async showItem() {} },
+    sys: { async openPath() {}, async showItem() {}, async copy() {} },
   }
 
   // 截图检查用：直接进入某个画面

@@ -14,6 +14,10 @@
 // 大家只用主分支上的内容，所以没审核的东西不会出现在别人那里。
 //
 // 安装：把技能或插件从库里复制到 <数据目录>/installed/，引擎下次启动时加载（技能目录、插件的工具服务由引擎补丁加上）。
+// 我的库可以直接当 Obsidian 的库打开（条目就是带头信息的 Markdown）：在 Obsidian 里改的，工作台定时提交（commitExternal）。
+// 共享库同步时会丢掉本地改动，在 Obsidian 里只能看；.obsidian（Obsidian 的设置）同步时保留。
+// 待整理/：知识整理（蒸馏）写的候选条目，不在 knowledge/ 下，所以智能体检索不到；采纳后才移进 knowledge/<类别>/。
+//
 // 只用 Node 内置模块和系统的 git。
 
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
@@ -21,13 +25,26 @@ import { tmpdir, userInfo } from 'node:os'
 import { basename, isAbsolute, join, relative, resolve } from 'node:path'
 import { createHash, randomBytes } from 'node:crypto'
 import { git, isRepo } from './git.mjs'
-import { parseEntry, serializeEntry } from '../../mcp/knowledge/lib/kb.mjs'
+import { parseEntry, serializeEntry, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
 
 const MINE = 'mine'
+export const INBOX = '待整理'
+/** 我的库里不进 Git 的：Obsidian 的设置和回收站、整理用的素材 */
+const MINE_IGNORE = ['.utest/', '.dsh/', '.acl-recovery/', '.astrolab-acl-ok', 'node_modules/', '.obsidian/', '.trash/', '.distill/']
 const readJson = (f, d) => { try { return JSON.parse(readFileSync(f, 'utf8')) } catch { return d } }
 const writeJson = (f, v) => { mkdirSync(join(f, '..'), { recursive: true }); writeFileSync(f, JSON.stringify(v, null, 1)) }
 const stamp = () => new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14)
 const safeId = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+
+/** 候选条目要先补齐的地方（采纳前检查） */
+export function candidateProblems(meta, body) {
+  const p = []
+  if (!String(meta.title || '').trim()) p.push('缺标题')
+  if (!['经验', '设计', '代码', '问题'].includes(meta.kind)) p.push('类别要是 经验、设计、代码、问题 之一')
+  if (!String(meta.source || '').trim()) p.push('缺来源（依据哪个任务、哪次提交或哪本书的哪一节）')
+  if (String(body || '').trim().length < 20) p.push('正文太短')
+  return p
+}
 
 /** SKILL.md 的头信息（name、description） */
 export function skillInfo(dir) {
@@ -158,13 +175,103 @@ export class Library {
     mkdirSync(join(dir, 'plugins'), { recursive: true })
     if (!existsSync(join(dir, '.git'))) {
       writeFileSync(join(dir, 'README.md'), '# 我的库\n\n个人的经验、好的设计和代码（knowledge/），自己做的技能（skills/）和插件（plugins/）。\n这里的内容只在本机；要分享给大家，在工作台里“提交到共享库”，审核通过后大家才能看到。\n')
-      writeFileSync(join(dir, '.gitignore'), '.utest/\n.dsh/\n.acl-recovery/\n.astrolab-acl-ok\nnode_modules/\n')
+      writeFileSync(join(dir, '.gitignore'), `${MINE_IGNORE.join('\n')}\n`)
       for (const d of ['knowledge', 'skills', 'plugins']) writeFileSync(join(dir, d, '.gitkeep'), '')
       await git(dir, ['init', '-q', '-b', 'main']).catch(() => git(dir, ['init', '-q']))
       await git(dir, [...(await this.gitId()), 'add', '-A'])
       await git(dir, [...(await this.gitId()), 'commit', '-q', '-m', '建立我的库'])
+    } else if (!this.ignoreChecked) {
+      // 早先建的库：补上后来加的忽略项（Obsidian 的设置、整理素材）
+      this.ignoreChecked = true
+      const f = join(dir, '.gitignore')
+      const cur = existsSync(f) ? readFileSync(f, 'utf8') : ''
+      const lines = new Set(cur.split(/\r?\n/).map((x) => x.trim()))
+      const add = MINE_IGNORE.filter((x) => !lines.has(x))
+      if (add.length) {
+        writeFileSync(f, `${cur}${cur && !cur.endsWith('\n') ? '\n' : ''}${add.join('\n')}\n`)
+        await this.commitMine(['.gitignore'], '我的库：忽略 Obsidian 的设置和整理素材').catch(() => {})
+      }
     }
     return dir
+  }
+
+  /**
+   * 在别的编辑器（Obsidian）里改的知识条目和待整理：提交进我的库的历史。没有改动返回 null。
+   * 我的库里正有任务在跑（技能创作、知识整理）时不提交：那些改动走任务自己的审核。
+   */
+  async commitExternal() {
+    const dir = await this.ensureMine()
+    const paths = ['knowledge', INBOX]
+    const st = (await git(dir, ['-c', 'core.quotepath=false', 'status', '--porcelain', '-uall', '--', ...paths])).trim()
+    if (!st) return null
+    // 在 Obsidian 里把候选拖进 knowledge/ 就算采纳：去掉“候选”状态
+    for (const line of st.split(/\r?\n/)) {
+      const rel = line.slice(3).replace(/^"(.*)"$/, '$1')
+      if (!rel.startsWith('knowledge/') || !rel.endsWith('.md')) continue
+      const f = join(dir, rel)
+      try {
+        const { meta, body } = parseEntry(readFileSync(f, 'utf8'))
+        if (meta.status === '候选') { delete meta.status; writeFileSync(f, serializeEntry(meta, body)) }
+      } catch { /* 删掉的文件 */ }
+    }
+    return this.commitMine(paths, '在其他编辑器里改的知识条目')
+  }
+
+  // ---------- 待整理（知识整理的候选） ----------
+  /** 候选条目和整理报告：{ dir, items: [{ path, meta, body, problems }], reports: [{ path, title, date, body }] } */
+  inbox() {
+    const dir = join(this.base, MINE, INBOX)
+    const out = { dir, items: [], reports: [] }
+    if (!existsSync(dir)) return out
+    const walk = (d) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (e.name.startsWith('.')) continue
+        const p = join(d, e.name)
+        if (e.isDirectory()) { walk(p); continue }
+        if (!e.name.endsWith('.md')) continue
+        const rel = relative(join(this.base, MINE), p).split(/[\\/]/).join('/')
+        let text = ''
+        try { text = readFileSync(p, 'utf8') } catch { continue }
+        const { meta, body } = parseEntry(text)
+        if (/整理报告/.test(e.name)) { out.reports.push({ path: rel, title: meta.title || e.name.replace(/\.md$/, ''), date: meta.date || '', body }); continue }
+        out.items.push({ path: rel, meta, body, problems: candidateProblems(meta, body) })
+      }
+    }
+    walk(dir)
+    out.items.sort((a, b) => b.path.localeCompare(a.path))
+    out.reports.sort((a, b) => b.path.localeCompare(a.path))
+    return out
+  }
+
+  inboxPath(rel) {
+    const root = join(this.base, MINE)
+    const abs = resolve(root, rel)
+    const r = relative(join(root, INBOX), abs)
+    if (!rel || r.startsWith('..') || isAbsolute(r) || !abs.endsWith('.md')) throw new Error('不是待整理里的文件')
+    if (!existsSync(abs)) throw new Error('这个候选已经不在了（可能在 Obsidian 里移走或删掉了）')
+    return abs
+  }
+
+  /** 采纳：移进 knowledge/<类别>/（去掉“候选”状态），提交；返回知识条目的 id（mine:<路径>） */
+  async acceptCandidate(rel) {
+    const abs = this.inboxPath(rel)
+    const { meta, body } = parseEntry(readFileSync(abs, 'utf8'))
+    const problems = candidateProblems(meta, body)
+    if (problems.length) throw new Error(`先改一下再采纳：${problems.join('；')}`)
+    const m = { ...meta }
+    delete m.status
+    const dir = await this.ensureMine()
+    const path = writeEntry(dir, m, body)
+    rmSync(abs, { force: true })
+    await this.commitMine([path, rel], `知识：采纳 ${m.title}`)
+    return `${MINE}:${path}`
+  }
+
+  /** 丢弃：删掉候选（整理报告也可以删） */
+  async discardCandidate(rel) {
+    const abs = this.inboxPath(rel)
+    rmSync(abs, { force: true })
+    await this.commitMine([rel], `待整理：丢弃 ${basename(rel, '.md')}`)
   }
 
   /** 同步一个共享库（没克隆就克隆）；返回状态 */
@@ -181,7 +288,7 @@ export class Library {
       } else {
         await git(s.dir, ['fetch', '-q', 'origin', `+refs/heads/${s.branch}:refs/remotes/origin/${s.branch}`])
         await git(s.dir, ['reset', '-q', '--hard', `origin/${s.branch}`])
-        await git(s.dir, ['clean', '-qfd'])
+        await git(s.dir, ['clean', '-qfd', '-e', '.obsidian', '-e', '.trash']) // 在 Obsidian 里打开过：它的设置留着
       }
       st.head = (await git(s.dir, ['rev-parse', 'HEAD'])).trim()
       st.lastSync = Date.now()
