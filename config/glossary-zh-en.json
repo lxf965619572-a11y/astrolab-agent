@@ -1,0 +1,706 @@
+{
+ "_说明": "中英术语对照：资料检索时把中文问题里的术语扩展成英文（资料原文多是英文）。部门资料库里的 reference/glossary.json 会合并进来，以那边为准。",
+ "遥测": [
+  "telemetry",
+  "TM"
+ ],
+ "遥控": [
+  "telecommand",
+  "TC",
+  "command"
+ ],
+ "指令": [
+  "command",
+  "telecommand"
+ ],
+ "测控": [
+  "TT&C",
+  "telemetry",
+  "tracking",
+  "command"
+ ],
+ "数管": [
+  "data handling",
+  "OBDH",
+  "CDH",
+  "C&DH"
+ ],
+ "星务": [
+  "OBDH",
+  "data handling",
+  "on-board computer",
+  "C&DH"
+ ],
+ "星载数据处理": [
+  "OBDH",
+  "on-board data handling"
+ ],
+ "星上数据处理": [
+  "OBDH",
+  "on-board data handling"
+ ],
+ "数据处理": [
+  "data handling",
+  "data processing"
+ ],
+ "星载计算机": [
+  "on-board computer",
+  "OBC",
+  "flight computer"
+ ],
+ "星上计算机": [
+  "on-board computer",
+  "OBC"
+ ],
+ "中央处理单元": [
+  "central processor",
+  "CTU",
+  "central terminal unit"
+ ],
+ "远置单元": [
+  "remote terminal unit",
+  "RTU"
+ ],
+ "远程终端": [
+  "remote terminal",
+  "RT",
+  "RTU"
+ ],
+ "总线": [
+  "bus"
+ ],
+ "数据总线": [
+  "data bus",
+  "bus"
+ ],
+ "1553": [
+  "1553",
+  "MIL-STD-1553",
+  "1553B"
+ ],
+ "1553B": [
+  "1553",
+  "MIL-STD-1553",
+  "1553B"
+ ],
+ "总线控制器": [
+  "bus controller",
+  "BC"
+ ],
+ "CAN": [
+  "CAN"
+ ],
+ "SpaceWire": [
+  "SpaceWire"
+ ],
+ "串口": [
+  "serial",
+  "UART",
+  "RS-422",
+  "RS-485"
+ ],
+ "422": [
+  "RS-422"
+ ],
+ "接口": [
+  "interface"
+ ],
+ "接口控制文件": [
+  "interface control document",
+  "ICD"
+ ],
+ "接口需求": [
+  "interface requirements",
+  "IRD"
+ ],
+ "帧": [
+  "frame"
+ ],
+ "遥测帧": [
+  "telemetry frame",
+  "transfer frame"
+ ],
+ "传送帧": [
+  "transfer frame"
+ ],
+ "数据包": [
+  "packet"
+ ],
+ "包": [
+  "packet"
+ ],
+ "源包": [
+  "source packet"
+ ],
+ "虚拟信道": [
+  "virtual channel",
+  "VC"
+ ],
+ "同步字": [
+  "synchronization",
+  "sync word",
+  "frame sync"
+ ],
+ "帧同步": [
+  "frame synchronization",
+  "sync"
+ ],
+ "格式": [
+  "format",
+  "formatting"
+ ],
+ "编码": [
+  "coding",
+  "encoding"
+ ],
+ "信道编码": [
+  "channel coding",
+  "error-correcting"
+ ],
+ "纠错": [
+  "error correction",
+  "error-correcting",
+  "FEC"
+ ],
+ "检错": [
+  "error detection",
+  "CRC",
+  "checksum"
+ ],
+ "校验": [
+  "check",
+  "checksum",
+  "CRC",
+  "verification"
+ ],
+ "校验和": [
+  "checksum"
+ ],
+ "循环冗余校验": [
+  "CRC",
+  "cyclic redundancy check"
+ ],
+ "交织": [
+  "interleaving"
+ ],
+ "卷积码": [
+  "convolutional"
+ ],
+ "RS码": [
+  "Reed-Solomon"
+ ],
+ "协议": [
+  "protocol"
+ ],
+ "CCSDS": [
+  "CCSDS"
+ ],
+ "PUS": [
+  "PUS",
+  "packet utilization standard"
+ ],
+ "时间码": [
+  "time code",
+  "time"
+ ],
+ "时统": [
+  "time synchronization",
+  "time"
+ ],
+ "星上时间": [
+  "on-board time",
+  "spacecraft clock"
+ ],
+ "存储": [
+  "storage",
+  "memory",
+  "recorder"
+ ],
+ "存储器": [
+  "memory",
+  "storage"
+ ],
+ "固存": [
+  "solid-state recorder",
+  "mass memory",
+  "SSR"
+ ],
+ "大容量存储": [
+  "mass memory",
+  "solid-state recorder"
+ ],
+ "存储器加载": [
+  "memory load",
+  "memory upload"
+ ],
+ "在轨维护": [
+  "in-orbit maintenance",
+  "software upload",
+  "patch"
+ ],
+ "在轨重构": [
+  "reconfiguration",
+  "software upload"
+ ],
+ "注入": [
+  "upload",
+  "uplink",
+  "memory load"
+ ],
+ "上行": [
+  "uplink"
+ ],
+ "下行": [
+  "downlink"
+ ],
+ "应答机": [
+  "transponder"
+ ],
+ "测距": [
+  "ranging"
+ ],
+ "地面站": [
+  "ground station"
+ ],
+ "地面段": [
+  "ground segment"
+ ],
+ "飞行软件": [
+  "flight software",
+  "FSW",
+  "on-board software"
+ ],
+ "星载软件": [
+  "on-board software",
+  "flight software",
+  "FSW"
+ ],
+ "嵌入式软件": [
+  "embedded software",
+  "on-board software",
+  "flight software"
+ ],
+ "软件": [
+  "software"
+ ],
+ "操作系统": [
+  "operating system",
+  "RTOS"
+ ],
+ "实时操作系统": [
+  "RTOS",
+  "real-time operating system"
+ ],
+ "软件框架": [
+  "framework",
+  "cFS",
+  "F Prime"
+ ],
+ "处理器": [
+  "processor",
+  "CPU",
+  "microprocessor"
+ ],
+ "微控制器": [
+  "microcontroller",
+  "MCU"
+ ],
+ "FPGA": [
+  "FPGA"
+ ],
+ "抗辐射": [
+  "radiation-hardened",
+  "rad-hard",
+  "radiation tolerant"
+ ],
+ "辐射": [
+  "radiation"
+ ],
+ "单粒子": [
+  "single event",
+  "SEU",
+  "SEE",
+  "single-event upset"
+ ],
+ "单粒子翻转": [
+  "single event upset",
+  "SEU"
+ ],
+ "单粒子锁定": [
+  "latch-up",
+  "SEL"
+ ],
+ "总剂量": [
+  "total ionizing dose",
+  "TID"
+ ],
+ "看门狗": [
+  "watchdog"
+ ],
+ "复位": [
+  "reset"
+ ],
+ "冗余": [
+  "redundancy",
+  "redundant"
+ ],
+ "备份": [
+  "redundancy",
+  "backup",
+  "cold redundant",
+  "hot redundant"
+ ],
+ "冷备份": [
+  "cold redundant",
+  "cold standby"
+ ],
+ "热备份": [
+  "hot redundant",
+  "hot standby"
+ ],
+ "故障": [
+  "failure",
+  "fault"
+ ],
+ "故障检测": [
+  "fault detection",
+  "FDIR"
+ ],
+ "故障诊断": [
+  "fault diagnosis",
+  "FDIR"
+ ],
+ "故障隔离": [
+  "fault isolation",
+  "FDIR"
+ ],
+ "故障恢复": [
+  "fault recovery",
+  "FDIR"
+ ],
+ "自主": [
+  "autonomy",
+  "autonomous"
+ ],
+ "安全模式": [
+  "safe mode"
+ ],
+ "姿态控制": [
+  "attitude control",
+  "ACS",
+  "AOCS"
+ ],
+ "姿轨控": [
+  "AOCS",
+  "attitude and orbit control",
+  "GNC"
+ ],
+ "姿控": [
+  "attitude control",
+  "ACS"
+ ],
+ "姿态确定": [
+  "attitude determination",
+  "attitude measurement"
+ ],
+ "敏感器": [
+  "sensor"
+ ],
+ "陀螺": [
+  "gyro",
+  "gyroscope"
+ ],
+ "星敏感器": [
+  "star tracker",
+  "star sensor"
+ ],
+ "太阳敏感器": [
+  "sun sensor"
+ ],
+ "执行机构": [
+  "actuator",
+  "torquer"
+ ],
+ "飞轮": [
+  "reaction wheel",
+  "momentum wheel"
+ ],
+ "磁力矩器": [
+  "magnetorquer",
+  "magnetic torquer"
+ ],
+ "控制律": [
+  "control law"
+ ],
+ "控制算法": [
+  "control algorithm",
+  "control law"
+ ],
+ "采样周期": [
+  "sampling",
+  "sample rate",
+  "control cycle"
+ ],
+ "滤波": [
+  "filter",
+  "filtering"
+ ],
+ "卡尔曼滤波": [
+  "Kalman filter"
+ ],
+ "电源": [
+  "power",
+  "EPS"
+ ],
+ "配电": [
+  "power distribution",
+  "PCDU"
+ ],
+ "热控": [
+  "thermal control"
+ ],
+ "需求": [
+  "requirement",
+  "requirements"
+ ],
+ "需求分析": [
+  "requirements analysis",
+  "requirements definition"
+ ],
+ "技术要求": [
+  "technical requirements"
+ ],
+ "需求分解": [
+  "requirements decomposition",
+  "allocation",
+  "flow down"
+ ],
+ "需求追溯": [
+  "traceability",
+  "trace"
+ ],
+ "追溯": [
+  "traceability",
+  "trace"
+ ],
+ "需求管理": [
+  "requirements management"
+ ],
+ "利益相关者": [
+  "stakeholder"
+ ],
+ "用户需求": [
+  "stakeholder expectations",
+  "user requirements"
+ ],
+ "任务书": [
+  "requirements",
+  "statement of work",
+  "SOW",
+  "specification"
+ ],
+ "规格说明": [
+  "specification"
+ ],
+ "验证": [
+  "verification",
+  "verify"
+ ],
+ "确认": [
+  "validation",
+  "validate",
+  "acknowledge",
+  "confirmation"
+ ],
+ "验证矩阵": [
+  "verification matrix",
+  "requirements verification matrix"
+ ],
+ "测试": [
+  "test",
+  "testing"
+ ],
+ "试验": [
+  "test",
+  "testing"
+ ],
+ "单元测试": [
+  "unit test",
+  "module test"
+ ],
+ "集成测试": [
+  "integration test"
+ ],
+ "系统测试": [
+  "system test"
+ ],
+ "总装集成": [
+  "assembly, integration",
+  "AIT",
+  "AIV"
+ ],
+ "总装集成测试": [
+  "AIT",
+  "assembly integration and test"
+ ],
+ "地面支持设备": [
+  "ground support equipment",
+  "GSE",
+  "EGSE"
+ ],
+ "模型": [
+  "model philosophy",
+  "engineering model",
+  "qualification model"
+ ],
+ "鉴定": [
+  "qualification"
+ ],
+ "验收": [
+  "acceptance"
+ ],
+ "评审": [
+  "review"
+ ],
+ "设计评审": [
+  "design review",
+  "PDR",
+  "CDR"
+ ],
+ "同行评审": [
+  "peer review",
+  "inspection"
+ ],
+ "走查": [
+  "walkthrough",
+  "inspection",
+  "peer review"
+ ],
+ "代码审查": [
+  "code review",
+  "inspection"
+ ],
+ "设计": [
+  "design"
+ ],
+ "概要设计": [
+  "preliminary design",
+  "architecture",
+  "PDR"
+ ],
+ "详细设计": [
+  "detailed design",
+  "CDR"
+ ],
+ "架构": [
+  "architecture"
+ ],
+ "功能分解": [
+  "functional decomposition",
+  "logical decomposition"
+ ],
+ "产品保证": [
+  "product assurance",
+  "PA"
+ ],
+ "软件产品保证": [
+  "software product assurance"
+ ],
+ "质量": [
+  "quality"
+ ],
+ "可靠性": [
+  "reliability",
+  "dependability"
+ ],
+ "安全性": [
+  "safety"
+ ],
+ "故障模式": [
+  "failure mode",
+  "FMEA",
+  "FMECA"
+ ],
+ "失效模式": [
+  "failure mode",
+  "FMEA",
+  "FMECA"
+ ],
+ "降额": [
+  "derating"
+ ],
+ "元器件": [
+  "parts",
+  "components",
+  "EEE parts"
+ ],
+ "构型管理": [
+  "configuration management",
+  "CM"
+ ],
+ "配置管理": [
+  "configuration management",
+  "CM"
+ ],
+ "技术状态": [
+  "configuration",
+  "configuration management"
+ ],
+ "风险": [
+  "risk"
+ ],
+ "裕度": [
+  "margin"
+ ],
+ "余量": [
+  "margin"
+ ],
+ "预算": [
+  "budget"
+ ],
+ "电磁兼容": [
+  "EMC",
+  "electromagnetic compatibility"
+ ],
+ "接地": [
+  "grounding"
+ ],
+ "静电放电": [
+  "electrostatic discharge",
+  "ESD"
+ ],
+ "立方星": [
+  "CubeSat"
+ ],
+ "小卫星": [
+  "small satellite",
+  "small spacecraft",
+  "smallsat"
+ ],
+ "微小卫星": [
+  "microsatellite",
+  "small satellite"
+ ],
+ "货架产品": [
+  "COTS",
+  "commercial off-the-shelf"
+ ],
+ "工业级器件": [
+  "COTS",
+  "commercial"
+ ],
+ "星上自主": [
+  "onboard autonomy",
+  "autonomy"
+ ],
+ "人工智能": [
+  "AI",
+  "artificial intelligence",
+  "machine learning"
+ ],
+ "应答": [
+  "acknowledge",
+  "acknowledgement",
+  "response"
+ ]
+}

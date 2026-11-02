@@ -32,3 +32,6 @@ app/dist/
 sample/coding/*/src/
 sample/coding/*/doc/编码说明-*
 .fence-test-*/
+
+# 学习资料、标准原文（有版权、文件大）：只放本机或内网共享文件夹，不进 Git；转好的文本进资料库
+资料/

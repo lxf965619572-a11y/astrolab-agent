@@ -1,0 +1,1031 @@
+{
+ "id": "sse4",
+ "title": "Spacecraft Systems Engineering (4th ed.)",
+ "titleZh": "航天器系统工程（第四版，英文原版）",
+ "edition": "4",
+ "authors": "Peter Fortescue, Graham Swinerd, John Stark (eds.)",
+ "publisher": "John Wiley & Sons",
+ "year": 2011,
+ "license": "internal",
+ "lang": "en",
+ "source": "资料/航天器系统工程.pdf",
+ "pageOffset": 21,
+ "note": "有版权（All rights reserved）：只在部门内部学习使用，资料库不对外；用公网模型时智能体检索不到。第一批只导入和嵌入式软件相关的节",
+ "include": [
+  "13",
+  "9.6",
+  "17",
+  "19.3",
+  "19.9"
+ ],
+ "toc": [
+  {
+   "no": "1.1",
+   "title": "Payloads and Missions",
+   "page": 24,
+   "chapter": "1 Introduction",
+   "printed": 3
+  },
+  {
+   "no": "1.2",
+   "title": "A System View of Spacecraft",
+   "page": 25,
+   "chapter": "1 Introduction",
+   "printed": 4
+  },
+  {
+   "no": "1.3",
+   "title": "The Future",
+   "page": 30,
+   "chapter": "1 Introduction",
+   "printed": 9
+  },
+  {
+   "no": "2.1",
+   "title": "Introduction",
+   "page": 32,
+   "chapter": "2 The Spacecraft Environment and its Effect On Design",
+   "printed": 11
+  },
+  {
+   "no": "2.2",
+   "title": "Pre-Operational Spacecraft Environments",
+   "page": 32,
+   "chapter": "2 The Spacecraft Environment and its Effect On Design",
+   "printed": 11
+  },
+  {
+   "no": "2.3",
+   "title": "Operational Spacecraft Environments",
+   "page": 38,
+   "chapter": "2 The Spacecraft Environment and its Effect On Design",
+   "printed": 17
+  },
+  {
+   "no": "2.4",
+   "title": "Environmental Effects on Design",
+   "page": 61,
+   "chapter": "2 The Spacecraft Environment and its Effect On Design",
+   "printed": 40
+  },
+  {
+   "no": "3.1",
+   "title": "Introduction",
+   "page": 70,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 49
+  },
+  {
+   "no": "3.2",
+   "title": "Trajectory Dynamics",
+   "page": 72,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 51
+  },
+  {
+   "no": "3.3",
+   "title": "General Attitude Dynamics",
+   "page": 79,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 58
+  },
+  {
+   "no": "3.4",
+   "title": "Attitude Motion of Specific Types of Spacecraft",
+   "page": 84,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 63
+  },
+  {
+   "no": "3.5",
+   "title": "Oscillatory Modes",
+   "page": 92,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 71
+  },
+  {
+   "no": "3.6",
+   "title": "In Conclusion",
+   "page": 94,
+   "chapter": "3 Dynamics of Spacecraft",
+   "printed": 73
+  },
+  {
+   "no": "4.1",
+   "title": "Introduction",
+   "page": 100,
+   "chapter": "4 Celestial Mechanics",
+   "printed": 79
+  },
+  {
+   "no": "4.2",
+   "title": "The Two-body Problem—Particle Dynamics",
+   "page": 102,
+   "chapter": "4 Celestial Mechanics",
+   "printed": 81
+  },
+  {
+   "no": "4.3",
+   "title": "Specifying the Orbit",
+   "page": 113,
+   "chapter": "4 Celestial Mechanics",
+   "printed": 92
+  },
+  {
+   "no": "4.4",
+   "title": "Orbit Perturbations",
+   "page": 114,
+   "chapter": "4 Celestial Mechanics",
+   "printed": 93
+  },
+  {
+   "no": "4.5",
+   "title": "Restricted Three-body Problem",
+   "page": 127,
+   "chapter": "4 Celestial Mechanics",
+   "printed": 106
+  },
+  {
+   "no": "5.1",
+   "title": "Introduction",
+   "page": 132,
+   "chapter": "5 Mission Analysis",
+   "printed": 111
+  },
+  {
+   "no": "5.2",
+   "title": "Keplerian Orbit Transfers",
+   "page": 135,
+   "chapter": "5 Mission Analysis",
+   "printed": 114
+  },
+  {
+   "no": "5.3",
+   "title": "Mission Analysis",
+   "page": 137,
+   "chapter": "5 Mission Analysis",
+   "printed": 116
+  },
+  {
+   "no": "5.4",
+   "title": "Polar LEO/Remote-Sensing Satellites",
+   "page": 143,
+   "chapter": "5 Mission Analysis",
+   "printed": 122
+  },
+  {
+   "no": "5.5",
+   "title": "Satellite Constellations",
+   "page": 148,
+   "chapter": "5 Mission Analysis",
+   "printed": 127
+  },
+  {
+   "no": "5.6",
+   "title": "Geostationary Earth Orbits (GEO)",
+   "page": 154,
+   "chapter": "5 Mission Analysis",
+   "printed": 133
+  },
+  {
+   "no": "5.7",
+   "title": "Highly Elliptic Orbits",
+   "page": 164,
+   "chapter": "5 Mission Analysis",
+   "printed": 143
+  },
+  {
+   "no": "5.8",
+   "title": "Interplanetary Missions",
+   "page": 168,
+   "chapter": "5 Mission Analysis",
+   "printed": 147
+  },
+  {
+   "no": "6.1",
+   "title": "Systems Classification",
+   "page": 198,
+   "chapter": "6 Propulsion Systems",
+   "printed": 177
+  },
+  {
+   "no": "6.2",
+   "title": "Chemical Rockets",
+   "page": 201,
+   "chapter": "6 Propulsion Systems",
+   "printed": 180
+  },
+  {
+   "no": "6.3",
+   "title": "Spacecraft Propulsion",
+   "page": 223,
+   "chapter": "6 Propulsion Systems",
+   "printed": 202
+  },
+  {
+   "no": "6.4",
+   "title": "Electric Propulsion",
+   "page": 227,
+   "chapter": "6 Propulsion Systems",
+   "printed": 206
+  },
+  {
+   "no": "7.1",
+   "title": "Introduction",
+   "page": 242,
+   "chapter": "7 Launch Vehicles",
+   "printed": 221
+  },
+  {
+   "no": "7.2",
+   "title": "Basic Launch Vehicle Performance and Operation",
+   "page": 243,
+   "chapter": "7 Launch Vehicles",
+   "printed": 222
+  },
+  {
+   "no": "7.3",
+   "title": "Spacecraft Launch Phases and Mission Planning",
+   "page": 252,
+   "chapter": "7 Launch Vehicles",
+   "printed": 231
+  },
+  {
+   "no": "7.4",
+   "title": "The Ariane 5 Launch Vehicle",
+   "page": 257,
+   "chapter": "7 Launch Vehicles",
+   "printed": 236
+  },
+  {
+   "no": "7.5",
+   "title": "US Crewed Launch Systems",
+   "page": 260,
+   "chapter": "7 Launch Vehicles",
+   "printed": 239
+  },
+  {
+   "no": "7.6",
+   "title": "Small Launchers and Reusable Sub-Orbital Vehicles",
+   "page": 263,
+   "chapter": "7 Launch Vehicles",
+   "printed": 242
+  },
+  {
+   "no": "7.7",
+   "title": "Re-Entry into Earth’s Atmosphere",
+   "page": 265,
+   "chapter": "7 Launch Vehicles",
+   "printed": 244
+  },
+  {
+   "no": "7.8",
+   "title": "Specific Launch Costs and Reliability",
+   "page": 268,
+   "chapter": "7 Launch Vehicles",
+   "printed": 247
+  },
+  {
+   "no": "8.1",
+   "title": "Introduction",
+   "page": 272,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 251
+  },
+  {
+   "no": "8.2",
+   "title": "Design Requirements",
+   "page": 272,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 251
+  },
+  {
+   "no": "8.3",
+   "title": "Material Selection",
+   "page": 277,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 256
+  },
+  {
+   "no": "8.4",
+   "title": "Analysis",
+   "page": 284,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 263
+  },
+  {
+   "no": "8.5",
+   "title": "Design Verification",
+   "page": 295,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 274
+  },
+  {
+   "no": "8.6",
+   "title": "Impact Protection",
+   "page": 297,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 276
+  },
+  {
+   "no": "8.7",
+   "title": "Configuration Examples",
+   "page": 299,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 278
+  },
+  {
+   "no": "8.8",
+   "title": "The Future of Space Structures",
+   "page": 306,
+   "chapter": "8 Spacecraft Structures",
+   "printed": 285
+  },
+  {
+   "no": "9.1",
+   "title": "Introduction",
+   "page": 310,
+   "chapter": "9 Attitude Control",
+   "printed": 289
+  },
+  {
+   "no": "9.2",
+   "title": "ACS Overview",
+   "page": 311,
+   "chapter": "9 Attitude Control",
+   "printed": 290
+  },
+  {
+   "no": "9.3",
+   "title": "The Spacecraft Attitude Response",
+   "page": 315,
+   "chapter": "9 Attitude Control",
+   "printed": 294
+  },
+  {
+   "no": "9.4",
+   "title": "Torques and Torquers",
+   "page": 322,
+   "chapter": "9 Attitude Control",
+   "printed": 301
+  },
+  {
+   "no": "9.5",
+   "title": "Attitude Measurement",
+   "page": 330,
+   "chapter": "9 Attitude Control",
+   "printed": 309
+  },
+  {
+   "no": "9.6",
+   "title": "ACS Computation",
+   "page": 342,
+   "chapter": "9 Attitude Control",
+   "printed": 321
+  },
+  {
+   "no": "10.1",
+   "title": "Introduction",
+   "page": 348,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 327
+  },
+  {
+   "no": "10.2",
+   "title": "Power System Elements",
+   "page": 349,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 328
+  },
+  {
+   "no": "10.3",
+   "title": "Primary Power Systems",
+   "page": 351,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 330
+  },
+  {
+   "no": "10.4",
+   "title": "Secondary Power Systems: Batteries",
+   "page": 366,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 345
+  },
+  {
+   "no": "10.5",
+   "title": "Power Management, Distribution and Control",
+   "page": 368,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 347
+  },
+  {
+   "no": "10.6",
+   "title": "Power Budget",
+   "page": 371,
+   "chapter": "10 Electrical Power Systems",
+   "printed": 350
+  },
+  {
+   "no": "11.1",
+   "title": "Introduction",
+   "page": 378,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 357
+  },
+  {
+   "no": "11.2",
+   "title": "The Thermal Environment",
+   "page": 379,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 358
+  },
+  {
+   "no": "11.3",
+   "title": "Thermal Balance",
+   "page": 383,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 362
+  },
+  {
+   "no": "11.4",
+   "title": "Thermal Analysis",
+   "page": 387,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 366
+  },
+  {
+   "no": "11.5",
+   "title": "Thermal Design",
+   "page": 392,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 371
+  },
+  {
+   "no": "11.6",
+   "title": "Thermal Technology",
+   "page": 396,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 375
+  },
+  {
+   "no": "11.7",
+   "title": "Thermal Design Verification",
+   "page": 407,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 386
+  },
+  {
+   "no": "11.8",
+   "title": "Example of Satellite Thermal Design—XMM/Newton",
+   "page": 411,
+   "chapter": "11 Thermal Control of Spacecraft",
+   "printed": 390
+  },
+  {
+   "no": "12.1",
+   "title": "Introduction",
+   "page": 416,
+   "chapter": "12 Telecommunications",
+   "printed": 395
+  },
+  {
+   "no": "12.2",
+   "title": "Techniques of Radio Communications",
+   "page": 421,
+   "chapter": "12 Telecommunications",
+   "printed": 400
+  },
+  {
+   "no": "12.3",
+   "title": "The Communications Payload",
+   "page": 443,
+   "chapter": "12 Telecommunications",
+   "printed": 422
+  },
+  {
+   "no": "12.4",
+   "title": "Conclusion",
+   "page": 457,
+   "chapter": "12 Telecommunications",
+   "printed": 436
+  },
+  {
+   "no": "13.1",
+   "title": "Introduction",
+   "page": 460,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 439
+  },
+  {
+   "no": "13.2",
+   "title": "System Architecture",
+   "page": 461,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 440
+  },
+  {
+   "no": "13.3",
+   "title": "Telemetry Data Formatting",
+   "page": 463,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 442
+  },
+  {
+   "no": "13.4",
+   "title": "Telecommand",
+   "page": 470,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 449
+  },
+  {
+   "no": "13.5",
+   "title": "Communication Techniques and Protocols",
+   "page": 476,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 455
+  },
+  {
+   "no": "13.6",
+   "title": "On-Board Data Handling (OBDH) and Processing",
+   "page": 479,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 458
+  },
+  {
+   "no": "13.7",
+   "title": "Technology",
+   "page": 485,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 464
+  },
+  {
+   "no": "13.8",
+   "title": "Tools and Controlling Documents",
+   "page": 487,
+   "chapter": "13 Telemetry, Command, Data Handling and Processing",
+   "printed": 466
+  },
+  {
+   "no": "14.1",
+   "title": "Introduction",
+   "page": 488,
+   "chapter": "14 Ground Segment",
+   "printed": 467
+  },
+  {
+   "no": "14.2",
+   "title": "The Ground Station",
+   "page": 489,
+   "chapter": "14 Ground Segment",
+   "printed": 468
+  },
+  {
+   "no": "14.3",
+   "title": "Flight Dynamics",
+   "page": 496,
+   "chapter": "14 Ground Segment",
+   "printed": 475
+  },
+  {
+   "no": "14.4",
+   "title": "The Ground Data System",
+   "page": 501,
+   "chapter": "14 Ground Segment",
+   "printed": 480
+  },
+  {
+   "no": "14.5",
+   "title": "The Flight Operations System",
+   "page": 504,
+   "chapter": "14 Ground Segment",
+   "printed": 483
+  },
+  {
+   "no": "15.1",
+   "title": "Introduction",
+   "page": 516,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 495
+  },
+  {
+   "no": "15.2",
+   "title": "One-Shot Devices",
+   "page": 518,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 497
+  },
+  {
+   "no": "15.3",
+   "title": "Continuously and Intermittently Operating Devices",
+   "page": 528,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 507
+  },
+  {
+   "no": "15.4",
+   "title": "Components",
+   "page": 534,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 513
+  },
+  {
+   "no": "15.5",
+   "title": "Materials",
+   "page": 541,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 520
+  },
+  {
+   "no": "15.6",
+   "title": "Tribology",
+   "page": 542,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 521
+  },
+  {
+   "no": "15.7",
+   "title": "Testing and Verification",
+   "page": 544,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 523
+  },
+  {
+   "no": "15.8",
+   "title": "Conclusion",
+   "page": 545,
+   "chapter": "15 Spacecraft Mechanisms",
+   "printed": 524
+  },
+  {
+   "no": "16.1",
+   "title": "Introduction",
+   "page": 548,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 527
+  },
+  {
+   "no": "16.2",
+   "title": "Examples of EMC Problems",
+   "page": 549,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 528
+  },
+  {
+   "no": "16.3",
+   "title": "EMC Specifications",
+   "page": 549,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 528
+  },
+  {
+   "no": "16.4",
+   "title": "Electromagnetic Compatibility—Terms and Definitions",
+   "page": 550,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 529
+  },
+  {
+   "no": "16.5",
+   "title": "EMC Fundamentals",
+   "page": 551,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 530
+  },
+  {
+   "no": "16.6",
+   "title": "The Systems Approach to EMC",
+   "page": 552,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 531
+  },
+  {
+   "no": "16.7",
+   "title": "EMC Categories",
+   "page": 552,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 531
+  },
+  {
+   "no": "16.8",
+   "title": "Electrostatic Discharge",
+   "page": 556,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 535
+  },
+  {
+   "no": "16.9",
+   "title": "Spacecraft Grounding Schemes",
+   "page": 557,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 536
+  },
+  {
+   "no": "16.10",
+   "title": "Major Causes of Spacecraft EMC Problems",
+   "page": 562,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 541
+  },
+  {
+   "no": "16.11",
+   "title": "Analysis Methods for Spacecraft EMC Engineering",
+   "page": 563,
+   "chapter": "16 Spacecraft Electromagnetic Compatibility Engineering",
+   "printed": 542
+  },
+  {
+   "no": "17.1",
+   "title": "Introduction",
+   "page": 566,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 545
+  },
+  {
+   "no": "17.2",
+   "title": "Some Definitions",
+   "page": 566,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 545
+  },
+  {
+   "no": "17.3",
+   "title": "The Verification Plan",
+   "page": 568,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 547
+  },
+  {
+   "no": "17.4",
+   "title": "Relationship between Analysis and Test",
+   "page": 572,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 551
+  },
+  {
+   "no": "17.5",
+   "title": "The AIV Plan",
+   "page": 573,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 552
+  },
+  {
+   "no": "17.6",
+   "title": "Testing: General",
+   "page": 574,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 553
+  },
+  {
+   "no": "17.7",
+   "title": "Test Types",
+   "page": 578,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 557
+  },
+  {
+   "no": "17.8",
+   "title": "Model Philosophy",
+   "page": 582,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 561
+  },
+  {
+   "no": "17.9",
+   "title": "Build Standards and Applications",
+   "page": 585,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 564
+  },
+  {
+   "no": "17.10",
+   "title": "Ground Support Equipment",
+   "page": 588,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 567
+  },
+  {
+   "no": "17.11",
+   "title": "Checkpoints in the AIV Programme",
+   "page": 592,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 571
+  },
+  {
+   "no": "17.12",
+   "title": "Verification Closeout",
+   "page": 593,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 572
+  },
+  {
+   "no": "17.13",
+   "title": "Launch Preparation",
+   "page": 593,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 572
+  },
+  {
+   "no": "17.14",
+   "title": "Conclusion",
+   "page": 594,
+   "chapter": "17 Assembly, Integration and Verification",
+   "printed": 573
+  },
+  {
+   "no": "18.1",
+   "title": "Introduction",
+   "page": 596,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 575
+  },
+  {
+   "no": "18.2",
+   "title": "Small Satellite Design Philosophy",
+   "page": 600,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 579
+  },
+  {
+   "no": "18.3",
+   "title": "Small Satellite System Design",
+   "page": 601,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 580
+  },
+  {
+   "no": "18.4",
+   "title": "COTS Components in the Space Environment",
+   "page": 604,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 583
+  },
+  {
+   "no": "18.5",
+   "title": "Microsatellite Platforms",
+   "page": 608,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 587
+  },
+  {
+   "no": "18.6",
+   "title": "Minisatellite Platforms",
+   "page": 611,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 590
+  },
+  {
+   "no": "18.7",
+   "title": "Nanosatellite Platforms",
+   "page": 611,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 590
+  },
+  {
+   "no": "18.8",
+   "title": "Affordable Launches for Small Satellites",
+   "page": 613,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 592
+  },
+  {
+   "no": "18.9",
+   "title": "In-Orbit Operations",
+   "page": 615,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 594
+  },
+  {
+   "no": "18.10",
+   "title": "Small Satellite Applications",
+   "page": 618,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 597
+  },
+  {
+   "no": "18.11",
+   "title": "Picosatellites and Recent Advances in Miniaturization",
+   "page": 624,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 603
+  },
+  {
+   "no": "18.12",
+   "title": "Conclusion",
+   "page": 625,
+   "chapter": "18 Small Satellite Engineering and Applications",
+   "printed": 604
+  },
+  {
+   "no": "19.1",
+   "title": "Introduction",
+   "page": 628,
+   "chapter": "19 Product Assurance",
+   "printed": 607
+  },
+  {
+   "no": "19.2",
+   "title": "Product Assurance in a Project",
+   "page": 630,
+   "chapter": "19 Product Assurance",
+   "printed": 609
+  },
+  {
+   "no": "19.3",
+   "title": "Reliability/Dependability",
+   "page": 634,
+   "chapter": "19 Product Assurance",
+   "printed": 613
+  },
+  {
+   "no": "19.4",
+   "title": "Parts",
+   "page": 639,
+   "chapter": "19 Product Assurance",
+   "printed": 618
+  },
+  {
+   "no": "19.5",
+   "title": "Materials and Processes",
+   "page": 643,
+   "chapter": "19 Product Assurance",
+   "printed": 622
+  },
+  {
+   "no": "19.6",
+   "title": "Product Assurance in Manufacturing, AI&V",
+   "page": 647,
+   "chapter": "19 Product Assurance",
+   "printed": 626
+  },
+  {
+   "no": "19.7",
+   "title": "Safety",
+   "page": 655,
+   "chapter": "19 Product Assurance",
+   "printed": 634
+  },
+  {
+   "no": "19.8",
+   "title": "Product Assurance in Operations",
+   "page": 658,
+   "chapter": "19 Product Assurance",
+   "printed": 637
+  },
+  {
+   "no": "19.9",
+   "title": "Software Product Assurance",
+   "page": 659,
+   "chapter": "19 Product Assurance",
+   "printed": 638
+  },
+  {
+   "no": "19.10",
+   "title": "PA in Technology Developments",
+   "page": 661,
+   "chapter": "19 Product Assurance",
+   "printed": 640
+  },
+  {
+   "no": "19.11",
+   "title": "The Assurance Message",
+   "page": 663,
+   "chapter": "19 Product Assurance",
+   "printed": 642
+  },
+  {
+   "no": "20.1",
+   "title": "Introduction",
+   "page": 664,
+   "chapter": "20 Spacecraft System Engineering",
+   "printed": 643
+  },
+  {
+   "no": "20.2",
+   "title": "System Engineering",
+   "page": 665,
+   "chapter": "20 Spacecraft System Engineering",
+   "printed": 644
+  },
+  {
+   "no": "20.3",
+   "title": "Concurrent Engineering",
+   "page": 675,
+   "chapter": "20 Spacecraft System Engineering",
+   "printed": 654
+  },
+  {
+   "no": "20.4",
+   "title": "A Case Study: Cryosat",
+   "page": 688,
+   "chapter": "20 Spacecraft System Engineering",
+   "printed": 667
+  },
+  {
+   "no": "20.5",
+   "title": "Conclusion",
+   "page": 699,
+   "chapter": "20 Spacecraft System Engineering",
+   "printed": 678
+  }
+ ]
+}

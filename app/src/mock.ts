@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport } from './api'
+import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import { categoryMode } from './modes'
@@ -447,6 +447,39 @@ export function createMockApi(): AstroApi {
     }
   }
 
+  // 资料库（浏览器里看界面用）
+  const sec = (no: string, title: string, chapter: string, pages: string) => ({ no, title, chapter, pages, file: `${no}.md` })
+  const refDocs: RefDoc[] = [
+    { id: 'sse4', lib: 'ref', libName: '部门资料库', title: 'Spacecraft Systems Engineering (4th ed.)', titleZh: '航天器系统工程（第四版，英文原版）', year: 2011, license: 'internal', sections: [
+      sec('9.6', 'ACS Computation', '9 Attitude Control', '321-326'),
+      sec('13.1', 'Introduction', '13 Telemetry, Command, Data Handling and Processing', '439-440'), sec('13.2', 'System Architecture', '13 Telemetry, Command, Data Handling and Processing', '440-442'),
+      sec('13.3', 'Telemetry Data Formatting', '13 Telemetry, Command, Data Handling and Processing', '442-449'), sec('13.4', 'Telecommand', '13 Telemetry, Command, Data Handling and Processing', '449-455'),
+      sec('13.6', 'On-Board Data Handling (OBDH) and Processing', '13 Telemetry, Command, Data Handling and Processing', '458-464'),
+      sec('19.9', 'Software Product Assurance', '19 Product Assurance', '638-640'),
+    ] },
+    { id: 'nasa-se-hb', lib: 'ref', libName: '部门资料库', title: 'NASA Systems Engineering Handbook (NASA/SP-2016-6105 Rev2)', titleZh: 'NASA 系统工程手册（2016 修订版 2）', year: 2016, license: 'public', sections: [
+      sec('4.2', 'Technical Requirements Definition', '4 System Design Processes', '54-62'), sec('5.3', 'Product Verification', '5 Product Realization', '88-99'),
+      sec('App.C', 'How to Write a Good Requirement— Checklist', 'Appendices', '197-200'),
+    ] },
+  ]
+  const refZh: Record<string, RefTranslation | undefined> = {}
+  const refEdit: Record<string, string> = {}
+  const refHl: Record<string, RefHighlight[]> = {}
+  const hlKey = (id: string) => { const [, d, f] = /^ref:([^/]+)\/(.+)$/.exec(id) || []; return `${d}|${f}` }
+  function refRead(id: string): RefRead {
+    const [, docId, file] = /^ref:([^/]+)\/(.+)$/.exec(id) || []
+    const d = refDocs.find((x) => x.id === docId)!
+    const i = d.sections.findIndex((s) => s.file === file)
+    const s = d.sections[i]
+    const sib = (j: number) => (d.sections[j] ? { id: `ref:${d.id}/${d.sections[j].file}`, no: d.sections[j].no, title: d.sections[j].title } : null)
+    const text = refEdit[id] ?? refText[s.no] ?? 'This section describes …'
+    return { id, meta: { doc: d.id, docTitle: d.title, docTitleZh: d.titleZh || '', lib: d.lib, libName: d.libName, no: s.no, title: s.title, chapter: s.chapter, pages: s.pages, license: d.license }, cite: `${d.title} §${s.no} ${s.title}，第 ${s.pages} 页`,
+      paragraphs: text.split(/\n{2,}/), edited: id in refEdit, translation: refZh[id] || null, translating: null, highlights: refHl[hlKey(id)] || [], prev: sib(i - 1), next: sib(i + 1) }
+  }
+  const refText: Record<string, string> = {
+    '13.3': '#### 13.3.1 Telemetry frame\n\nThe telemetry data are organized into frames, each beginning with a synchronization word so that the ground station can locate the start of the frame. The frame length is fixed for a given format, and a frame counter allows lost frames to be detected.\n\n*Figure 13.3 Telemetry frame format*\n\nPackets of variable length are multiplexed into the fixed-length frames …',
+    'App.C': '### C.1 Use of Correct Terms\n\n• Shall = requirement\n\n• Will = facts or declaration of purpose\n\n• Should = goal\n\n### C.2 Editorial Checklist\n\nThe requirement is in the form “product ABC shall XYZ.” …',
+  }
   // 知识库和技能库（浏览器里看界面用）
   let inbox: InboxItem[] = [
     { path: '待整理/2026-11-01/复位等待按大于或等于判超时.md', problems: [], meta: { title: '复位等待按“大于或等于”判超时，边界取 N-1、N、N+1', kind: '经验', tags: ['复位', '超时', '边界值'], source: '任务 t-20261029-0932（示例工程）；提交 3f2a91c', status: '候选' }, body: '## 结论\n设计写“≥ N tick 视为超时”时，代码用 `>=`，单元测试取 N-1、N、N+1 三个点。\n\n## 依据\n智能体把判断写成 `elapsed > 10`，审核时人改成 `>=`，并补了第 10 tick 的用例。\n\n## 怎么用\n凡是设计里写“达到/超过”的阈值，先确认是否包含等号，再定代码和用例。' },
@@ -642,6 +675,30 @@ export function createMockApi(): AstroApi {
       },
       async remove(id) { kbEntries = kbEntries.filter((x) => x.id !== id) },
       async publish() { await wait(300); return { branch: 'submit/lixf/x-20261027' } },
+    },
+    ref: {
+      async docs() { return refDocs },
+      async search(q: string, doc?: string) {
+        const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
+        const hits = refDocs.flatMap((d) => d.sections.map((s) => ({ d, s }))).filter(({ d, s }) => (!doc || d.id === doc) && terms.some((t) => `${s.title} ${refText[s.no] || ''}`.toLowerCase().includes(t) || (t.includes('遥测') && s.no === '13.3') || (t.includes('需求') && /App\.C|4\.2/.test(s.no))))
+        return { expanded: q.includes('遥测') ? ['telemetry', 'TM'] : q.includes('需求') ? ['requirement'] : [], hits: hits.map(({ d, s }) => ({ id: `ref:${d.id}/${s.file}`, doc: d.id, docTitle: d.title, no: s.no, title: s.title, chapter: s.chapter, pages: s.pages, license: d.license, score: 1, snippet: (refText[s.no] || 'This section describes …').slice(0, 160), cite: `${d.title} §${s.no} ${s.title}，第 ${s.pages} 页` })) }
+      },
+      async read(id: string) { return refRead(id) },
+      async counts(_lib: string, doc: string) { const out: Record<string, number> = {}; for (const [k, v] of Object.entries(refHl)) { const [d, f] = k.split('|'); if (d === doc && v.length) out[f] = v.length } return out },
+      async translate(id: string) {
+        const r = refRead(id)
+        for (let i = 1; i <= 3; i++) { emitUi({ type: 'ref-translate', payload: { id, job: { done: i - 1, total: 3, at: Date.now() } } }); await sleep(400) }
+        refZh[id] = { from: 'mine', title: '（模拟）' + r.meta.title, model: 'deepseek-flash', at: '2026-11-02 10:40', edited: false, stale: false, paragraphs: r.paragraphs.map((p) => p.startsWith('#') ? p.replace(/^(#+ [\d.]+ ).*/, '$1遥测帧') : p.startsWith('*') ? '*图 13.3 遥测帧格式*' : '遥测数据按帧组织，每帧以同步字开头，地面站据此找到帧的起点。对一种格式，帧长固定，帧计数用来发现丢帧。') }
+        emitUi({ type: 'ref-translate', payload: { id, job: null } })
+        return refRead(id)
+      },
+      async saveTranslation(id: string, paras: string[]) { refZh[id] = { ...refZh[id]!, paragraphs: paras, edited: true, stale: false }; return refRead(id) },
+      async saveOriginal(id: string, text: string) { refEdit[id] = text; if (refZh[id]) refZh[id] = { ...refZh[id]!, stale: true }; return refRead(id) },
+      async revert(id: string, what: 'original' | 'translation') { if (what === 'original') delete refEdit[id]; else delete refZh[id]; return refRead(id) },
+      async submit() { return { branch: 'submit/lixf/ref-20261102' } },
+      async addHighlight(id: string, h) { const k = hlKey(id); const item: RefHighlight = { id: `h${Date.now()}`, at: Date.now(), ...h, note: h.note || '' }; (refHl[k] ||= []).push(item); return item },
+      async updateHighlight(id: string, hid: string, patch) { const h = (refHl[hlKey(id)] || []).find((x) => x.id === hid)!; Object.assign(h, patch); return h },
+      async removeHighlight(id: string, hid: string) { refHl[hlKey(id)] = (refHl[hlKey(id)] || []).filter((x) => x.id !== hid); return true },
     },
     update: {
       async state() { return { ...up } },

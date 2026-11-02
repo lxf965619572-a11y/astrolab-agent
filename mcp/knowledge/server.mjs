@@ -7,9 +7,13 @@
 import { userInfo } from 'node:os'
 import { serve } from '../common/mcp-lite.mjs'
 import { KINDS, buildIndex, librariesFromEnv, readEntry, search, writeEntry } from './lib/kb.mjs'
+import { buildRefIndex, listDocs, loadGlossary, readRef, searchRef } from './lib/ref.mjs'
 
 const libs = () => librariesFromEnv()
 const noLib = '知识库还没有配置（在工作台里使用时会自动配置）'
+// 资料的许可范围：工作台用公网模型时给 public（有版权的资料不发出去），部门模型时给 all
+const refScope = () => (process.env.ASTROLAB_REFERENCE_SCOPE === 'public' ? 'public' : 'all')
+const LIC = { public: '公版', internal: '仅部门内部' }
 
 serve({ name: 'knowledge', version: '1.0.0' }, [
   {
@@ -47,6 +51,58 @@ serve({ name: 'knowledge', version: '1.0.0' }, [
       const e = readEntry(L, id)
       const head = [`# ${e.meta.title || e.path}`, `类别：${e.meta.kind || '经验'}　来源：${e.libName}${e.meta.model ? `　型号：${e.meta.model}` : ''}${e.meta.tags.length ? `　标签：${e.meta.tags.join('、')}` : ''}${e.meta.author ? `　作者：${e.meta.author}` : ''}${e.meta.date ? `　日期：${e.meta.date}` : ''}`]
       return { text: `${head.join('\n')}\n\n${e.body}`, data: { id: e.id, meta: e.meta } }
+    },
+  },
+  {
+    name: 'search_reference',
+    description:
+      '在部门资料库（学习资料、标准原文，按节切开）里检索，找依据和细节。和知识库不同：知识库是部门提炼的结论，资料是出处。' +
+      '资料原文多是英文：用英文术语检索最准（如“telemetry frame format”“requirement verification matrix”）；用中文时会按术语表补上英文。' +
+      '返回资料名、节号、页码、摘要和 id，要看原文用 read_reference。引用资料时写出“资料名 §节号，第几页”，不要凭记忆补页码。',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: '检索词，英文术语优先，空格分隔' },
+        doc: { type: 'string', description: '只在某一份资料里找（list_references 返回的资料 id）' },
+        limit: { type: 'integer', minimum: 1, maximum: 20, description: '最多返回几条，默认 6' },
+      },
+      required: ['query'],
+    },
+    handler: async ({ query, doc, limit = 6 }) => {
+      const L = libs()
+      const idx = buildRefIndex(L, { scope: refScope() })
+      if (!idx.secs.length) return { text: refScope() === 'public' ? '资料库里没有可用的公版资料（有版权的资料只在部门模型下可以检索）。' : '资料库里还没有资料。', data: { hits: [] } }
+      const r = searchRef(idx, query, { doc, limit, glossary: loadGlossary(L) })
+      if (!r.hits.length) return { text: `资料里没有找到与“${query}”相关的内容。试试英文术语。`, data: r }
+      const lines = r.hits.map((h, i) => `${i + 1}. ${h.cite}（${LIC[h.license] || h.license}）\n   id: ${h.id}\n   ${h.snippet}`)
+      return { text: `${r.expanded.length ? `（按术语表补上：${r.expanded.join(', ')}）\n` : ''}${lines.join('\n')}`, data: r }
+    },
+  },
+  {
+    name: 'read_reference',
+    description: '读资料的一节原文（search_reference 或 list_references 返回的 id）。太长的节分几部分，用 part 读后面的部分。引用时用返回的 cite。',
+    inputSchema: { type: 'object', properties: { id: { type: 'string' }, part: { type: 'integer', minimum: 1 } }, required: ['id'] },
+    handler: async ({ id, part = 1 }) => {
+      const r = readRef(libs(), id, { part, scope: refScope() })
+      const head = [`# ${r.meta.no} ${r.meta.title}`, `出处：${r.cite}${r.parts > 1 ? `　第 ${r.part}/${r.parts} 部分` : ''}`]
+      const nav = [r.prev && `上一节：${r.prev.no} ${r.prev.title}（${r.prev.id}）`, r.next && `下一节：${r.next.no} ${r.next.title}（${r.next.id}）`].filter(Boolean)
+      return { text: `${head.join('\n')}\n\n${r.text}\n\n${nav.join('\n')}`, data: { id: r.id, meta: r.meta, cite: r.cite, part: r.part, parts: r.parts } }
+    },
+  },
+  {
+    name: 'list_references',
+    description: '列出资料库里有哪些资料；给了资料 id 时列出这份资料已导入的章节（节号、标题、页码、id）。',
+    inputSchema: { type: 'object', properties: { doc: { type: 'string' } } },
+    handler: async ({ doc } = {}) => {
+      const scope = refScope()
+      const docs = listDocs(libs()).filter((d) => scope !== 'public' || d.license === 'public')
+      if (!docs.length) return { text: '资料库里还没有可用的资料。', data: { docs: [] } }
+      if (doc) {
+        const d = docs.find((x) => x.id === doc)
+        if (!d) return { text: `没有这份资料：${doc}`, isError: true }
+        return { text: [`${d.title}（${d.titleZh || ''}，${LIC[d.license] || d.license}）`, ...d.sections.map((s) => `- §${s.no} ${s.title}，第 ${s.pages} 页　id: ${d.lib}:${d.id}/${s.file}`)].join('\n'), data: { doc: d } }
+      }
+      return { text: docs.map((d) => `- ${d.id}：${d.title}（${d.titleZh || ''}，${LIC[d.license] || d.license}，已导入 ${d.sections.length} 节）`).join('\n'), data: { docs: docs.map(({ dir, ...x }) => x) } }
     },
   },
   {

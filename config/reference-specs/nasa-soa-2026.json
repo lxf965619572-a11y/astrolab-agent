@@ -1,0 +1,1381 @@
+{
+ "id": "nasa-soa-2026",
+ "title": "NASA State-of-the-Art of Small Spacecraft Technology (2026)",
+ "titleZh": "NASA 小卫星技术现状报告（2026）",
+ "edition": "2026",
+ "authors": "NASA Ames Research Center, Small Spacecraft Systems Virtual Institute",
+ "publisher": "NASA",
+ "year": 2026,
+ "license": "public",
+ "lang": "en",
+ "source": "资料/NASA小卫星技术现状报告_2026.pdf",
+ "pageOffset": 0,
+ "note": "美国政府出版物（公版）。第一批导入第 8 章星载电子（星载计算、飞行软件）",
+ "include": [
+  "8"
+ ],
+ "toc": [
+  {
+   "no": "1",
+   "title": "Introduction",
+   "page": 12,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.1",
+   "title": "Objective",
+   "page": 12,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.2",
+   "title": "Scope",
+   "page": 12,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.3",
+   "title": "Assessment",
+   "page": 14,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.3.1",
+   "title": "Terminology",
+   "page": 15,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.3.2",
+   "title": "Heritage Systems",
+   "page": 16,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "2",
+   "title": "Complete Spacecraft Platforms",
+   "page": 19,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.1",
+   "title": "Introduction",
+   "page": 19,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.2",
+   "title": "State-of-the-Art – Spacecraft Platforms",
+   "page": 19,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.2.1",
+   "title": "Hosted Orbital Services",
+   "page": 19,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.2.2",
+   "title": "Spacecraft Bus Procurement",
+   "page": 23,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.3",
+   "title": "Other Complete Spacecraft Platforms Providers",
+   "page": 36,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.4",
+   "title": "Programmatic and Systems Engineering Considerations",
+   "page": 36,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.5",
+   "title": "Summary",
+   "page": 37,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "2.6",
+   "title": "References",
+   "page": 37,
+   "chapter": "2 Complete Spacecraft Platforms"
+  },
+  {
+   "no": "3",
+   "title": "Power",
+   "page": 43,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.1",
+   "title": "Introduction",
+   "page": 43,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.2",
+   "title": "State-of-the-Art – Power Generation",
+   "page": 44,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.2.1",
+   "title": "Solar Cells",
+   "page": 45,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.2.2",
+   "title": "Solar Panels & Arrays",
+   "page": 46,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.3",
+   "title": "On the Horizon – Power Generation",
+   "page": 53,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.3.1",
+   "title": "Multi-junction Solar Cells",
+   "page": 53,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.3.2",
+   "title": "Unitized Regenerative Fuel Cells",
+   "page": 55,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.4",
+   "title": "State-of-the-Art – Energy Storage",
+   "page": 56,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.4.1",
+   "title": "Secondary Li-ion Batteries",
+   "page": 56,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.5",
+   "title": "On the Horizon – Energy Storage",
+   "page": 61,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.5.1",
+   "title": "Nanomaterials",
+   "page": 61,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.5.2",
+   "title": "Supercapacitors",
+   "page": 62,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.5.3",
+   "title": "Solid-State Batteries",
+   "page": 63,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.5.4",
+   "title": "Energy Storage Systems",
+   "page": 64,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.6",
+   "title": "State-of-the-Art – Power Management and Distribution",
+   "page": 65,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.6.1",
+   "title": "PMAD Selection Considerations",
+   "page": 65,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.7",
+   "title": "On the Horizon – Power Management and Distribution",
+   "page": 70,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "3.8",
+   "title": "Summary",
+   "page": 70,
+   "chapter": "3 Power"
+  },
+  {
+   "no": "5",
+   "title": "Guidance, Navigation & Control",
+   "page": 162,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.1",
+   "title": "Introduction",
+   "page": 162,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2",
+   "title": "State-of-the-Art – GNC Subsystems",
+   "page": 163,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.1",
+   "title": "Integrated Units",
+   "page": 163,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.2",
+   "title": "Reaction Wheels",
+   "page": 165,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.3",
+   "title": "Magnetic Torquers",
+   "page": 167,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.4",
+   "title": "Thrusters",
+   "page": 169,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.5",
+   "title": "Star Trackers",
+   "page": 170,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.6",
+   "title": "Magnetometers",
+   "page": 172,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.7",
+   "title": "Sun Sensors",
+   "page": 173,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.8",
+   "title": "Horizon Sensors",
+   "page": 176,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.9",
+   "title": "Inertial Sensing",
+   "page": 176,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.10",
+   "title": "GPS Receivers",
+   "page": 180,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.11",
+   "title": "Deep Space Navigation",
+   "page": 181,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.12",
+   "title": "Atomic Clocks",
+   "page": 181,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.2.13",
+   "title": "LiDAR",
+   "page": 182,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.3",
+   "title": "Formation Flying, Rendezvous and Proximity Operations",
+   "page": 182,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.4",
+   "title": "On the Horizon",
+   "page": 185,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.5",
+   "title": "Summary",
+   "page": 186,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "5.6",
+   "title": "References",
+   "page": 186,
+   "chapter": "5 Guidance, Navigation & Control"
+  },
+  {
+   "no": "6",
+   "title": "Structure, Mechanisms, and Materials",
+   "page": 193,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.1",
+   "title": "Introduction",
+   "page": 193,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.2",
+   "title": "State-of-the-Art – Primary Structures",
+   "page": 194,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.2.1",
+   "title": "CubeSat Standard",
+   "page": 194,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.2.2",
+   "title": "Custom CubeSat Primary Structures",
+   "page": 196,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.2.3",
+   "title": "Primary Structure Standard Dispenser",
+   "page": 197,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.2.4",
+   "title": "CubeSat Structures Construction Methods",
+   "page": 197,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.3",
+   "title": "State-of-the-Art – Mechanisms",
+   "page": 198,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.3.1",
+   "title": "Actuators",
+   "page": 199,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.3.2",
+   "title": "Deployable Structures",
+   "page": 201,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.3.3",
+   "title": "Robotic Manipulator",
+   "page": 203,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.3.4",
+   "title": "Reliability Considerations",
+   "page": 203,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.4",
+   "title": "State-of-the-Art – Polymeric Additive Manufacturing",
+   "page": 204,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.4.1",
+   "title": "Applicability of TRL to Polymer AM",
+   "page": 204,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.4.2",
+   "title": "Inspection and Testing",
+   "page": 205,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.4.3",
+   "title": "Thermoplastics and Photopolymers",
+   "page": 205,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.4.4",
+   "title": "AM Design Optimization",
+   "page": 213,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5",
+   "title": "Radiation Effects and Mitigation Strategies",
+   "page": 215,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.1",
+   "title": "Shielding from the Space Environment",
+   "page": 215,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.2",
+   "title": "Inherent Mass Shielding",
+   "page": 215,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.3",
+   "title": "Shields-1 Mission, Radiation Shielding for CubeSat Structural Design",
+   "page": 217,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.4",
+   "title": "Ad Hoc Shielding",
+   "page": 218,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.5",
+   "title": "Charge Dissipation Coating",
+   "page": 218,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.5.6",
+   "title": "LUNA Innovations, Inc. XP Charge Dissipation Coating",
+   "page": 218,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "6.6",
+   "title": "Summary",
+   "page": 219,
+   "chapter": "6 Structure, Mechanisms, and Materials"
+  },
+  {
+   "no": "7",
+   "title": "Thermal Control",
+   "page": 226,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.1",
+   "title": "Introduction",
+   "page": 226,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2",
+   "title": "State-of-the-Art – Passive Systems",
+   "page": 227,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.1",
+   "title": "Sprayable Thermal Control Coatings, Tapes, and MLI",
+   "page": 229,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.2",
+   "title": "Thermal Straps",
+   "page": 232,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.3",
+   "title": "Thermal Contact Conductance and Bolted Joint Conductance",
+   "page": 234,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.4",
+   "title": "Thermal Interface Materials and Conductive Gaskets",
+   "page": 234,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.5",
+   "title": "Sunshields",
+   "page": 235,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.6",
+   "title": "Thermal Louvers",
+   "page": 235,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.7",
+   "title": "Deployable Radiators",
+   "page": 236,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.8",
+   "title": "Heat Pipes",
+   "page": 237,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.9",
+   "title": "Phase Change Materials and Thermal Storage Units",
+   "page": 237,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.10",
+   "title": "Thermal Switches",
+   "page": 238,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.2.11",
+   "title": "Multifunctional Thermal Structures",
+   "page": 239,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.3",
+   "title": "State-of-the-Art – Active Systems",
+   "page": 239,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.3.1",
+   "title": "Heaters",
+   "page": 240,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.3.2",
+   "title": "Cryocoolers",
+   "page": 241,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.3.3",
+   "title": "Thermoelectric Coolers (TECs)",
+   "page": 242,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.3.4",
+   "title": "Fluid Loops",
+   "page": 243,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "7.4",
+   "title": "Summary",
+   "page": 244,
+   "chapter": "7 Thermal Control"
+  },
+  {
+   "no": "8",
+   "title": "Small Spacecraft Avionics",
+   "page": 249,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.1",
+   "title": "Introduction",
+   "page": 249,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.1.1",
+   "title": "Chapter Organization and Disclaimers",
+   "page": 250,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2",
+   "title": "State-of-the-Art: Onboard Computing",
+   "page": 250,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.1",
+   "title": "Radiation Mitigation and Tolerance Schemes",
+   "page": 251,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.2",
+   "title": "Computing Form Factors",
+   "page": 252,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.3",
+   "title": "Processor Architectures",
+   "page": 253,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.4",
+   "title": "Memory, Electronic Function Blocks, and Components",
+   "page": 253,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.5",
+   "title": "Bus Electrical Interfaces",
+   "page": 254,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.6",
+   "title": "Information Processing and AI",
+   "page": 255,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.2.7",
+   "title": "Highly Integrated Onboard Computing Products",
+   "page": 258,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.3",
+   "title": "State-of-the-Art: Flight Software",
+   "page": 266,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.3.1",
+   "title": "Implication of Onboard Computing on FSW",
+   "page": 266,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.3.2",
+   "title": "Frameworks",
+   "page": 266,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.3.3",
+   "title": "Operating Systems",
+   "page": 269,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.4",
+   "title": "On the Horizon: Avionics",
+   "page": 269,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "8.5",
+   "title": "Summary",
+   "page": 270,
+   "chapter": "8 Small Spacecraft Avionics"
+  },
+  {
+   "no": "9",
+   "title": "Communications",
+   "page": 277,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.1",
+   "title": "Introduction",
+   "page": 277,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2",
+   "title": "State-of-the-art: Radio Frequency Communications",
+   "page": 278,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.1",
+   "title": "Frequency Bands",
+   "page": 278,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.2",
+   "title": "System Architecture",
+   "page": 279,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.3",
+   "title": "Major Components in SmallSat Communication Systems",
+   "page": 280,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.4",
+   "title": "Design Considerations",
+   "page": 281,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.5",
+   "title": "Policies and Licensing",
+   "page": 281,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.6",
+   "title": "Encryption",
+   "page": 282,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.7",
+   "title": "Antennas",
+   "page": 282,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.2.8",
+   "title": "Radios",
+   "page": 283,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3",
+   "title": "State-of-the-art: Free Space Optical Communications",
+   "page": 301,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3.1",
+   "title": "System Architecture",
+   "page": 302,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3.2",
+   "title": "Optical Ground Stations",
+   "page": 302,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3.3",
+   "title": "Design Considerations",
+   "page": 303,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3.4",
+   "title": "Policies and Licensing",
+   "page": 304,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.3.5",
+   "title": "Mission Examples",
+   "page": 305,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.4",
+   "title": "Future Communications Technologies",
+   "page": 308,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.5",
+   "title": "Summary",
+   "page": 309,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "9.6",
+   "title": "References",
+   "page": 310,
+   "chapter": "9 Communications"
+  },
+  {
+   "no": "4",
+   "title": "In-Space Propulsion",
+   "page": 79,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.1",
+   "title": "Introduction",
+   "page": 79,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.1.1",
+   "title": "Document Organization",
+   "page": 79,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.2",
+   "title": "Public Data Sources and Disclaimers",
+   "page": 79,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.3",
+   "title": "Definitions",
+   "page": 80,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.4",
+   "title": "Technology Maturity",
+   "page": 80,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.4.1",
+   "title": "Application of the TRL Scale to Small Spacecraft Propulsion Systems",
+   "page": 80,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.4.2",
+   "title": "Progress Toward Mission Infusion (PMI)",
+   "page": 81,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.5",
+   "title": "Overview of In-Space Propulsion Technology Types",
+   "page": 84,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.6",
+   "title": "State-of-the-Art in Small Spacecraft Propulsion",
+   "page": 86,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.6.1",
+   "title": "In-Space Chemical Propulsion",
+   "page": 86,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.6.2",
+   "title": "In-Space Electric Propulsion",
+   "page": 99,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "4.6.3",
+   "title": "In-Space Propellant-less Propulsion",
+   "page": 120,
+   "chapter": "4 In-Space Propulsion"
+  },
+  {
+   "no": "10",
+   "title": "Integration, Launch, Deployment, and Orbital Transport",
+   "page": 316,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.1",
+   "title": "Introduction",
+   "page": 316,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.2",
+   "title": "State-of-the-Art – Launch Integration Role",
+   "page": 317,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.2.1",
+   "title": "Launch Brokers and Launch Integrators",
+   "page": 318,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.3",
+   "title": "Launch Paradigms",
+   "page": 318,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.3.1",
+   "title": "Dedicated Launches",
+   "page": 320,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.3.2",
+   "title": "Rideshare Launches",
+   "page": 321,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.4",
+   "title": "Launch and Integration Hardware",
+   "page": 321,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.4.1",
+   "title": "Primary Structural Interfaces",
+   "page": 321,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.4.2",
+   "title": "Dispensers for Canisterized SmallSats",
+   "page": 322,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.4.3",
+   "title": "Separation Systems",
+   "page": 324,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.5",
+   "title": "Orbital Transfer / Maneuvering Vehicles (OTV/OMV)",
+   "page": 326,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.5.1",
+   "title": "Commercial Development/Services",
+   "page": 327,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.6",
+   "title": "International Space Station Options",
+   "page": 333,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.6.1",
+   "title": "Deployment from ISS",
+   "page": 333,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.6.2",
+   "title": "Deployment Above ISS",
+   "page": 334,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "10.7",
+   "title": "Summary",
+   "page": 335,
+   "chapter": "10 Integration, Launch, Deployment, and Orbital Transport"
+  },
+  {
+   "no": "11",
+   "title": "Ground Data Systems & Mission Operations",
+   "page": 342,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.1",
+   "title": "Introduction",
+   "page": 342,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.2",
+   "title": "Ground System Architecture",
+   "page": 343,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.2.1",
+   "title": "Types of Communication Infrastructure",
+   "page": 344,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.3",
+   "title": "Frequency Considerations",
+   "page": 345,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.3.1",
+   "title": "Frequency Selection: Link Budget",
+   "page": 346,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.3.2",
+   "title": "Frequency Licensing",
+   "page": 346,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.4",
+   "title": "Ground Segment Services",
+   "page": 347,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.4.1",
+   "title": "Ground Networks – NASA and Partners",
+   "page": 348,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.4.2",
+   "title": "Ground Segment as a Service (GSaaS)",
+   "page": 355,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.4.3",
+   "title": "Space Relay Networks - NASA",
+   "page": 365,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.4.4",
+   "title": "Low-Latency, Low-Rate (Short Burst) Space Relay Providers",
+   "page": 366,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.5",
+   "title": "Ground Stations Components",
+   "page": 367,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.5.1",
+   "title": "Ground Station Operation",
+   "page": 367,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.5.2",
+   "title": "Component Hardware for Ground Systems (GS)",
+   "page": 369,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.5.3",
+   "title": "Ground Software",
+   "page": 371,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.6",
+   "title": "Mission and Science Operations Centers",
+   "page": 376,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.6.1",
+   "title": "Software for Mission Operations",
+   "page": 378,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.7",
+   "title": "End-to-End Communications and Compatibility Testing",
+   "page": 379,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.7.1",
+   "title": "End-to-End Hardware for Ground Systems",
+   "page": 380,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8",
+   "title": "Cyber Security",
+   "page": 386,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.1",
+   "title": "Minimum Protections for Command Authority",
+   "page": 386,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.2",
+   "title": "Resilience to External Dependencies (GNSS/PNT and Ground Infrastructure)",
+   "page": 386,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.3",
+   "title": "Defense in Depth (On Board and Ground)",
+   "page": 386,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.4",
+   "title": "Supply Chain Risk Management (SCRM)",
+   "page": 387,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.5",
+   "title": "Continuous Monitoring, Detection, and Incident Response",
+   "page": 387,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.8.6",
+   "title": "Policy and Standards Context",
+   "page": 387,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.9",
+   "title": "State-of-the-Art – Ground Data and Supporting Systems",
+   "page": 387,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.9.1",
+   "title": "Technologies",
+   "page": 387,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.9.2",
+   "title": "Ground Aggregators",
+   "page": 389,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.9.3",
+   "title": "Scheduling and Mission Operations Software",
+   "page": 390,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.10",
+   "title": "On the Horizon",
+   "page": 396,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.10.1",
+   "title": "Free Space Optical Communications",
+   "page": 397,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.10.2",
+   "title": "Optical Ground Stations and Future Infrastructure Requirements",
+   "page": 398,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.10.3",
+   "title": "Techniques to Improve Optical Comm Reliability",
+   "page": 404,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.10.4",
+   "title": "Role of Optical Relays",
+   "page": 404,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "11.11",
+   "title": "Summary",
+   "page": 405,
+   "chapter": "11 Ground Data Systems & Mission Operations"
+  },
+  {
+   "no": "12",
+   "title": "Identification and Tracking Systems",
+   "page": 411,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.1",
+   "title": "Introduction",
+   "page": 411,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.2",
+   "title": "Identification and Tracking Ground Systems",
+   "page": 413,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.3",
+   "title": "Tracking Aids",
+   "page": 415,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.4",
+   "title": "Devices that Communicate Position and ID via Radio",
+   "page": 416,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.5",
+   "title": "Devices that Use Coded Light Signals",
+   "page": 418,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.5.1",
+   "title": "Van Atta Arrays and RF Interrogation Receivers",
+   "page": 419,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.5.2",
+   "title": "Laser-Interrogated Corner Cube Reflectors",
+   "page": 420,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.5.3",
+   "title": "Passive Increase in Albedo",
+   "page": 420,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.6",
+   "title": "Future Efforts",
+   "page": 421,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "12.7",
+   "title": "Summary",
+   "page": 421,
+   "chapter": "12 Identification and Tracking Systems"
+  },
+  {
+   "no": "13",
+   "title": "Deorbit Systems",
+   "page": 427,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.1",
+   "title": "Introduction",
+   "page": 427,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.2",
+   "title": "Orbital Debris Regulations",
+   "page": 429,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.2.1",
+   "title": "Considerations for Orbital Lifetime Requirements in LEO",
+   "page": 430,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.3",
+   "title": "State-of-the-Art – Passive Deorbit Systems",
+   "page": 431,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.3.1",
+   "title": "High TRL Drag Sails",
+   "page": 431,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.3.2",
+   "title": "Deployable Booms",
+   "page": 439,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.3.3",
+   "title": "Electromagnetic Tethers",
+   "page": 439,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.3.4",
+   "title": "Natural Deorbiting Highways",
+   "page": 440,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.4",
+   "title": "State-of-the-Art – Active Deorbit Systems",
+   "page": 440,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.4.1",
+   "title": "Active Debris Removal Hardware",
+   "page": 440,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.4.2",
+   "title": "Active Debris Removal / Spacecraft Reentry Services",
+   "page": 442,
+   "chapter": "13 Deorbit Systems"
+  },
+  {
+   "no": "13.5",
+   "title": "Summary",
+   "page": 445,
+   "chapter": "13 Deorbit Systems"
+  }
+ ]
+}

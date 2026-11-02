@@ -1,0 +1,407 @@
+{
+ "id": "nasa-se-hb",
+ "title": "NASA Systems Engineering Handbook (NASA/SP-2016-6105 Rev2)",
+ "titleZh": "NASA 系统工程手册（2016 修订版 2）",
+ "edition": "Rev2",
+ "authors": "NASA",
+ "publisher": "NASA",
+ "year": 2016,
+ "license": "public",
+ "lang": "en",
+ "source": "资料/NASA系统工程手册_NASA_SE_Handbook_2016.pdf",
+ "pageOffset": 10,
+ "note": "美国政府出版物（公版）。第一批导入需求、接口、验证相关的节（附录 N 在这一版里已删除）",
+ "include": [
+  "4.1",
+  "4.2",
+  "4.3",
+  "4.4",
+  "5.3",
+  "5.4",
+  "6.2",
+  "6.3",
+  "App.C",
+  "App.D",
+  "App.L"
+ ],
+ "toc": [
+  {
+   "no": "1",
+   "title": "Introduction",
+   "page": 11,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.1",
+   "title": "Purpose",
+   "page": 11,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "1.2",
+   "title": "Scope and Depth",
+   "page": 11,
+   "chapter": "1 Introduction"
+  },
+  {
+   "no": "2",
+   "title": "Fundamentals of",
+   "page": 13,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.1",
+   "title": "The Common Technical Processes and the SE Engine",
+   "page": 15,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.2",
+   "title": "An Overview of the SE Engine by Project Phase",
+   "page": 18,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.3",
+   "title": "Example of Using the SE Engine",
+   "page": 20,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.4",
+   "title": "Distinctions between Product Verification and Product Validation",
+   "page": 21,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.5",
+   "title": "Cost Effectiveness Considerations",
+   "page": 21,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.6",
+   "title": "Human Systems Integration (HSI) in the SE Process",
+   "page": 22,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "2.7",
+   "title": "Competency Model for Systems Engineers",
+   "page": 23,
+   "chapter": "2 Fundamentals of"
+  },
+  {
+   "no": "3",
+   "title": "NASA Program/Project Life Cycle",
+   "page": 27,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.1",
+   "title": "Program Formulation",
+   "page": 30,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.2",
+   "title": "Program Implementation",
+   "page": 30,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.3",
+   "title": "Project Pre-Phase A: Concept Studies",
+   "page": 31,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.4",
+   "title": "Project Phase A: Concept and Technology Development",
+   "page": 33,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.5",
+   "title": "Project Phase B: Preliminary Design and Technology Completion",
+   "page": 35,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.6",
+   "title": "Project Phase C: Final Design and Fabrication",
+   "page": 37,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.7",
+   "title": "Project Phase D: System Assembly, Integration and Test, Launch",
+   "page": 39,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.8",
+   "title": "Project Phase E: Operations and Sustainment",
+   "page": 41,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.9",
+   "title": "Project Phase F: Closeout",
+   "page": 41,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.10",
+   "title": "Funding: The Budget Cycle",
+   "page": 43,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "3.11",
+   "title": "Tailoring and Customization of NPR 7123.1 Requirements",
+   "page": 44,
+   "chapter": "3 NASA Program/Project Life Cycle"
+  },
+  {
+   "no": "4",
+   "title": "System Design Processes",
+   "page": 53,
+   "chapter": "4 System Design Processes"
+  },
+  {
+   "no": "4.1",
+   "title": "Stakeholder Expectations Definition",
+   "page": 55,
+   "chapter": "4 System Design Processes"
+  },
+  {
+   "no": "4.2",
+   "title": "Technical Requirements Definition",
+   "page": 64,
+   "chapter": "4 System Design Processes"
+  },
+  {
+   "no": "4.3",
+   "title": "Logical Decomposition",
+   "page": 72,
+   "chapter": "4 System Design Processes"
+  },
+  {
+   "no": "4.4",
+   "title": "Design Solution Definition",
+   "page": 75,
+   "chapter": "4 System Design Processes"
+  },
+  {
+   "no": "5",
+   "title": "Product Realization",
+   "page": 87,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "5.1",
+   "title": "Product Implementation",
+   "page": 88,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "5.2",
+   "title": "Product Integration",
+   "page": 93,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "5.3",
+   "title": "Product Verification",
+   "page": 98,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "5.4",
+   "title": "Product Validation",
+   "page": 109,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "5.5",
+   "title": "Product Transition",
+   "page": 116,
+   "chapter": "5 Product Realization"
+  },
+  {
+   "no": "6",
+   "title": "Crosscutting Technical Management",
+   "page": 123,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.1",
+   "title": "Technical Planning",
+   "page": 123,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.2",
+   "title": "Requirements Management",
+   "page": 140,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.3",
+   "title": "Interface Management",
+   "page": 145,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.4",
+   "title": "Technical Risk Management",
+   "page": 148,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.5",
+   "title": "Configuration Management",
+   "page": 153,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.6",
+   "title": "Technical Data Management",
+   "page": 161,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.7",
+   "title": "Technical Assessment",
+   "page": 165,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "6.8",
+   "title": "Decision Analysis",
+   "page": 170,
+   "chapter": "6 Crosscutting Technical Management"
+  },
+  {
+   "no": "App.A",
+   "title": "Acronyms",
+   "page": 183,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.B",
+   "title": "Glossary",
+   "page": 186,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.C",
+   "title": "How to Write a Good Requirement— Checklist",
+   "page": 207,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.D",
+   "title": "Requirements Verification Matrix",
+   "page": 211,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.E",
+   "title": "Creating the Validation Plan with a Validation Requirements Matrix",
+   "page": 213,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.F",
+   "title": "Functional, Timing, and State Analysis",
+   "page": 215,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.G",
+   "title": "Technology Assessment/Insertion",
+   "page": 216,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.H",
+   "title": "Integration Plan Outline",
+   "page": 224,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.I",
+   "title": "Verification and Validation Plan Outline",
+   "page": 226,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.J",
+   "title": "SEMP Content Outline",
+   "page": 233,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.K",
+   "title": "Technical Plans",
+   "page": 245,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.L",
+   "title": "Interface Requirements Document Outline",
+   "page": 246,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.M",
+   "title": "CM Plan Outline",
+   "page": 249,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.N",
+   "title": "Guidance on Technical Peer Reviews/Inspections",
+   "page": 250,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.O",
+   "title": "Reserved",
+   "page": 251,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.P",
+   "title": "SOW Review Checklist",
+   "page": 252,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.Q",
+   "title": "Reserved",
+   "page": 253,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.R",
+   "title": "HSI Plan Content Outline",
+   "page": 254,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.S",
+   "title": "Concept of Operations Annotated Outline",
+   "page": 261,
+   "chapter": "Appendices"
+  },
+  {
+   "no": "App.T",
+   "title": "Systems Engineering in Phase E",
+   "page": 264,
+   "chapter": "Appendices"
+  }
+ ]
+}

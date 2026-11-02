@@ -78,6 +78,7 @@ export type AstroEvent =
   | { type: 'warn'; payload: string }
   | { type: 'library'; payload: LibSource[] }
   | { type: 'update'; payload: UpdateState }
+  | { type: 'ref-translate'; payload: { id: string; job: RefJob | null } }
 
 /** 软件更新（main/update.mjs 的 state()） */
 export interface UpdateState {
@@ -96,6 +97,19 @@ export type KbKind = '经验' | '设计' | '代码' | '问题'
 export interface KbMeta { title: string; kind: KbKind; model?: string; tags: string[]; author?: string; date?: string; source?: string; status?: string }
 export interface KbHit { id: string; title: string; kind: KbKind; model: string; tags: string[]; lib: string; libName: string; writable: boolean; path: string; date: string; author: string; status: string; source: string; score: number; snippet: string }
 export interface KbEntry { id: string; lib: string; libName: string; writable: boolean; path: string; meta: KbMeta; body: string }
+/** 资料库：学习资料、标准原文，按节切开（mcp/knowledge/lib/ref.mjs） */
+export interface RefSection { no: string; title: string; chapter: string; pages: string; file: string; words?: number }
+export interface RefDoc { id: string; lib: string; libName: string; title: string; titleZh?: string; edition?: string; year?: number; authors?: string; license: 'public' | 'internal'; lang?: string; note?: string; sections: RefSection[] }
+export interface RefHit { id: string; doc: string; docTitle: string; no: string; title: string; chapter: string; pages: string; license: string; score: number; snippet: string; cite: string }
+export type HlColor = 'yellow' | 'green' | 'blue' | 'pink'
+export interface RefHighlight { id: string; quote: string; prefix: string; suffix: string; lang: 'en' | 'zh'; color: HlColor; note: string; at: number }
+export interface RefJob { done: number; total: number; at: number }
+export interface RefTranslation { from: 'mine' | 'shared'; title: string; model: string; at: string; edited: boolean; stale: boolean; paragraphs: string[] }
+export interface RefRead {
+  id: string; meta: { doc: string; docTitle: string; docTitleZh: string; lib: string; libName: string; no: string; title: string; chapter: string; pages: string; license: string }; cite: string
+  paragraphs: string[]; edited: boolean; translation: RefTranslation | null; translating: RefJob | null; highlights: RefHighlight[]
+  prev: { id: string; no: string; title: string } | null; next: { id: string; no: string; title: string } | null
+}
 /** 待整理：知识整理写的候选（我的库的 待整理/，不进检索），采纳后才进 knowledge/ */
 export interface InboxItem { path: string; meta: KbMeta; body: string; problems: string[] }
 export interface InboxReport { path: string; title: string; date: string; body: string }
@@ -139,6 +153,13 @@ export interface AstroApi {
     obsidian(path?: string): Promise<{ opened: boolean; installed: boolean; dir: string }>; openMine(): Promise<void>
   }
   skills: { list(): Promise<SkillCard[]>; pin(name: string, on: boolean): Promise<SkillCard[]> }
+  ref: {
+    docs(): Promise<RefDoc[]>; search(q: string, doc?: string): Promise<{ expanded: string[]; hits: RefHit[] }>; read(id: string): Promise<RefRead>; counts(lib: string, doc: string): Promise<Record<string, number>>
+    translate(id: string): Promise<RefRead>; saveTranslation(id: string, paras: string[]): Promise<RefRead>; saveOriginal(id: string, text: string): Promise<RefRead>
+    revert(id: string, what: 'original' | 'translation'): Promise<RefRead>; submit(id: string, what: 'original' | 'translation'): Promise<{ branch: string }>
+    addHighlight(id: string, h: { quote: string; prefix: string; suffix: string; lang: 'en' | 'zh'; color: HlColor; note?: string }): Promise<RefHighlight>
+    updateHighlight(id: string, hid: string, patch: { color?: HlColor; note?: string }): Promise<RefHighlight>; removeHighlight(id: string, hid: string): Promise<boolean>
+  }
   update: { state(): Promise<UpdateState>; check(): Promise<UpdateState>; stage(): Promise<UpdateState>; apply(): Promise<boolean> }
   lib: {
     state(): Promise<{ sources: LibSource[]; mine: string }>; sync(id?: string): Promise<LibSource[]>

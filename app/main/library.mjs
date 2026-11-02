@@ -201,7 +201,7 @@ export class Library {
    */
   async commitExternal() {
     const dir = await this.ensureMine()
-    const paths = ['knowledge', INBOX]
+    const paths = ['knowledge', INBOX, '摘录']
     const st = (await git(dir, ['-c', 'core.quotepath=false', 'status', '--porcelain', '-uall', '--', ...paths])).trim()
     if (!st) return null
     // 在 Obsidian 里把候选拖进 knowledge/ 就算采纳：去掉“候选”状态

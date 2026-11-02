@@ -49,6 +49,8 @@ interface Store {
   kbEditor: null | { id?: string; meta: KbMeta; body: string }
   libraries: LibSource[]
   kbVersion: number
+  /** 资料翻译的进度（按节 id） */
+  refJobs: Record<string, { done: number; total: number; at: number }>
   toasts: Toast[]
   settings: Settings
   lastError: string | null
@@ -98,6 +100,7 @@ export const useStore = create<Store>((set, get) => ({
   kbEditor: null,
   libraries: [],
   kbVersion: 0,
+  refJobs: {},
   toasts: [],
   settings: loadSettings(),
   lastError: null,
@@ -209,6 +212,7 @@ function onEvent(e: AstroEvent) {
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break
     case 'library': useStore.setState({ libraries: e.payload, kbVersion: st.kbVersion + 1 }); break
     case 'update': if (st.app) useStore.setState({ app: { ...st.app, update: e.payload } }); break
+    case 'ref-translate': { const j = { ...st.refJobs }; if (e.payload.job) j[e.payload.id] = e.payload.job; else delete j[e.payload.id]; useStore.setState({ refJobs: j }); break }
   }
 }
 

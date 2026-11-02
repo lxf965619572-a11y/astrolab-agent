@@ -12,7 +12,10 @@ import { STAGES, TaskController } from './task.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
+import { ReferenceService } from './reference.mjs'
+import { chat } from './llm.mjs'
 import { buildIndex, readEntry, search, writeEntry } from '../../mcp/knowledge/lib/kb.mjs'
+import { buildRefIndex, listDocs, loadGlossary, searchRef } from '../../mcp/knowledge/lib/ref.mjs'
 
 const P = resolvePaths()
 mkdirSync(P.data, { recursive: true })
@@ -48,6 +51,7 @@ let store = null
 let ctl = null
 let lib = null
 let updates = null
+let refs = null
 let notes = []
 /** 启动时的提醒（打开项目时 notes 会换成项目的，这些不跟着换） */
 const bootNotes = []
@@ -78,6 +82,8 @@ function makeEngine(project) {
   // 知识库工具服务用：我的库 + 全部共享库（还没克隆的也列上，同步后不用重启引擎就能查到）
   env.ASTROLAB_LIBRARIES = JSON.stringify(lib.sources().map((x) => ({ id: x.id, name: x.name, dir: x.dir, model: x.model || '', writable: !!x.writable })))
   const m = modelConfig(env)
+  // 资料库的许可：用公网接口时只开放公版资料（有版权的不发出去）；设置里写了 ASTROLAB_REFERENCE_SCOPE 就按设置
+  if (!['public', 'all'].includes(env.ASTROLAB_REFERENCE_SCOPE)) env.ASTROLAB_REFERENCE_SCOPE = distillScope({}, m.baseURL) === 'sample' ? 'public' : 'all'
   mkdirSync(P.logs, { recursive: true })
   return new Engine({
     dshBin: P.dshBin, nodePath: P.nodePath, cwd: project.path, env,
@@ -285,6 +291,19 @@ function registerIpc() {
   handle('kb:read', (id) => readEntry(kbLibs(), id))
   handle('kb:save', (e) => kbSave(e))
   handle('kb:delete', (id) => kbDelete(id))
+  // 资料库（人在界面上读：不按许可过滤，那是给发到公网模型的检索用的）
+  handle('ref:docs', () => listDocs(kbLibs()).map(({ dir, ...d }) => d))
+  handle('ref:search', (q, doc) => searchRef(buildRefIndex(kbLibs()), String(q || ''), { doc: doc || undefined, limit: 30, glossary: loadGlossary(kbLibs()) }))
+  handle('ref:read', (id) => refs.read(String(id)))
+  handle('ref:counts', (lib, doc) => refs.counts(String(lib), String(doc)))
+  handle('ref:translate', (id) => refs.translate(String(id), { onProgress: (i, job) => send('ref-translate', { id: i, job }) }))
+  handle('ref:saveTranslation', (id, paras) => refs.saveTranslation(String(id), paras))
+  handle('ref:saveOriginal', (id, text) => refs.saveOriginal(String(id), String(text || '')))
+  handle('ref:revert', (id, what) => refs.revert(String(id), what === 'translation' ? 'translation' : 'original'))
+  handle('ref:submit', (id, what) => refs.submit(String(id), what === 'original' ? 'original' : 'translation'))
+  handle('ref:addHighlight', (id, h) => refs.addHighlight(String(id), h || {}))
+  handle('ref:updateHighlight', (id, hid, patch) => refs.updateHighlight(String(id), String(hid), patch || {}))
+  handle('ref:removeHighlight', (id, hid) => refs.removeHighlight(String(id), String(hid)))
   handle('kb:inbox', async () => { await commitExternalEdits(); return { ...lib.inbox(), distill: distillInfo() } })
   handle('kb:accept', (rel) => lib.acceptCandidate(String(rel)))
   handle('kb:discard', (rel) => lib.discardCandidate(String(rel)))
@@ -456,6 +475,21 @@ async function boot() {
     quit: () => app.quit(),
     onState: (s) => send('update', s),
     log: mlog,
+  })
+  // 资料阅读：翻译直接调部门模型（模拟引擎时用假的译文，不调模型）
+  refs = new ReferenceService({
+    libs: () => kbLibs(), mineDir: () => mineLib().dir, dataDir: P.data,
+    model: () => {
+      const env = engineEnv(P)
+      const m = modelConfig(env)
+      const scope = ['public', 'all'].includes(env.ASTROLAB_REFERENCE_SCOPE) ? env.ASTROLAB_REFERENCE_SCOPE : distillScope({}, m.baseURL) === 'sample' ? 'public' : 'all'
+      return { baseURL: m.baseURL, apiKey: env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY || '', model: m.model, scope }
+    },
+    chat: P.mock
+      ? async ({ messages }) => ({ content: messages[1].content.includes('【') ? [...messages[1].content.matchAll(/【(\d+)】([^\n]*)/g)].map((x) => `【${x[1]}】（模拟译文）${x[2].slice(0, 60)}`).join('\n\n') : '（模拟译文）' })
+      : chat,
+    commit: (paths, msg) => lib.commitMine(paths, msg),
+    submit: (libId, rel, title) => lib.submit(libId, rel, title),
   })
   const upNote = updates.boot()
   if (upNote) bootNotes.push(upNote)

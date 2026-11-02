@@ -1,10 +1,11 @@
 // 知识库：检索个人库、部门通用库、型号库里的经验、好的设计和代码；看条目；在我的库里新建、编辑、确认草稿；提交到共享库审核。
 // 智能体在任务中会检索（知识库工具服务）；用户在对话里要求“记到知识库”时，它把内容记成我的库里的草稿，在这里确认。
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Button, Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components'
 import { useStore } from '../store'
-import type { Inbox, InboxItem, InboxReport, KbEntry, KbHit, KbKind, KbMeta, LibSource } from '../api'
+import type { HlColor, Inbox, InboxItem, InboxReport, KbEntry, KbHit, KbKind, KbMeta, LibSource, RefDoc, RefHighlight, RefHit, RefRead } from '../api'
+import { applyMarks, selectionAnchor, type Anchor } from '../components/highlight'
 import { Icon } from '../components/Icon'
 import { Key } from '../components/Keys'
 import { Markdown } from '../components/Markdown'
@@ -24,7 +25,7 @@ export function KnowledgeView() {
   const [sel, setSel] = useState<string | null>(null)
   const [entry, setEntry] = useState<KbEntry | null>(null)
   const [sources, setSources] = useState<LibSource[]>([])
-  const [tab, setTab] = useState<'entries' | 'inbox'>('entries')
+  const [tab, setTab] = useState<'entries' | 'inbox' | 'ref'>('entries')
   const [inbox, setInbox] = useState<Inbox | null>(null)
   useEffect(() => { void run((api) => api.kb.inbox()).then((b) => b && setInbox(b)) }, [run, version, tab])
   const inboxCount = inbox ? inbox.items.length : 0
@@ -63,6 +64,7 @@ export function KnowledgeView() {
           <div className="segmented small" role="tablist" aria-label="知识库">
             <button type="button" role="tab" aria-selected={tab === 'entries'} className={`seg-btn ${tab === 'entries' ? 'on' : ''}`} onClick={() => setTab('entries')}>条目</button>
             <button type="button" role="tab" aria-selected={tab === 'inbox'} className={`seg-btn ${tab === 'inbox' ? 'on' : ''}`} onClick={() => setTab('inbox')}>待整理{inboxCount ? <span className="seg-count">{inboxCount}</span> : null}</button>
+            <button type="button" role="tab" aria-selected={tab === 'ref'} className={`seg-btn ${tab === 'ref' ? 'on' : ''}`} onClick={() => setTab('ref')}>资料</button>
           </div>
           <ObsidianButton />
           {tab === 'entries' && <Key size="sm" onPress={() => void run((api) => api.lib.sync(), '同步失败').then((s) => { if (s) { setSources(s); useStore.setState({ kbVersion: version + 1 }) } })}><Icon name="refresh" size={14} />同步共享库</Key>}
@@ -70,6 +72,7 @@ export function KnowledgeView() {
         </div>
       </div>
 
+      {tab === 'ref' && <RefPanel />}
       {tab === 'inbox' && inbox && <InboxPanel inbox={inbox} onChanged={() => useStore.setState({ kbVersion: version + 1 })} />}
       {tab === 'entries' && <div className="kb-body pad-x">
         <section className="kb-list card" aria-label="检索结果">
@@ -101,6 +104,248 @@ export function KnowledgeView() {
           {entry ? <EntryView entry={entry} sources={shared} onChanged={(id) => { useStore.setState({ kbVersion: version + 1 }); if (id !== undefined) setSel(id) }} toast={toast} /> : <div className="pad muted">选一条看全文。</div>}
         </section>
       </div>}
+    </div>
+  )
+}
+
+const LIC: Record<string, string> = { public: '公版', internal: '仅部门内部' }
+
+/** 资料：学习资料、标准原文，按节读。知识库是提炼的结论，这里是出处（引用写资料名、节号和页码） */
+function RefPanel() {
+  const run = useStore((s) => s.run)
+  const [docs, setDocs] = useState<RefDoc[]>([])
+  const [q, setQ] = useState('')
+  const [doc, setDoc] = useState('')
+  const [hits, setHits] = useState<{ expanded: string[]; hits: RefHit[] } | null>(null)
+  const [sel, setSel] = useState<string | null>(null)
+  const [counts, setCounts] = useState<Record<string, Record<string, number>>>({})
+  const [bump, setBump] = useState(0)
+  useEffect(() => { void run((api) => api.ref.docs()).then((d) => { if (d) { setDocs(d); if (!sel && d[0]?.sections[0]) setSel(`${d[0].lib}:${d[0].id}/${d[0].sections[0].file}`) } }) }, [run])
+  useEffect(() => { void Promise.all(docs.map((d) => run((api) => api.ref.counts(d.lib, d.id)).then((c) => [d.id, c || {}] as const))).then((all) => setCounts(Object.fromEntries(all))) }, [docs, bump, run])
+  useEffect(() => {
+    if (!q.trim()) { setHits(null); return }
+    const t = setTimeout(() => { void run((api) => api.ref.search(q, doc || undefined)).then((r) => r && setHits(r)) }, 180)
+    return () => clearTimeout(t)
+  }, [q, doc, run])
+  const open = (id: string) => setSel(id)
+  const shown = docs.filter((d) => !doc || d.id === doc)
+  return (
+    <div className="kb-body pad-x">
+      <section className="kb-list card" aria-label="资料">
+        <div className="kb-search">
+          <Icon name="search" size={15} className="muted" />
+          <input placeholder="搜资料原文，中英文都行，例如：遥测帧格式" value={q} onChange={(e) => setQ(e.target.value)} aria-label="检索资料" />
+        </div>
+        <div className="kb-filters">
+          <select className="kb-lib" value={doc} onChange={(e) => setDoc(e.target.value)} aria-label="资料">
+            <option value="">全部资料</option>
+            {docs.map((d) => <option key={d.id} value={d.id}>{d.titleZh || d.title}</option>)}
+          </select>
+        </div>
+        {hits && hits.expanded.length > 0 && <div className="ref-expanded muted small">按术语表补上：{hits.expanded.join('、')}</div>}
+        <div className="kb-hits">
+          {hits ? hits.hits.map((h) => (
+            <Button key={h.id} className={`kb-hit ${sel === h.id ? 'on' : ''}`} onPress={() => open(h.id)}>
+              <span className="kb-hit-top"><span className="mono small ref-no">§{h.no.replace(/^App\./, '附录 ')}</span><span className="kb-hit-title">{h.title}</span></span>
+              <span className="kb-hit-snip">{h.snippet}</span>
+              <span className="kb-hit-meta">{docs.find((d) => d.id === h.doc)?.titleZh || h.docTitle} · 第 {h.pages} 页</span>
+            </Button>
+          )) : shown.map((d) => (
+            <div key={d.id} className="ref-doc">
+              <div className="ref-doc-head"><span className="strong">{d.titleZh || d.title}</span><span className={`pill sm ${d.license === 'public' ? 'ok' : 'ask'}`}>{LIC[d.license] || d.license}</span></div>
+              {d.sections.map((s) => {
+                const id = `${d.lib}:${d.id}/${s.file}`
+                const n = counts[d.id]?.[s.file] || 0
+                return <Button key={id} className={`ref-sec ${sel === id ? 'on' : ''}`} onPress={() => open(id)}><span className="mono small ref-no">{s.no.replace(/^App\./, '附录 ')}</span><span className="ref-sec-title">{s.title}</span><span className="muted small">{n ? <span className="ref-hl-count" title={`${n} 处高亮`}>{n}</span> : null}{s.pages}</span></Button>
+              })}
+            </div>
+          ))}
+          {hits && !hits.hits.length && <div className="pad muted small">没有找到。资料原文是英文，试试英文术语。</div>}
+          {!hits && !docs.length && <div className="pad muted small">资料库里还没有资料。管理员用 scripts/reference/build.mjs 导入后，在“技能与插件 → 共享库”里加上部门资料库。</div>}
+        </div>
+      </section>
+      <section className="kb-detail card" aria-label="原文">
+        {sel ? <RefReader key={sel} id={sel} onOpen={open} onMarks={() => setBump((x) => x + 1)} /> : <div className="pad muted">选一节读原文。</div>}
+      </section>
+    </div>
+  )
+}
+
+const HL: HlColor[] = ['yellow', 'green', 'blue', 'pink']
+const HL_NAME: Record<HlColor, string> = { yellow: '黄', green: '绿', blue: '蓝', pink: '粉' }
+type View = 'en' | 'zh' | 'both'
+const secNo = (no: string) => no.replace(/^App\./, '附录 ')
+
+/**
+ * 读一节：原文 / 中文 / 对照；选中文字高亮、写批注；改原文或译文（存在我的库，叠在资料库上），提交到资料库审核。
+ * 翻译调部门模型，按段对齐；有版权的资料用公网接口时不翻译。
+ */
+function RefReader({ id, onOpen, onMarks }: { id: string; onOpen: (id: string) => void; onMarks: () => void }) {
+  const run = useStore((s) => s.run)
+  const toast = useStore((s) => s.toast)
+  const job = useStore((s) => s.refJobs[id])
+  const [page, setPage] = useState<RefRead | null>(null)
+  const [view, setView] = useState<View>(() => { try { return (localStorage.getItem('astrolab.refView') as View) || 'en' } catch { return 'en' } })
+  const [editing, setEditing] = useState<null | { what: 'original' | 'translation'; text: string }>(null)
+  const [tool, setTool] = useState<null | { anchor: Anchor; lang: 'en' | 'zh'; x: number; y: number; note: string | null }>(null)
+  const [pop, setPop] = useState<null | { h: RefHighlight; x: number; y: number; note: string }>(null)
+  const [lost, setLost] = useState<string[]>([])
+  const body = useRef<HTMLDivElement>(null)
+  const load = () => run((api) => api.ref.read(id)).then((r) => { if (r) setPage(r); return r })
+  useEffect(() => { void load() }, [id])
+  useEffect(() => { if (!job && page?.translating) void load() }, [job])
+  const tr = page?.translation || null
+  const v: View = tr ? view : 'en'
+  const setV = (x: View) => { setView(x); try { localStorage.setItem('astrolab.refView', x) } catch { /* 记不住就算了 */ } }
+  const roots = (lang: 'en' | 'zh') => Array.from(body.current?.querySelectorAll(`[data-lang="${lang}"]`) || [])
+  // 包高亮：每次内容、视图、高亮变了都重新包
+  useLayoutEffect(() => {
+    if (!page || editing) return
+    const l1 = applyMarks(roots('en'), page.highlights.filter((h) => h.lang === 'en'))
+    const l2 = applyMarks(roots('zh'), page.highlights.filter((h) => h.lang === 'zh'))
+    // 只在显示了那种语言时才算“找不到”
+    setLost([...(v !== 'zh' ? l1 : []), ...(v !== 'en' ? l2 : [])])
+  }, [page, v, editing])
+
+  if (!page) return <div className="pad muted">正在打开…</div>
+  const m = page.meta
+  const busy = !!(job || page.translating)
+  const progress = job || page.translating
+
+  const onUp = () => {
+    for (const lang of ['en', 'zh'] as const) {
+      const a = selectionAnchor(roots(lang))
+      if (a) { const host = body.current!.getBoundingClientRect(); setTool({ anchor: { quote: a.quote, prefix: a.prefix, suffix: a.suffix }, lang, x: a.rect.left - host.left + a.rect.width / 2, y: a.rect.top - host.top + body.current!.scrollTop, note: null }); setPop(null); return }
+    }
+    setTool(null)
+  }
+  const onClick = (e: React.MouseEvent) => {
+    const mk = (e.target as HTMLElement).closest('mark.hl') as HTMLElement | null
+    if (!mk || window.getSelection()?.toString()) return
+    const h = page.highlights.find((x) => x.id === mk.dataset.hid)
+    if (!h) return
+    const r = mk.getBoundingClientRect(), host = body.current!.getBoundingClientRect()
+    setPop({ h, x: r.left - host.left + r.width / 2, y: r.bottom - host.top + body.current!.scrollTop, note: h.note })
+    setTool(null)
+  }
+  const addHl = async (color: HlColor, note = '') => {
+    if (!tool) return
+    const h = await run((api) => api.ref.addHighlight(id, { ...tool.anchor, lang: tool.lang, color, note }), '没有高亮上')
+    window.getSelection()?.removeAllRanges()
+    setTool(null)
+    if (h) { setPage({ ...page, highlights: [...page.highlights, h] }); onMarks() }
+  }
+  const updHl = async (hid: string, patch: { color?: HlColor; note?: string }) => {
+    const h = await run((api) => api.ref.updateHighlight(id, hid, patch), '没有改好')
+    if (h) { setPage({ ...page, highlights: page.highlights.map((x) => (x.id === hid ? h : x)) }); setPop((p) => (p && p.h.id === hid ? { ...p, h } : p)) }
+  }
+  const delHl = async (hid: string) => {
+    const ok = await run((api) => api.ref.removeHighlight(id, hid), '没有删掉')
+    if (ok) { setPage({ ...page, highlights: page.highlights.filter((x) => x.id !== hid) }); setPop(null); onMarks() }
+  }
+  const translate = async () => {
+    const r = await run((api) => api.ref.translate(id), '翻译没有完成')
+    if (r) { setPage(r); setV(v === 'en' ? 'both' : v); toast({ text: '翻译好了，存在我的库里', tone: 'ok' }) }
+  }
+  const startEdit = (what: 'original' | 'translation') => { setEditing({ what, text: (what === 'original' ? page.paragraphs : tr?.paragraphs || []).join('\n\n') }); setTool(null); setPop(null) }
+  const paraCount = (t: string) => t.split(/\n{2,}/).filter((x) => x.trim()).length
+  const saveEdit = async () => {
+    if (!editing) return
+    const r = editing.what === 'original'
+      ? await run((api) => api.ref.saveOriginal(id, editing.text), '没有保存')
+      : await run((api) => api.ref.saveTranslation(id, editing.text.split(/\n{2,}/).map((x) => x.trim())), '没有保存')
+    if (r) { setPage(r); setEditing(null); toast({ text: '已保存到我的库', tone: 'ok' }) }
+  }
+  const revert = async (what: 'original' | 'translation') => { const r = await run((api) => api.ref.revert(id, what), '没有还原'); if (r) { setPage(r); setEditing(null); toast({ text: what === 'original' ? '已还原成资料库的原文' : '已删掉我的译文', tone: 'info' }) } }
+  const submit = async (what: 'original' | 'translation') => { const r = await run((api) => api.ref.submit(id, what), '没有提交'); if (r) toast({ text: `已提交到${m.libName}，审核通过后大家都用这一份`, tone: 'ok' }) }
+  const copy = (text: string) => void run(async (api) => { await api.sys.copy?.(text); toast({ text: '引用已复制', tone: 'ok' }) })
+  const scrollTo = (hid: string) => { const el = body.current?.querySelector(`mark[data-hid="${hid}"]`); if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1200) } }
+
+  const en = page.paragraphs
+  const zh = tr?.paragraphs || []
+  const cell = (lang: 'en' | 'zh', text: string, i: number) => <div key={`${lang}${i}`} className={`ref-cell ${lang}`} data-lang={lang} lang={lang === 'en' ? 'en' : 'zh'}><Markdown text={text || (lang === 'zh' ? '　' : '')} /></div>
+  const mine = page.highlights
+
+  return (
+    <div className="kb-entry ref-reader">
+      <div className="kb-entry-head">
+        <div className="kb-entry-tags">
+          <span className={`pill sm ${m.license === 'public' ? 'ok' : 'ask'}`}>{LIC[m.license] || m.license}</span>
+          {page.edited && <span className="pill sm run">原文我改过</span>}
+          <span className="muted small">{m.docTitleZh || m.docTitle}{m.chapter ? ` · ${m.chapter}` : ''}</span>
+        </div>
+        <h2>§{secNo(m.no)} {v === 'zh' && tr?.title ? tr.title : m.title}</h2>
+        <div className="ref-head-row">
+          <span className="muted small">{v === 'zh' && tr?.title ? `${m.title} · ` : ''}第 {m.pages} 页{tr ? ` · ${tr.from === 'shared' ? '部门译文' : '我的译文'}${tr.edited ? '（改过）' : ''}${tr.model ? ` · ${tr.model}` : ''}${tr.at ? ` · ${tr.at}` : ''}` : ''}</span>
+          <span className="grow" />
+          <div className="segmented small" role="tablist" aria-label="语言">
+            {(['en', 'zh', 'both'] as View[]).map((x) => <button key={x} type="button" role="tab" aria-selected={v === x} disabled={!tr && x !== 'en'} className={`seg-btn ${v === x ? 'on' : ''}`} onClick={() => setV(x)} title={!tr && x !== 'en' ? '先翻译' : undefined}>{x === 'en' ? '原文' : x === 'zh' ? '中文' : '对照'}</button>)}
+          </div>
+        </div>
+        {tr?.stale && <div className="badge-warn ref-warn"><Icon name="warn" size={14} />原文改过之后还没重新翻译，译文可能对不上</div>}
+        {busy && <div className="ref-progress"><div className="up-bar"><i style={{ width: `${progress && progress.total ? Math.round((100 * progress.done) / progress.total) : 5}%` }} /></div><span className="muted small">正在翻译 {progress ? `${progress.done}/${progress.total}` : ''} 组段落（部门模型）</span></div>}
+      </div>
+
+      {editing ? (
+        <div className="kb-entry-body ref-editing">
+          <div className="muted small">{editing.what === 'original' ? '改原文（比如提取出错的公式、断词）。空行分段，存在我的库里，资料库的原文不动。' : `改译文。空行分段，一段对应原文一段（现在 ${paraCount(editing.text)} 段，原文 ${en.length} 段）。`}</div>
+          <textarea className="ref-edit" value={editing.text} onChange={(e) => setEditing({ ...editing, text: e.target.value })} spellCheck={false} autoFocus />
+        </div>
+      ) : (
+        <div className="kb-entry-body ref-text" ref={body} onMouseUp={onUp} onClick={onClick}>
+          {v === 'both'
+            ? <div className="ref-both">{en.map((p, i) => <div key={i} className="ref-row">{cell('en', p, i)}{cell('zh', zh[i] || '', i)}</div>)}</div>
+            : (v === 'zh' ? zh : en).map((p, i) => cell(v, p, i))}
+          {mine.length > 0 && (
+            <div className="ref-notes">
+              <div className="ref-notes-head">本节摘录 {mine.length}</div>
+              {mine.map((h) => (
+                <button key={h.id} type="button" className={`ref-note hl-${h.color}`} onClick={() => scrollTo(h.id)}>
+                  <span className="ref-note-q">{h.quote}</span>
+                  {h.note && <span className="ref-note-n">{h.note}</span>}
+                  {lost.includes(h.id) && <span className="ref-note-lost">原文里找不到了（改过）</span>}
+                  {((h.lang === 'zh' && v === 'en') || (h.lang === 'en' && v === 'zh')) && <span className="ref-note-lost">在{h.lang === 'zh' ? '中文' : '原文'}里</span>}
+                </button>
+              ))}
+            </div>
+          )}
+          {tool && (
+            <div className="hl-tool" style={{ left: tool.x, top: tool.y }} onMouseUp={(e) => e.stopPropagation()}>
+              {tool.note === null ? (<>
+                {HL.map((c) => <button key={c} type="button" className={`hl-dot hl-${c}`} aria-label={`${HL_NAME[c]}色高亮`} onClick={() => void addHl(c)} />)}
+                <button type="button" className="hl-btn" onClick={() => setTool({ ...tool, note: '' })}>批注</button>
+              </>) : (<div className="hl-note-edit">
+                <textarea autoFocus rows={3} placeholder="写点批注：为什么记下、和我们的做法有什么关系" value={tool.note} onChange={(e) => setTool({ ...tool, note: e.target.value })} />
+                <div className="row gap"><span className="grow" /><button type="button" className="hl-btn" onClick={() => setTool(null)}>取消</button><button type="button" className="hl-btn primary" onClick={() => void addHl('yellow', tool.note || '')}>保存</button></div>
+              </div>)}
+            </div>
+          )}
+          {pop && (
+            <div className="hl-tool hl-pop" style={{ left: pop.x, top: pop.y + 6 }} onMouseUp={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
+              <div className="row gap">{HL.map((c) => <button key={c} type="button" className={`hl-dot hl-${c} ${pop.h.color === c ? 'on' : ''}`} aria-label={`改成${HL_NAME[c]}色`} onClick={() => void updHl(pop.h.id, { color: c })} />)}<span className="grow" /><button type="button" className="hl-btn" onClick={() => void delHl(pop.h.id)}>删除</button></div>
+              <textarea rows={3} placeholder="批注" value={pop.note} onChange={(e) => setPop({ ...pop, note: e.target.value })} />
+              <div className="row gap"><span className="grow" /><button type="button" className="hl-btn" onClick={() => setPop(null)}>关闭</button><button type="button" className="hl-btn primary" disabled={pop.note === pop.h.note} onClick={() => void updHl(pop.h.id, { note: pop.note })}>保存批注</button></div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="kb-entry-foot">
+        {editing ? (<>
+          <Key size="sm" variant="primary" onPress={() => void saveEdit()}><Icon name="check" size={14} stroke={2.4} />保存</Key>
+          <Key size="sm" onPress={() => setEditing(null)}>取消</Key>
+          {editing.what === 'original' && page.edited && <Key size="sm" onPress={() => void revert('original')}><Icon name="undo" size={14} />还原成资料库的原文</Key>}
+          {editing.what === 'translation' && tr?.from === 'mine' && <Key size="sm" onPress={() => void revert('translation')}><Icon name="undo" size={14} />删掉我的译文</Key>}
+        </>) : (<>
+          <Key size="sm" variant={tr ? 'key' : 'primary'} isDisabled={busy} onPress={() => void translate()}><Icon name="sparkle" size={14} />{tr ? '重新翻译' : '翻译成中文'}</Key>
+          <Key size="sm" onPress={() => startEdit(v === 'en' || !tr ? 'original' : 'translation')}><Icon name="edit" size={14} />{v === 'en' || !tr ? '改原文' : '改译文'}</Key>
+          <Key size="sm" onPress={() => copy(page.cite)}>复制引用</Key>
+          {(page.edited || tr?.from === 'mine') && <Key size="sm" onPress={() => void submit(page.edited && (v === 'en' || !tr) ? 'original' : 'translation')}><Icon name="upload" size={14} />提交到资料库</Key>}
+          <span className="grow" />
+          {page.prev && <Key size="sm" onPress={() => onOpen(page.prev!.id)}>← {secNo(page.prev.no)}</Key>}
+          {page.next && <Key size="sm" onPress={() => onOpen(page.next!.id)}>{secNo(page.next.no)} →</Key>}
+        </>)}
+      </div>
     </div>
   )
 }
