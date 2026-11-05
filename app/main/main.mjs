@@ -48,7 +48,13 @@ mlog('start', { version: app.getVersion(), electron: process.versions.electron, 
 let win = null
 let bridge = null
 let store = null
+// 任务控制器：每个项目（文件夹）一个，各有自己的引擎和当前任务。不同文件夹的任务可以同时进行；
+// 同一个文件夹同一时间只有一个任务（几个智能体同时改一个文件夹会互相覆盖，审核也分不清是谁改的）。
+// ctl 是界面上正在看的项目的控制器；切到别的项目时，有任务在进行的控制器留在后台接着做。
 let ctl = null
+const ctls = new Map() // 项目 id -> TaskController
+/** 同时进行的任务上限：每个任务一个引擎进程，模型并发和本机资源都有限 */
+const MAX_PARALLEL = Math.max(1, Number(process.env.ASTROLAB_MAX_PARALLEL) || 3)
 let lib = null
 let updates = null
 let refs = null
@@ -87,7 +93,7 @@ function makeEngine(project) {
   mkdirSync(P.logs, { recursive: true })
   return new Engine({
     dshBin: P.dshBin, nodePath: P.nodePath, cwd: project.path, env,
-    logFile: join(P.logs, `engine-${new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)}.jsonl`),
+    logFile: join(P.logs, `engine-${new Date().toISOString().replace(/[:.]/g, '').slice(0, 15)}-${project.id}.jsonl`), // 多个项目同时启动引擎时不重名
     provider: m.provider, model: m.model, reasoningEffort: m.reasoningEffort,
     patches: P.mock ? [] : [writeEnginePatch(P.engineDir, { skillDirs: lib.skillDirs(), mcpServers: lib.mcpServers(P.nodePath), readFence: fenceRoots(env) })],
   })
@@ -110,7 +116,36 @@ function appState() {
     update: updates ? updates.state() : null,
     task: ctl.snapshotState(),
     items: ctl.items(),
+    background: background(),
   }
+}
+
+// ---------- 多个项目并行 ----------
+const anyBusy = () => [...ctls.values()].some((c) => c.busy)
+const allCtls = () => [...ctls.values()]
+/** 后台的任务（不是正在看的项目）：侧栏显示它们的状态，点一下切过去 */
+function background() {
+  return allCtls().filter((c) => c !== ctl && c.task && c.project).map((c) => ({
+    projectId: c.project.id, projectName: c.project.name, status: c.status,
+    task: { id: c.task.id, title: c.task.title, stageName: c.task.stageName, mode: c.task.mode, category: c.task.category, startedAt: c.task.startedAt },
+    asking: c.questions.size > 0,
+  }))
+}
+const sendBackground = () => send('background', background())
+const norm = (x) => resolve(x).toLowerCase().replace(/[\\/]+$/, '')
+/** 在 c 的项目里开始（或继续）任务之前：不超过并行上限；别的进行中的项目不能和它是包含关系（那样就是同一批文件） */
+function checkParallel(c) {
+  if (c.busy || !c.project) return
+  const others = allCtls().filter((x) => x !== c && x.busy && x.project)
+  if (others.length >= MAX_PARALLEL) throw new Error(`同时最多 ${MAX_PARALLEL} 个任务在进行：${others.map((x) => `${x.project.name}（${x.task ? x.task.stageName : ''}）`).join('、')}。等其中一个结束再开始`)
+  const me = norm(c.project.path)
+  const clash = others.find((x) => { const o = norm(x.project.path); return o === me || o.startsWith(me + sep) || me.startsWith(o + sep) })
+  if (clash) throw new Error(`“${clash.project.name}”（${clash.project.path}）有任务在进行，它和这个项目是同一批文件（文件夹互相包含），同时改会互相覆盖。等那个任务结束再开始`)
+}
+function newController() {
+  const c = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, shared: true, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
+  wireController(c)
+  return c
 }
 
 async function openProject(id) {
@@ -119,7 +154,20 @@ async function openProject(id) {
   if (!existsSync(p.path)) throw new Error(`项目文件夹不存在：${p.path}`)
   notes = await prepareProject(p, P)
   store.update(p.id, { ...p, lastOpenedAt: Date.now() })
-  await ctl.setProject(store.get(id))
+  const prev = ctl
+  let c = ctls.get(p.id)
+  if (!c) {
+    c = newController()
+    ctls.set(p.id, c)
+    await c.setProject(store.get(id))
+  } else c.project = store.get(id)
+  ctl = c
+  // 离开的项目没有任务在进行：关掉它的控制器和引擎（省资源，记录都已保存，回来时从历史打开）；有任务就留在后台接着做
+  if (prev && prev !== c && !prev.busy) {
+    if (prev.project && ctls.get(prev.project.id) === prev) ctls.delete(prev.project.id)
+    void prev.dispose().catch((e) => mlog('dispose', e))
+  }
+  sendBackground()
   return appState()
 }
 
@@ -164,10 +212,12 @@ async function kbDelete(id) {
 }
 /** 在“我的库”里发起技能或插件创作：我的库当作一个项目打开，智能体只能写这里 */
 async function createInLibrary(kind, prompt) {
-  if (ctl.busy) throw new Error('当前有任务在进行，结束后再创作')
   const dir = await lib.ensureMine()
   const p = store.findByPath(dir) || store.add(dir, { name: '我的库', library: true })
+  const lc = ctls.get(p.id)
+  if (lc && lc.busy) throw new Error('我的库里有任务在进行，结束后再创作')
   await openProject(p.id)
+  checkParallel(ctl)
   return ctl.start({ stage: kind === 'plugin' ? 'plugin' : 'skill', prompt, files: [], options: { report: false } })
 }
 // ---------- 知识整理（蒸馏）和 Obsidian ----------
@@ -185,7 +235,6 @@ function distillInfo() {
 }
 /** 整理最近的任务：生成素材，在我的库里发起“知识整理”任务（技能 knowledge-distill）；候选写到 待整理/ */
 async function distillNow() {
-  if (ctl.busy) throw new Error('当前有任务在进行，结束后再整理')
   const mine = await lib.ensureMine()
   const { scope, st } = distillContext()
   const known = buildIndex(kbLibs()).docs.map((d) => `${d.title}（${d.libName}）`)
@@ -197,7 +246,10 @@ async function distillNow() {
       : '上次整理之后没有新结束的任务')
   }
   const p = store.findByPath(mine) || store.add(mine, { name: '我的库', library: true })
+  const lc = ctls.get(p.id)
+  if (lc && lc.busy) throw new Error('我的库里有任务在进行，结束后再整理')
   await openProject(p.id)
+  checkParallel(ctl)
   const date = new Date(at).toISOString().slice(0, 10)
   const t = await ctl.start({ stage: 'distill', prompt: distillPrompt({ rel: m.rel, count: m.count, date }), files: [], options: { report: false } })
   t.distill = { at, tasks: m.tasks, material: m.rel, scope }
@@ -205,12 +257,12 @@ async function distillNow() {
   return t
 }
 /** 整理任务做完：工作台提交 待整理/ 的候选（不走审核页），记下这次整理到哪里 */
-async function afterDistill(task) {
+async function afterDistill(task, c = ctl) {
   try {
     const sha = await lib.commitMine([INBOX], `知识整理：${task.distill ? task.distill.tasks.length : ''} 个任务的候选`)
-    if (sha && ctl.task === task) {
+    if (sha && c.task === task) {
       const paths = (await git(mineLib().dir, ['show', '--name-only', '--pretty=format:', sha])).split(/\r?\n/).filter(Boolean)
-      ctl.markCommitted(sha, '知识整理的候选（工作台提交）', paths)
+      c.markCommitted(sha, '知识整理的候选（工作台提交）', paths)
     }
     if (task.distill) {
       const st = readState(mineLib().dir)
@@ -221,7 +273,7 @@ async function afterDistill(task) {
 }
 /** 在 Obsidian 里改的知识条目：定时提交进我的库（我的库里有任务在跑时等它结束） */
 async function commitExternalEdits() {
-  if (!lib || (ctl && ctl.busy && ctl.project && ctl.project.library)) return
+  if (!lib || allCtls().some((c) => c.busy && c.project && c.project.library)) return
   try { if (await lib.commitExternal()) send('library', lib.states()) } catch (e) { mlog('commit external', e) }
 }
 /** Obsidian 记着的库：%APPDATA%\obsidian\obsidian.json 的 vaults。没装或没打开过返回 null */
@@ -251,12 +303,13 @@ async function openInObsidian(rel) {
  * 任务进行中不能关引擎，就等任务结束再装。
  */
 async function freeInstalled() {
-  if (ctl.busy) throw new Error('任务进行中：引擎正在用已安装的技能和插件，等任务结束后再安装、试用或卸载')
-  await ctl.closeEngine()
+  if (anyBusy()) throw new Error('任务进行中：引擎正在用已安装的技能和插件，等任务结束后再安装、试用或卸载')
+  for (const c of allCtls()) await c.closeEngine()
 }
 
 function afterInstall() {
-  const now = ctl.requestRestart()
+  let now = true
+  for (const c of allCtls()) now = c.requestRestart() && now
   return { restarted: now, skills: lib.skillCards() }
 }
 
@@ -274,14 +327,15 @@ function registerIpc() {
   // 代码模式：整个项目的文件（git 跟踪的 + 没被忽略的新文件，最多 5000 个）和只读看一个文件
   handle('project:tree', () => (ctl.project ? listFiles(ctl.project.path, '', 5000) : []))
   handle('project:read', (rel) => { if (!ctl.project) throw new Error('还没有打开项目'); return readProjectFile(ctl.project.path, rel) })
-  handle('task:start', (input) => ctl.start(input))
-  handle('task:send', (text, extra) => ctl.send(text, extra))
+  handle('task:start', (input) => { checkParallel(ctl); return ctl.start(input) })
+  handle('task:send', (text, extra) => { checkParallel(ctl); return ctl.send(text, extra) })
   handle('task:stop', () => ctl.stop())
-  handle('task:resume', (text) => ctl.resume(text))
+  handle('task:resume', (text) => { checkParallel(ctl); return ctl.resume(text) })
   handle('task:answer', (id, answers) => ctl.answer(id, answers))
   handle('task:new', () => ctl.reset())
   handle('task:open', (id) => ctl.openTask(id))
   handle('task:history', () => ctl.history())
+  handle('task:peek', (id) => ctl.peekTask(id))
   handle('review:changes', () => ctl.changes())
   handle('review:file', (path) => ctl.fileVersions(path))
   handle('review:commit', (message, paths) => ctl.commit(message, paths))
@@ -314,8 +368,8 @@ function registerIpc() {
   handle('kb:publish', async (id, target) => { const e = readEntry(kbLibs(), id); return lib.submit(target, mineEntryPath(id), `知识：${e.meta.title || e.path}`) })
   handle('lib:state', () => ({ sources: lib.states(), mine: mineLib().dir }))
   handle('lib:sync', async (id) => { if (id) await lib.sync(id); else await lib.syncAll(); return lib.states() })
-  handle('lib:addSource', async (s) => { const id = lib.addSource(s); await lib.sync(id); ctl.requestRestart(); return lib.states() })
-  handle('lib:removeSource', (id) => { lib.removeSource(id); ctl.requestRestart(); return lib.states() })
+  handle('lib:addSource', async (s) => { const id = lib.addSource(s); await lib.sync(id); allCtls().forEach((c) => c.requestRestart()); return lib.states() })
+  handle('lib:removeSource', (id) => { lib.removeSource(id); allCtls().forEach((c) => c.requestRestart()); return lib.states() })
   handle('lib:catalog', () => lib.catalog())
   handle('lib:install', async (key) => { await freeInstalled(); return { ...(await lib.install(key)), ...afterInstall() } })
   handle('lib:uninstall', async (kind, name) => { await freeInstalled(); lib.uninstall(kind, name); return afterInstall() })
@@ -356,22 +410,28 @@ function registerIpc() {
   })
 }
 
-function wireController() {
-  ctl.on('state', (s) => send('state', s))
-  ctl.on('activity', (items) => send('activity', items))
-  ctl.on('question', (q) => send('question', q))
-  ctl.on('question-closed', (c) => send('question-closed', c))
-  ctl.on('queued', (q) => send('queued', q))
-  ctl.on('warn', (w) => { mlog('warn', w); send('warn', w) })
-  ctl.on('task-done', (t) => { if (t && t.stage === 'distill') void afterDistill(t) })
-  ctl.on('state', (s) => { if (s.status === 'error') mlog('task error', s.error) })
-  let engineSince = 0
-  ctl.on('engine', (e) => {
-    if (e.state === 'starting') engineSince = Date.now()
-    mlog('engine', e.state, e.state === 'ready' || e.state === 'error' ? `${Date.now() - engineSince} ms` : '', e.error || '', e.pid ? `pid ${e.pid}` : '')
+function wireController(c) {
+  const active = () => c === ctl
+  const tag = (n) => (active() || !c.project ? n : { ...n, title: `${c.project.name}：${n.title}` })
+  c.on('state', (st) => { if (active()) send('state', st); else sendBackground() })
+  c.on('activity', (items) => { if (active()) send('activity', items) })
+  c.on('question', (q) => { if (active()) send('question', q); else sendBackground() })
+  c.on('question-closed', (q) => { if (active()) send('question-closed', q); else sendBackground() })
+  c.on('queued', (q) => { if (active()) send('queued', q) })
+  c.on('warn', (w) => { mlog('warn', w); if (active()) send('warn', w) })
+  c.on('task-done', (t) => {
+    if (t && t.stage === 'distill') void afterDistill(t, c)
+    // 后台的任务做完了：引擎先关掉（省资源，切回来追问时会重新启动并恢复会话）
+    if (!active()) void c.closeEngine().catch(() => {})
   })
-  bridge.on('hello', (h) => mlog('bridge hello', h))
-  ctl.on('notify', (n) => {
+  c.on('state', (st) => { if (st.status === 'error') mlog('task error', c.project && c.project.name, st.error) })
+  let engineSince = 0
+  c.on('engine', (e) => {
+    if (e.state === 'starting') engineSince = Date.now()
+    mlog('engine', c.project ? c.project.name : '', e.state, e.state === 'ready' || e.state === 'error' ? `${Date.now() - engineSince} ms` : '', e.error || '', e.pid ? `pid ${e.pid}` : '')
+  })
+  c.on('notify', (n0) => {
+    const n = tag(n0)
     send('notify', n)
     if (!win || win.isDestroyed()) return
     // 窗口不在前台时才打扰：L2 任务栏闪一次，L3 一直闪到用户回来；系统通知不出声（声音由界面按设置播放）
@@ -419,7 +479,7 @@ async function createWindow() {
     if (!e.isMainFrame && !e.url.startsWith(`${PREVIEW}:`) && e.url !== 'about:blank') e.preventDefault()
   })
   win.on('close', (e) => {
-    if (ctl && ctl.busy && !app.isQuitting) {
+    if (anyBusy() && !app.isQuitting) {
       const r = dialog.showMessageBoxSync(win, {
         type: 'question', buttons: ['停止任务并退出', '取消'], defaultId: 1, cancelId: 1,
         title: 'AstroLab', message: '任务还在进行', detail: '退出会停止任务。对话和已写的文件都会保留，下次打开可以继续。',
@@ -457,8 +517,10 @@ async function boot() {
   store = new ProjectStore(join(P.data, 'projects.json'))
   lib = new Library({ dataDir: P.data, root: P.root })
   try { await lib.ensureMine() } catch (e) { notes.push(`我的库没有建好：${e.message}`) }
-  ctl = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
-  wireController()
+  bridge.on('hello', (h) => mlog('bridge hello', h))
+  // 提问按引擎进程分给各项目的控制器；没有控制器认领的（引擎已换掉）拒绝掉，免得智能体一直等
+  bridge.on('question', (q) => setImmediate(() => { if (!allCtls().some((c) => c.questions.has(q.id))) bridge.decline(q.id) }))
+  ctl = newController()
   // 软件更新：更新位置是部门的共享文件夹；装好的软件才换文件（开发时只显示版本、可以检查）
   updates = new UpdateService({
     installRoot: P.installed ? resolve(P.root, '..') : null,
@@ -467,9 +529,9 @@ async function boot() {
     updateDir: () => updateDirOf(readLocalEnv(P.localEnv), join(P.root, 'config', 'update.json')),
     nodeExe: P.nodePath,
     relaunchExe: P.installed ? process.execPath : '',
-    isBusy: () => !!(ctl && ctl.busy),
+    isBusy: () => anyBusy(),
     beforeQuit: async () => {
-      try { if (ctl) await ctl.dispose() } catch (e) { mlog('update dispose', e) }
+      for (const c of allCtls()) { try { await c.dispose() } catch (e) { mlog('update dispose', e) } }
       try { if (bridge) await bridge.close() } catch { /* 退出前尽力而为 */ }
     },
     quit: () => app.quit(),
@@ -527,7 +589,7 @@ async function boot() {
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus() } })
 app.on('before-quit', () => { app.isQuitting = true })
 app.on('window-all-closed', async () => {
-  try { if (ctl) await ctl.dispose() } catch { /* 退出时尽力而为 */ }
+  for (const c of allCtls()) { try { await c.dispose() } catch { /* 退出时尽力而为 */ } }
   try { if (bridge) await bridge.close() } catch { /* 同上 */ }
   app.quit()
 })

@@ -32,6 +32,7 @@ contextBridge.exposeInMainWorld('astro', {
     reset: () => invoke('task:new'),
     open: (id) => invoke('task:open', id),
     history: () => invoke('task:history'),
+    peek: (id) => invoke('task:peek', id),
   },
   review: {
     changes: () => invoke('review:changes'),

@@ -333,6 +333,10 @@ function dedupe(pts) {
 }
 
 // —— 输出 Word 图形（DrawingML 组合：wpg/wps，Word 2010 及以上、WPS、LibreOffice 可显示和编辑）——
+// 框内文字的西文字体（docx-write 按模板设置；空则沿用文档默认）
+let LATIN = ''
+export function setFlowchartLatin(font) { LATIN = font || '' }
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const E = 12700 // 1 pt = 12700 EMU
 const emu = (v) => Math.round(v * E)
@@ -359,7 +363,7 @@ function geom(shape, w, h) {
 function para(text, sz) {
   return text.split('\n').map((t) => '<w:p><w:pPr><w:snapToGrid w:val="0"/><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>' +
     '<w:ind w:left="0" w:right="0" w:firstLine="0" w:firstLineChars="0"/><w:jc w:val="center"/></w:pPr>' +
-    `<w:r><w:rPr><w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join('')
+    `<w:r><w:rPr>${LATIN ? `<w:rFonts w:ascii="${LATIN}" w:hAnsi="${LATIN}" w:cs="${LATIN}"/>` : ''}<w:sz w:val="${sz}"/><w:szCs w:val="${sz}"/></w:rPr><w:t xml:space="preserve">${esc(t)}</w:t></w:r></w:p>`).join('')
 }
 
 /**

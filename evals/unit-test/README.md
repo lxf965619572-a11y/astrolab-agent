@@ -58,11 +58,13 @@
 
    结果写在 `evals\unit-test\results\<时间>-<用例>-test\summary.md`。
 
-4. 检查报告：
+4. 检查单元测试记录和报告：
 
    ```
-   node skills\unit-test-design\scripts\check-ut.mjs $S\utest\<用例>\test\单元测试报告-<用例>-<日期>.md --run $S\.utest\<用例>\last-run.json
+   node skills\unit-test-design\scripts\check-ut.mjs $S\utest\<用例>\test\单元测试记录-<用例>-<日期>.md --run $S\.utest\<用例>\last-run.json --report "<智能体生成的单元测试报告.md>"
    ```
+
+   单元测试报告（部门模板 02-6）由 `skills\unit-test-design\scripts\gen-ut-report.mjs` 从记录和运行记录生成；智能体没有生成报告时去掉 `--report`。2026-11-03 之前的结果目录中的“单元测试报告-*.md”就是现在的单元测试记录。
 
    运行记录的目录名是智能体调用 `run_unit_tests` 时的 `name`（默认取被测文件名），以智能体回复中的“运行记录”为准。
 

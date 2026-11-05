@@ -5,7 +5,7 @@ import { Sidebar, StatusBar, TitleBar, Toasts } from './components/Shell'
 import { SideRail } from './components/Panels'
 import { modeOf } from './modes'
 import { LaunchView } from './views/LaunchView'
-import { TaskView } from './views/TaskView'
+import { PeekView, TaskView } from './views/TaskView'
 import { CodeView } from './views/CodeView'
 import { HistoryView } from './views/HistoryView'
 import { KbEditor, KnowledgeView } from './views/KnowledgeView'
@@ -50,6 +50,7 @@ export function App() {
           {v === 'task' && <TaskView />}
           {(v === 'code' || v === 'code-launch') && <CodeView fresh={v === 'code-launch'} />}
           {v === 'history' && <HistoryView />}
+          {v === 'peek' && <PeekView />}
           {v === 'knowledge' && <KnowledgeView />}
           {v === 'library' && <LibraryView />}
         </div>

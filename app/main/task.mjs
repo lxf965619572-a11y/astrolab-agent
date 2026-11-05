@@ -40,6 +40,10 @@ export const STAGE_CATEGORY = { requirements: '需求', hld: '设计', dd: '设�
 const MAX_SKILLS = 3
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
+// 进度按智能体的 todo_write 显示。模型常常不列，所以：新一轮的话后面带一句提示；一轮里做了几步还没列，工作台插一句提醒
+export const PLAN_HINT = '【工作台】超过三步的工作，开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。'
+export const PLAN_NUDGE = '【工作台】这项工作有好几步，请先用 todo_write 列出要做的步骤（工作台的“进度”按它显示），之后每做完一步更新状态，然后接着做。'
+const PLAN_NUDGE_AFTER = 4 // 一轮里调用了这么多次工具还没列步骤，就提醒一次
 
 /**
  * 追问带的技能和文件：拼在用户写的话后面交给智能体。插话经引擎桥送到，DSH 不会像第一条消息那样展开“/技能名”，
@@ -47,18 +51,18 @@ const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着�
  */
 export function composeFollowUp(text, { skills = [], files = [] } = {}, titleOf = (n) => n) {
   const parts = [text]
-  if (skills.length) parts.push(`【技能】${skills.map(titleOf).join(' + ')}\n这次请先用 skill 工具加载技能 ${skills.join('、')}，再按技能的步骤做。`)
+  if (skills.length) parts.push(`【技能】${skills.map(titleOf).join(' + ')}\n这次请先用 skill 工具加载技能 ${skills.join('、')}，再按技能的步骤做。开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。`)
   if (files.length) parts.push(`【相关文件】\n${files.map((f) => `- ${f}`).join('\n')}`)
   return parts.join('\n\n')
 }
 export function followUpDisplay(t) {
-  const i = t.search(/\n\n【(技能|相关文件)】/)
+  const i = t.search(/\n\n【(技能|相关文件|工作台)】/)
   if (i < 0) return t
   const sk = /\n\n【技能】([^\n]*)/.exec(t)
   const fi = t.indexOf('\n\n【相关文件】')
   const files = fi < 0 ? [] : t.slice(fi).split('\n').filter((l) => l.startsWith('- ')).map((l) => l.slice(2))
   const note = [sk ? `技能：${sk[1]}` : '', files.length ? `文件：${files.join('、')}` : ''].filter(Boolean).join('；')
-  return `${t.slice(0, i)}\n（${note}）`
+  return note ? `${t.slice(0, i)}\n（${note}）` : t.slice(0, i)
 }
 
 function stamp() {
@@ -95,9 +99,12 @@ export class TaskController extends EventEmitter {
     this.queued = [] // 已发出、智能体还没接收的插话 { id, messageId?, text, at }
     this.stopping = false
     this.idleWaiters = []
-    o.bridge.on('question', (q) => this.onQuestion(q))
-    o.bridge.on('abort', (m) => this.closeQuestion(m.id, 'aborted'))
-    o.bridge.on('lost', (m) => this.closeQuestion(m.id, 'lost'))
+    this.bridgeHandlers = {
+      question: (q) => this.onQuestion(q),
+      abort: (m) => this.closeQuestion(m.id, 'aborted'),
+      lost: (m) => this.closeQuestion(m.id, 'lost'),
+    }
+    for (const [ev, f] of Object.entries(this.bridgeHandlers)) o.bridge.on(ev, f)
   }
 
   // ---------- 状态 ----------
@@ -240,6 +247,7 @@ export class TaskController extends EventEmitter {
       if (id && id === this.task.firstMessageId) this.flushEarly()
     }
     const changed = applyEvent(this.activity, ev)
+    this.watchPlan(ev)
     // 发给智能体的第一条消息带了环节、技能、约定等说明；对话里只显示用户自己写的那句
     for (const it of changed) {
       if (it.kind === 'user' && this.task.firstMessage && it.text.trim() === this.task.firstMessage.trim()) it.text = this.task.prompt
@@ -250,6 +258,20 @@ export class TaskController extends EventEmitter {
     if (['turn/start', 'step/start', 'tool/call', 'tool/result', 'turn/end', 'user/message'].includes(ev.type)) {
       this.emit('state', this.snapshotState())
     }
+  }
+
+  /** 一轮里做了几步还没列步骤：插一句提醒（每轮最多一次）。工作台的“进度”只能按智能体自己列的步骤打勾 */
+  watchPlan(ev) {
+    if (ev.type === 'turn/start') { this.plan = { tools: 0, seen: false, nudged: false }; return }
+    if (ev.type !== 'tool/call') return
+    const pl = (this.plan ||= { tools: 0, seen: false, nudged: false })
+    const name = (ev.data && ev.data.name) || ''
+    if (name === 'todo_write') { pl.seen = true; return }
+    pl.tools++
+    if (pl.seen || pl.nudged || pl.tools < PLAN_NUDGE_AFTER || this.o.planNudge === false || !this.busy) return
+    if ((this.activity.todos || []).some((x) => x.status !== 'completed')) return // 本轮之前列的还没做完，接着用
+    pl.nudged = true
+    this.deliver(PLAN_NUDGE).catch(() => { /* 送不到就算了，不影响任务 */ })
   }
 
   onStatus(p) {
@@ -296,7 +318,7 @@ export class TaskController extends EventEmitter {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
     const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处。需要依据或细节（标准、教材里怎么说）时用 mcp__knowledge__search_reference 查部门资料库（原文多是英文，用英文术语检索），引用写资料名、节号和页码。不要主动往知识库里记东西：只有我明确说“记到知识库”“入库”时，才用 mcp__knowledge__propose_knowledge 按我说的内容记一条草稿。' : ''
-    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。命令和工具调用的说明（description）也用中文写，我在界面上看得懂。${kb}`]
+    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。命令和工具调用的说明（description）也用中文写，我在界面上看得懂。超过三步的工作，开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。${kb}`]
     const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
     if (skills.length) {
       // 写成 /技能名：DSH 在第一步之前就把技能内容附到对话里（和 skill 工具返回的一样），
@@ -421,7 +443,18 @@ export class TaskController extends EventEmitter {
     if (skills.length || files.length) {
       const cards = new Map((this.o.skillCards ? this.o.skillCards() : []).map((c) => [c.name, c]))
       text = composeFollowUp(text, { skills, files }, (n) => (cards.get(n) && cards.get(n).title) || n)
-      if (skills.length) { this.task.skills = [...new Set([...(this.task.skills || []), ...skills])]; this.save() }
+      if (skills.length) {
+        this.task.skills = [...new Set([...(this.task.skills || []), ...skills])]
+        // 带技能的追问是一项新的工作：上一项的步骤清掉，等智能体按新技能重新列（不然进度里一直是上一项打满勾的清单）
+        this.activity.todos = []
+        this.save()
+      }
+    }
+    // 新一轮（不是进行中的插话）：带上列步骤的提示；上一项的步骤已经全部做完的，清掉等新列的
+    if (!this.busy) {
+      if (!/todo_write/.test(text)) text = `${text}\n\n${PLAN_HINT}`
+      const td = this.activity.todos || []
+      if (td.length && td.every((x) => x.status === 'completed')) this.activity.todos = []
     }
     if (this.status === 'starting' && !this.task.firstSent) {
       const q = { id: `q${Date.now()}`, messageId: null, text, raw, at: Date.now() }
@@ -515,6 +548,8 @@ export class TaskController extends EventEmitter {
 
   // ---------- 提问 ----------
   onQuestion(q) {
+    // 多个项目并行（shared）：每个项目的控制器有自己的引擎，别的引擎发来的问题不管（没人认领的由 main 拒绝）
+    if (this.o.shared && q.pid && (!this.engine || q.pid !== this.engine.pid)) return
     if (!this.task || (q.session && q.session !== this.task.sessionId)) return this.o.bridge.decline(q.id)
     const item = { id: q.id, questions: q.questions || [], at: Date.now() }
     this.questions.set(q.id, item)
@@ -662,6 +697,14 @@ export class TaskController extends EventEmitter {
     return { task: this.task, items: rec.items }
   }
 
+  /** 只读查看一个任务的记录，不切换当前任务（当前任务进行中时也能看别的任务） */
+  peekTask(id) {
+    if (this.task && this.task.id === id) return { task: this.task, items: this.items(), current: true }
+    const rec = JSON.parse(readFileSync(join(this.tasksDir(), `${id}.json`), 'utf8'))
+    const task = { ...rec.task, status: ['running', 'asking', 'starting'].includes(rec.task.status) ? 'interrupted' : rec.task.status }
+    return { task, items: rec.items, current: false }
+  }
+
   /** 回到“发起任务”：当前任务已结束或已停止时清空（记录已保存） */
   async reset() {
     if (this.busy) throw new Error('任务进行中，先停止')
@@ -677,6 +720,7 @@ export class TaskController extends EventEmitter {
 
   async dispose() {
     this.stopping = true
+    for (const [ev, f] of Object.entries(this.bridgeHandlers || {})) this.o.bridge.off(ev, f)
     await this.closeEngine()
   }
 }

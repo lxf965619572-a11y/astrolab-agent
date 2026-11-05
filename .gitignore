@@ -11,6 +11,7 @@ sample/utest/*/test-*/
 evals/results/
 evals/unit-test/results/
 .utest/
+.cppcheck/
 sample/design/*/doc/
 sample/design/*/doc-*/
 evals/detailed-design/results/
@@ -35,3 +36,7 @@ sample/coding/*/doc/编码说明-*
 
 # 学习资料、标准原文（有版权、文件大）：只放本机或内网共享文件夹，不进 Git；转好的文本进资料库
 资料/
+# 网上整理的 GJB 8114 规则（独立 Git 仓库，含与项目无关的 PDF）；已转成 skills/code-walkthrough/references/gjb8114-c.md
+GJB_8114-2013md/
+
+evals/g3-pdus/results/

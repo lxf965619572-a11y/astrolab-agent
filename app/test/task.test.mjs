@@ -287,3 +287,78 @@ test('空闲时引擎自己退出：后台再热一个（下个任务不用等�
   await new Promise((r) => setTimeout(r, 600))
   assert.equal(made(), first + 3, '第 4 次退出后不再自动重启')
 })
+
+test('当前任务进行中时只读查看另一个任务：不切换当前任务；带技能的追问清掉上一项的步骤', async (t) => {
+  const cards = [{ name: 'unit-test-design', title: '单元测试', category: '测试' }]
+  const { ctl } = await setup(t, { skillCards: () => cards })
+  const a = await ctl.start({ stage: 'utest', prompt: '第一个任务' })
+  await until(() => ctl.status === 'done')
+  assert.ok(ctl.snapshotState().summary.todos.length > 0)
+  await ctl.reset()
+  const b = await ctl.start({ stage: 'utest', prompt: '第二个任务' })
+  await until(() => ctl.busy)
+  const p = ctl.peekTask(a.id)
+  assert.equal(p.task.id, a.id)
+  assert.equal(p.current, false)
+  assert.ok(p.items.some((i) => i.kind === 'user'))
+  assert.equal(ctl.task.id, b.id, '查看不切换当前任务')
+  assert.equal(ctl.peekTask(b.id).current, true)
+  await until(() => ctl.status === 'done')
+  assert.ok(ctl.snapshotState().summary.todos.length > 0)
+  await ctl.send('再做一项', { skills: ['unit-test-design'] })
+  assert.equal(ctl.snapshotState().summary.todos.length, 0, '带技能的追问：上一项的步骤清掉，等新列的')
+  await until(() => ctl.status === 'done')
+})
+
+test('两个项目同时各做一个任务（shared）：各用各的引擎，提问只交给自己的控制器，互不串', async (t) => {
+  const bridge = new EngineBridge()
+  await bridge.listen()
+  const data = mkdtempSync(join(tmpdir(), 'astro-data-'))
+  const mk = async (name) => {
+    const ws = mkdtempSync(join(tmpdir(), `astro-${name}-`))
+    writeFileSync(join(ws, 'readme.md'), name)
+    await git.initRepo(ws, '初始版本')
+    const c = new TaskController({
+      bridge, dataDir: data, logDir: join(data, 'logs'), shared: true, warm: false,
+      makeEngine: () => new Engine({ dshBin: MOCK, nodePath: process.execPath, cwd: ws, provider: 'mock', model: 'mock', env: { ...process.env, MOCK_DSH_SPEED: '0.02', ASTROLAB_BRIDGE: bridge.path } }),
+    })
+    await c.setProject({ id: name, name, path: ws })
+    return c
+  }
+  const a = await mk('pa'), b = await mk('pb')
+  // 没有控制器认领的问题由外面兜底拒绝（main.mjs 里的做法）
+  const declined = []
+  bridge.on('question', (q) => setImmediate(() => { if (![a, b].some((c) => c.questions.has(q.id))) { declined.push(q.id); bridge.decline(q.id) } }))
+  t.after(async () => { await a.dispose(); await b.dispose(); await bridge.close() })
+  const askedA = [], askedB = []
+  a.on('question', (q) => { askedA.push(q.id); setTimeout(() => a.answer(q.id, [{ id: 'lang', selected: ['英文'] }, { id: 'title', selected: [], custom: 'A' }]), 30) })
+  b.on('question', (q) => { askedB.push(q.id) })
+  await Promise.all([a.start({ stage: 'utest', prompt: '[ask] 先问我' }), b.start({ stage: 'utest', prompt: '做单元测试' })])
+  await until(() => a.busy && b.busy)
+  assert.notEqual(a.engine.pid, b.engine.pid, '每个项目一个引擎')
+  await until(() => a.status === 'done' && b.status === 'done', 15000)
+  assert.equal(askedA.length, 1)
+  assert.equal(askedB.length, 0, 'A 的问题没有跑到 B')
+  assert.equal(declined.length, 0)
+  assert.ok(a.activity.items.some((i) => i.kind === 'user' && /先问我/.test(i.text)))
+  assert.ok(!b.activity.items.some((i) => i.kind === 'user' && /先问我/.test(i.text)), 'B 的对话里没有 A 的消息')
+  assert.equal(a.history().length, 1)
+  assert.equal(b.history().length, 1, '任务记录按项目分开')
+})
+
+test('列步骤：一轮里做了几步还没列就提醒一次；新一轮的话带提示，对话里不显示提示', async (t) => {
+  const { ctl } = await setup(t)
+  const sent = []
+  const orig = ctl.deliver.bind(ctl)
+  ctl.deliver = (text) => { sent.push(text); return orig(text) }
+  await ctl.start({ stage: 'utest', prompt: '[noplan] 看几个文件' })
+  await until(() => ctl.status === 'done' && sent.length >= 1)
+  assert.equal(sent.filter((x) => x.includes('请先用 todo_write')).length, 1, '每轮最多提醒一次')
+  await until(() => ctl.status === 'done')
+  await ctl.send('[noplan] 再看一遍')
+  await until(() => ctl.status === 'done' && ctl.activity.items.filter((i) => i.kind === 'user').length >= 3)
+  const follow = sent.find((x) => x.startsWith('[noplan] 再看一遍'))
+  assert.ok(follow && /todo_write/.test(follow), '新一轮的话带列步骤的提示')
+  const users = ctl.activity.items.filter((i) => i.kind === 'user').map((i) => i.text)
+  assert.ok(users.includes('[noplan] 再看一遍'), `对话里只显示用户写的那句：${JSON.stringify(users)}`)
+})

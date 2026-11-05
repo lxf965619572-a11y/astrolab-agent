@@ -6,7 +6,7 @@ import { play, setSoundSettings } from './sound'
 import { modeOf, type Mode } from './modes'
 
 // launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面
-export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'history' | 'knowledge' | 'library'
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'history' | 'knowledge' | 'library' | 'peek'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'
@@ -40,6 +40,12 @@ interface Store {
   index: Map<string, number>
   questions: Question[]
   view: View
+  /** 只读查看的任务（当前任务进行中时看别的任务） */
+  peek: null | { task: import('./api').Task; items: Item[] }
+  /** 打开一个任务：当前任务进行中且不是它时只读查看，否则切换过去 */
+  openTask(t: import('./api').Task): Promise<void>
+  /** 切到另一个项目：它有任务（进行中或刚做完）就打开那个任务，没有就到新任务页。原项目进行中的任务在后台接着做 */
+  openProject(id: string): Promise<void>
   /** 当前模式：跟着视图走（知识库、技能这些共用页面保持进来前的模式） */
   mode: Mode
   setMode(m: Mode): void
@@ -94,6 +100,7 @@ export const useStore = create<Store>((set, get) => ({
   index: new Map(),
   questions: [],
   view: 'launch',
+  peek: null,
   mode: 'task',
   draft: { prompt: '', files: [], report: true, dismissed: [], skills: [] },
   chatDraft: '',
@@ -128,6 +135,27 @@ export const useStore = create<Store>((set, get) => ({
     set({ app, ts: task, items, index, questions: task.questions })
   },
 
+  async openProject(id) {
+    const s = await get().run((api) => api.project.open(id), '切换项目失败')
+    if (!s) return
+    get().applyAppState(s)
+    const t = s.task.task
+    get().setView(t ? (modeOf(t) === 'code' ? 'code' : 'task') : 'launch')
+  },
+  async openTask(t) {
+    const st = get()
+    const target = modeOf(t) === 'code' ? 'code' : 'task'
+    const cur = st.ts?.task?.id
+    if (cur === t.id) { st.setView(target); return }
+    const busy = st.ts ? ['starting', 'running', 'asking'].includes(st.ts.status) : false
+    if (busy) {
+      const p = await st.run((api) => api.task.peek(t.id), '打不开这个任务')
+      if (p) set({ peek: { task: p.task, items: p.items }, view: 'peek' })
+      return
+    }
+    const s = await st.run(async (api) => { await api.task.open(t.id); return api.getState() }, '打不开这个任务')
+    if (s) { get().applyAppState(s); get().setView(target) }
+  },
   setView(v) {
     const mode: Mode = v === 'code' || v === 'code-launch' || v === 'review' ? 'code' : v === 'launch' || v === 'task' ? 'task' : get().mode
     set({ view: v === 'review' ? 'code' : v, mode })
@@ -202,6 +230,7 @@ function onEvent(e: AstroEvent) {
       break
     }
     case 'queued': break
+    case 'background': if (st.app) useStore.setState({ app: { ...st.app, background: e.payload } }); break
     case 'notify': {
       if (e.payload.kind === 'done') play('done')
       else if (e.payload.kind === 'ask') play('ask')

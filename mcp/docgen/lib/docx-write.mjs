@@ -9,7 +9,7 @@
 import { readZip, writeZip } from '../../common/zip.mjs'
 import { cleanText, escAttr, escText, kid, kids, parseXml, serializeDoc, val, walk } from '../../common/xml.mjs'
 import { parseMarkdown, plainText } from './markdown.mjs'
-import { renderFlowchart } from './flowchart.mjs'
+import { renderFlowchart, setFlowchartLatin } from './flowchart.mjs'
 
 const MARKERS = /(【待确认】|【待补充】|【待定】|【TBD】)/
 const FIELD_RE = /\{\{\s*([^{}]+?)\s*\}\}/g
@@ -86,6 +86,7 @@ function runs(inlines, ctx, base = {}) {
       const code = x.code || base.code
       let rPr = ''
       if (code) rPr += '<w:rFonts w:ascii="Courier New" w:hAnsi="Courier New" w:cs="Courier New"/>'
+      else if (ctx.latin) rPr += `<w:rFonts w:ascii="${ctx.latin}" w:hAnsi="${ctx.latin}" w:cs="${ctx.latin}"/>`
       if (b) rPr += '<w:b/><w:bCs/>'
       if (x.i) rPr += '<w:i/><w:iCs/>'
       if (base.sz) rPr += `<w:sz w:val="${base.sz}"/><w:szCs w:val="${base.sz}"/>`
@@ -396,12 +397,24 @@ export function inspectTemplate(buf, mapping) {
  * @param {string} markdown 正文
  * @param {object} opts { fields, mapping, headingNumbers: 'auto'|'keep'|'strip', titleAsField: true, tocLevels }
  */
+/** styles.xml 中每个 w:rFonts 的西文（ascii、hAnsi、cs）改为指定字体，东亚字体不变 */
+function latinStyles(xml, font) {
+  return xml.replace(/<w:rFonts\b([^>]*?)\/>/g, (m, attrs) => {
+    if (/Courier|Consolas|Mono/i.test(attrs)) return m
+    const a = attrs.replace(/\s+w:(ascii|hAnsi|cs|asciiTheme|hAnsiTheme|cstheme)="[^"]*"/g, '')
+    return `<w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="${font}"${a}/>`
+  }).replace(/(<w:rPrDefault>\s*<w:rPr>)(?!\s*<w:rFonts)/, `$1<w:rFonts w:ascii="${font}" w:hAnsi="${font}" w:cs="${font}"/>`)
+}
+
 export function renderDocx(templateBuf, markdown, opts = {}) {
   const zip = readZip(templateBuf)
   const fields = { ...(opts.fields || {}) }
   const st = resolveStyles(loadStyles(zip), opts.mapping || {})
+  // 西文字体：部门文档中英文、数字统一用 Times New Roman（中文字体沿用模板）。模板 .json 中 "latinFont": null 可关闭
+  const latin = opts.latinFont !== undefined ? opts.latinFont : opts.mapping && opts.mapping.latinFont !== undefined ? opts.mapping.latinFont : 'Times New Roman'
   const ctx = {
     st,
+    latin: latin ? escText(String(latin)) : '',
     headingNumbers: opts.headingNumbers || 'auto',
     tocLevels: opts.tocLevels,
     shift: 0,
@@ -413,6 +426,7 @@ export function renderDocx(templateBuf, markdown, opts = {}) {
     textHeight: 13958, // A4 竖排、上下页边距各 2.54 cm；按模板的页面设置改
   }
   const notes = []
+  setFlowchartLatin(ctx.latin)
 
   let blocks = parseMarkdown(markdown)
   // 文首唯一的一级标题当作文档名称：填入字段，正文标题整体提升一级
@@ -489,6 +503,9 @@ export function renderDocx(templateBuf, markdown, opts = {}) {
     for (const n of walk(part.root)) if (n.name === 'w:p') replaceFields(n, fields, report)
     files.set(name, serializeDoc(part))
   }
+
+  // 样式中的西文字体统一（模板的标题、表格、目录等样式多用主题字体 Cambria、Calibri）；代码样式（Courier 等）不改
+  if (ctx.latin && zip.has('word/styles.xml')) files.set('word/styles.xml', latinStyles(zip.text('word/styles.xml'), ctx.latin))
 
   // 有目录域时，让 Word 打开文档时提示更新域
   if (tocPlaced && zip.has('word/settings.xml')) {

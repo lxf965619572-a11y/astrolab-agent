@@ -1,8 +1,9 @@
 #!/usr/bin/env node
-// 单元测试报告自查脚本：对照测试代码和最后一次运行记录（last-run.json），按固定规则检查报告。
+// 单元测试自查脚本：对照测试代码和最后一次运行记录（last-run.json），按固定规则检查单元测试记录（工作底稿）；
+// 给 --report 时，再核对 gen-ut-report.mjs 生成的部门模板格式报告（章节、数字、附录 A 用例数）。
 // 只读，不修改任何文件。列出的是疑似问题：“必须处理”项要改正，“复核”项逐条判断。
 //
-// 用法：node check-ut.mjs <单元测试报告.md> [--run <last-run.json>] [--tests <测试目录>]
+// 用法：node check-ut.mjs <单元测试记录.md> [--run <last-run.json>] [--tests <测试目录>] [--report <单元测试报告.md>]
 //   --run    run_unit_tests 返回的“运行记录”路径。省略时在当前目录的 .utest/ 下找最近的一次
 //   --tests  测试代码目录。省略时用运行记录中的测试文件
 // 退出码：0 = 没有“必须处理”项；1 = 有“必须处理”项；2 = 用法或文件错误
@@ -15,10 +16,11 @@ const args = process.argv.slice(2)
 const opt = (n) => { const k = args.indexOf(n); if (k < 0) return null; const v = args[k + 1]; args.splice(k, 2); return v }
 let runPath = opt('--run')
 const testsDir = opt('--tests')
+const reportFile = opt('--report')
 const file = args[0]
-if (!file) { console.error('用法：node check-ut.mjs <单元测试报告.md> [--run <last-run.json>] [--tests <测试目录>]'); process.exit(2) }
+if (!file) { console.error('用法：node check-ut.mjs <单元测试记录.md> [--run <last-run.json>] [--tests <测试目录>] [--report <单元测试报告.md>]'); process.exit(2) }
 let text
-try { text = readFileSync(file, 'utf8').replace(/^﻿/, '') } catch (e) { console.error(`读不到报告：${file}（${e.message}）`); process.exit(2) }
+try { text = readFileSync(file, 'utf8').replace(/^﻿/, '') } catch (e) { console.error(`读不到单元测试记录：${file}（${e.message}）`); process.exit(2) }
 const lines = text.split(/\r?\n/)
 
 // —— 运行记录 ——
@@ -292,12 +294,32 @@ for (const r of fixRows) {
   if (!basis || FROM_CODE.test(basis)) add('必须处理', 'U12 修正无设计依据', r.line, `用例修正记录“${r.cells[0]}”的设计依据为“${basis || '空'}”：只有证明用例与设计不符才能修正预期`)
 }
 
+
+// —— U13 部门模板格式的报告（--report）——
+if (reportFile) {
+  let rl = null
+  try { rl = readFileSync(reportFile, 'utf8').replace(/^﻿/, '').split(/\r?\n/) } catch (e) { console.error(`读不到单元测试报告：${reportFile}（${e.message}）`); process.exit(2) }
+  const rh = rl.map((l, i) => ({ m: /^(#{1,6})\s+(.*)$/.exec(l), i })).filter((x) => x.m).map((x) => ({ title: x.m[2].replace(/\s+/g, ''), line: x.i }))
+  const NEED = [['1', '范围'], ['1.1', '标识'], ['1.2', '系统概述'], ['1.3', '文档概述'], ['1.4', '术语和缩略语'], ['2', '引用文件'], ['3', '测试过程概述'], ['3.1', '被测试软件说明'], ['3.2', '测试工作概述'], ['3.3', '测试数据及度量分析'], ['3.4', '不可测试项仿真'], ['3.5', '测试结论'], ['3.6', '测试环境的影响'], ['3.7', '产品质量的评价和建议'], ['4', '详细测试结果'], ['4.1', '测试结果概述'], ['4.2', '测试结果统计'], ['4.2.1', '文件测试结果统计'], ['4.2.2', '函数测试结果统计'], ['4.3', '未覆盖测试情况说明'], ['4.4', '测试问题统计'], ['5', '测试工作总结'], ['附录A', '']]
+  for (const [n, t] of NEED) if (!rh.some((h) => h.title.startsWith(n) && h.title.slice(n.length).replace(/^[.．]/, '').startsWith(t))) add('必须处理', 'U13 报告结构', '报告', `报告缺少“${n} ${t}”一节（按部门模板；报告用 gen-ut-report.mjs 生成）`)
+  const pend = rl.map((l, i) => [l, i]).filter(([l]) => /【待补充/.test(l) && !/^\s*<!--/.test(l))
+  if (pend.length) add('复核', 'U13 报告待补充', '报告', `报告中还有 ${pend.length} 处【待补充】（第 ${pend.slice(0, 8).map(([, i]) => i + 1).join('、')} 行${pend.length > 8 ? '……' : ''}），有依据的填上，没有的保留并告诉用户`)
+  if (run?.summary) {
+    const t41 = rl.join('\n')
+    const get = (k) => { const m = new RegExp(`\\|\\s*${k}\\s*\\|\\s*(\\d+)`).exec(t41); return m ? Number(m[1]) : null }
+    const nCases = get('测试用例个数'), nFail = get('失败用例个数')
+    if (nCases !== null && nCases < run.summary.cases) add('必须处理', 'U13 报告数字', '报告', `报告 4.1 测试用例个数为 ${nCases}，本单元最后一次运行就有 ${run.summary.cases} 个：报告不是按最后一次运行生成的，重新运行 gen-ut-report.mjs`)
+    if (nFail !== null && nCases === run.summary.cases && nFail !== run.summary.failed) add('必须处理', 'U13 报告数字', '报告', `报告 4.1 失败用例个数为 ${nFail}，运行记录为 ${run.summary.failed}`)
+    const appA = rl.filter((l) => /^表\s*A-\d+\s+UT[-_]/i.test(l.trim())).map((l) => norm((l.match(ID_RE) || [''])[0]))
+    for (const c of run.cases || []) if (!appA.includes(norm(c.id))) { add('必须处理', 'U13 附录 A', '报告', `附录 A 中没有用例 ${c.id} 的记录，重新运行 gen-ut-report.mjs`); break }
+  }
+}
 // —— 输出 ——
 const order = { 必须处理: 0, 复核: 1 }
 findings.sort((a, b) => order[a.level] - order[b.level] || String(a.line).localeCompare(String(b.line), undefined, { numeric: true }))
 const count = (lv) => findings.filter((f) => f.level === lv).length
-console.log('# 单元测试报告自查结果\n')
-console.log(`报告：${file}`)
+console.log('# 单元测试自查结果\n')
+console.log(`单元测试记录：${file}${reportFile ? `；报告：${reportFile}` : ''}`)
 if (run) console.log(`运行记录：${runPath}（用例 ${run.summary ? `${run.summary.cases} 个，失败 ${run.summary.failed} 个` : '未完成'}，MC/DC ${run.mcdcMeasured ? '已测量' : '未测量'}）`)
 console.log(`测试代码：${testFiles.length ? testFiles.map((f) => basename(f)).join('、') : '未找到'}；用例表 ${caseRows.length} 行，疑似缺陷 ${defRows.length} 个，未覆盖项说明 ${uncRows.length} 行，待确认问题 ${qRows.length} 个`)
 for (const n of notes) console.log(`注意：${n}`)

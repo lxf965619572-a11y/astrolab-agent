@@ -8,7 +8,7 @@
 //   CPPCHECK_TIMEOUT_MS   单次分析超时，默认 600000（10 分钟）
 
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
@@ -126,8 +126,9 @@ server.registerTool('run_cppcheck', {
     enable: z.string().optional().describe('检查类别，默认 "warning,style,performance,portability"'),
     inconclusive: z.boolean().optional().describe('是否报告不确定的告警，默认 true'),
     misra: z.boolean().optional().describe('是否启用 MISRA 插件（需 Cppcheck 自带 misra 插件；规则原文需另行配置）'),
+    name: z.string().optional().describe('运行记录名称，默认 "last"；结果保存到工作区 .cppcheck/<name>-run.json，走查和静态分析的检查脚本据此核对告警是否逐条甄别'),
   },
-}, async ({ paths, target, includeDirs = [], defines = [], enable, inconclusive = true, misra = false }) => {
+}, async ({ paths, target, includeDirs = [], defines = [], enable, inconclusive = true, misra = false, name = 'last' }) => {
   const cwd = process.cwd()
   const missing = paths.filter((p) => !existsSync(isAbsolute(p) ? p : resolve(cwd, p)))
   if (missing.length) {
@@ -169,8 +170,17 @@ server.registerTool('run_cppcheck', {
     truncated: all.length > MAX_FINDINGS,
     findings: all.slice(0, MAX_FINDINGS),
   }
+  // 保存完整结果（不截断），供走查记录、静态分析记录的检查脚本核对
+  let runFile = ''
+  try {
+    const dir = join(cwd, '.cppcheck')
+    mkdirSync(dir, { recursive: true })
+    runFile = join(dir, `${String(name).replace(/[^\w.-]/g, '_')}-run.json`)
+    writeFileSync(runFile, JSON.stringify({ ...result, time: new Date().toISOString(), paths, version: (await run(['--version'])).stdout.trim(), truncated: false, findings: all }, null, 2), 'utf8')
+    result.runFile = runFile
+  } catch (e) { result.runFileError = String(e.message || e) }
   return {
-    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(result, null, 2) + (runFile ? `\n运行记录：${runFile}` : '') }],
     structuredContent: result,
   }
 })

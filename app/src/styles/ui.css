@@ -605,6 +605,7 @@ body.resizing .resizer:not(:hover)::after { background: transparent; }
 .conv-col { position: relative; max-width: 916px; margin: 0 auto; }
 .conv-vrow { position: absolute; top: 0; left: 0; width: 100%; padding: 0 28px; }
 .conv-vrow:first-child { padding-top: 10px; }
+.conv-vrow.static { position: static; transform: none; }
 .msg-user { display: flex; justify-content: flex-end; padding: 16px 0 8px; }
 .msg-user .bubble { max-width: 80%; }
 .msg-agent { position: relative; padding: 10px 0 14px; line-height: 1.75; word-break: break-word; }

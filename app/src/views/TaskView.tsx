@@ -16,6 +16,7 @@ import { play } from '../sound'
 import { TaskSide } from './TaskSide'
 import { FilePicker, MAX_SKILLS, SkillPickerButton, filterSkills } from '../components/Pickers'
 import { categoryOf, skillIcon } from '../skills'
+import { modeOf } from '../modes'
 import type { SkillCard } from '../api'
 
 export function useNow(active: boolean, ms = 1000) {
@@ -125,6 +126,45 @@ function ConvHead({ inCode }: { inCode: boolean }) {
   )
 }
 
+/** 只读查看另一个任务（当前任务进行中时）：只有对话记录，不能继续、不能审核；当前任务结束后再打开它 */
+export function PeekView() {
+  const peek = useStore((s) => s.peek)
+  const ts = useStore((s) => s.ts)
+  const setView = useStore((s) => s.setView)
+  if (!peek) return null
+  const t = peek.task
+  const items = peek.items.filter((i) => i.kind !== 'tools' || !(i.hidden || i.calls.every((c) => c.hidden)))
+  const back = () => setView(ts?.task && modeOf(ts.task) === 'code' ? 'code' : 'task')
+  return (
+    <div className="conv-page">
+      <section className="conv" aria-label="只读查看">
+        <header className="conv-head">
+          <div className="conv-head-row">
+            <div className="conv-title">
+              <h1 title={t.title}>{t.title}</h1>
+              <div className="conv-meta">
+                <span className="pill sm idle"><span className="dot" />只读</span>
+                <span className="conv-stage">{t.stageName}</span>
+                <span>{new Date(t.startedAt).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}{t.endedAt ? ` · 用时 ${elapsed(t.endedAt - t.startedAt)}` : ''}</span>
+              </div>
+            </div>
+            <div className="conv-actions">
+              {ts?.task && <Key size="sm" variant="primary" onPress={back}><Icon name="arrow" size={14} stroke={2} className="flip" />回到进行中的任务</Key>}
+            </div>
+          </div>
+          <div className="note-line muted small"><span className="led" />当前有任务在进行，这里只能查看记录；要继续、追问或审核这个任务，等当前任务结束后再打开它。</div>
+        </header>
+        <div className="conv-scroll">
+          <div className="conv-col">
+            {items.map((item) => <div key={item.id} className="conv-vrow static"><ItemRow item={item} task={t} /></div>)}
+            {!items.length && <div className="pad muted">这个任务没有对话记录。</div>}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 /** 右边面板的开关（和 Claude 右上角一样） */
 function PanelToggle({ inCode }: { inCode: boolean }) {
   const panel = useStore((s) => s.settings.panel)
@@ -199,14 +239,17 @@ function Stream({ inCode }: { inCode: boolean }) {
   )
 }
 
-function ItemRow({ item }: { item: Item }) {
+function ItemRow({ item, task: own }: { item: Item; task?: { stageName?: string; title?: string } }) {
   const ts = useStore((s) => s.ts)!
+  const src = own || ts.task
+  // 工作台自己插的提醒（如提醒列步骤）：不是用户说的话，显示成一行灰字
+  if (item.kind === 'user' && item.text.startsWith('【工作台】')) return <div className="act-row" title={clock(item.at)}><span className="act-icon"><Icon name="sparkle" size={13} stroke={2} /></span><div className="act-body"><span className="muted small">工作台提醒：{item.text.slice(6)}</span></div></div>
   if (item.kind === 'user') return <div className="msg-user"><div className="bubble user">{item.text}</div></div>
   if (item.kind === 'assistant') {
     return (
       <div className="msg-agent">
         <Markdown text={item.text} />
-        <Button className="bubble-act" aria-label="存到知识库" onPress={() => useStore.getState().openKbEditor({ meta: { kind: '经验', title: '', source: `${ts.task?.stageName || ''}任务：${ts.task?.title || ''}` }, body: item.text })}><Icon name="book" size={13} />存到知识库</Button>
+        <Button className="bubble-act" aria-label="存到知识库" onPress={() => useStore.getState().openKbEditor({ meta: { kind: '经验', title: '', source: `${src?.stageName || ''}任务：${src?.title || ''}` }, body: item.text })}><Icon name="book" size={13} />存到知识库</Button>
       </div>
     )
   }

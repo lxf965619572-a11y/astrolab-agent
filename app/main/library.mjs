@@ -629,7 +629,7 @@ export class Library {
     }
     // 按研制流程排：需求 → 设计 → 编码 → 测试 → 走查 → 文档与图 → 创作 → 其他；同类里内置的在前
     const rank = { builtin: 0, installed: 1, mine: 2 }
-    const order = ['requirements-analysis', 'preliminary-design', 'detailed-design', 'coding', 'unit-test-design', 'code-walkthrough']
+    const order = ['requirements-analysis', 'preliminary-design', 'detailed-design', 'coding', 'unit-test-design', 'code-walkthrough', 'static-analysis', 'confirmation-test', 'dev-summary']
     const pos = (c) => (order.includes(c.name) ? order.indexOf(c.name) : 99)
     return out.sort((a, b) => SKILL_CATEGORIES.indexOf(a.category) - SKILL_CATEGORIES.indexOf(b.category)
       || rank[a.source] - rank[b.source] || pos(a) - pos(b) || a.title.localeCompare(b.title, 'zh'))

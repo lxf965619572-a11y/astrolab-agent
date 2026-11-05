@@ -10,7 +10,7 @@ const LINE_TOL = 2   // 行号容差：模型报告的行号与答案相差不�
 
 const base = (f) => path.posix.basename(String(f || '').replace(/\\/g, '/').replace(/:\d+.*$/, '')).toLowerCase()
 const firstInt = (v) => { const m = String(v ?? '').match(/\d+/); return m ? Number(m[0]) : NaN }
-const isMinor = (sev) => /建议|suggest|info|low|minor|style/i.test(String(sev || ''))
+const isMinor = (sev) => /建议|Ⅴ级|suggest|info|low|minor|style/i.test(String(sev || ''))
 const pct = (a, b) => (b ? `${((100 * a) / b).toFixed(1)}%` : '—')
 const cell = (s) => String(s ?? '').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
 
@@ -156,7 +156,7 @@ function renderMd(s) {
   L.push(`| 检出率（召回率） | **${pct(t.detected, t.expected)}**（${t.detected}/${t.expected}） | 命中标准答案中的缺陷比例 |`)
   L.push(`| Cppcheck 单独可检出 | ${pct(t.cppcheckBaseline, t.expected)}（${t.cppcheckBaseline}/${t.expected}） | 只靠静态分析工具的基线 |`)
   L.push(`| 模型额外检出 | ${t.modelOnlyDetected} | Cppcheck 检不出、模型检出的缺陷数 |`)
-  L.push(`| 干净代码误报 | ${t.falsePositives} | 在无缺陷函数中报出的“严重/一般”问题 |`)
+  L.push(`| 干净代码误报 | ${t.falsePositives} | 在无缺陷函数中报出的Ⅰ～Ⅳ级（旧：严重/一般）问题 |`)
   L.push(`| 其他额外发现 | ${t.extras} | 不在答案中、也不在干净区的发现，**需人工判断**真伪 |`)
   L.push(`| findings.json 无效 | ${t.invalidFindings} | 未生成或格式错误的次数 |`)
   L.push(`| 平均耗时 | ${t.avgDurationSec != null ? `${t.avgDurationSec.toFixed(0)} 秒` : '—'} | |`)

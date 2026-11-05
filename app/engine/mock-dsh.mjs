@@ -6,6 +6,7 @@
 //   [ask]    先用 ask_user_question 提两个问题（经真实的提问桥插件），按回答收尾
 //   [fail]   第一个工具调用越界被拒绝
 //   [slow]   每一步都慢，用于测试停止
+//   [noplan] 连读几个文件、不列步骤就回复（测试工作台的列步骤提醒）
 //   其他     单元测试的典型过程：读设计和源码、思考、写测试和桩、编译运行、写报告、回复
 // 写文件的步骤真的写到工作区（test/ 下），审核和 Git 提交可以照常测试。
 // 与真实 DSH 一致的投递规则：session/prompt 排到下一轮（一轮一条）；经引擎桥 steer 的消息在下一步之前送到；
@@ -195,6 +196,12 @@ async function scenario(sessionId, text, signal) {
       return JSON.stringify(r)
     })
     await say(sessionId, t, ++n, answerText || '没有得到回答。')
+  } else if (/\[noplan\]/.test(text)) {
+    for (const f of ['a.md', 'b.md', 'c.md', 'd.md', 'e.md']) {
+      await step(sessionId, S, ++n)
+      await tool(sessionId, t, n, 'read', { file_path: f }, async () => `<path>${f}</path>…`)
+    }
+    await say(sessionId, t, ++n, '看完了。')
   } else if (/\[fail\]/.test(text)) {
     await step(sessionId, S, ++n)
     await tool(sessionId, t, n, 'write', { file_path: 'D:\\temp\\out.txt', content: 'x\n' }, async () => { throw new Error('sandbox denied: write outside the workspace is not permitted') })

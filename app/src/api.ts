@@ -63,6 +63,14 @@ export interface AppState {
   engineReady: boolean; projects: Project[]; stages: Stage[]; skills?: SkillCard[]; notes: string[]; libraryDir?: string
   update?: UpdateState | null
   task: TaskState; items: Item[]
+  /** 其他项目在后台的任务（多个项目可以同时各做一个任务） */
+  background?: BgTask[]
+}
+
+/** 后台项目的任务：侧栏显示状态，点一下切到那个项目 */
+export interface BgTask {
+  projectId: string; projectName: string; status: string; asking: boolean
+  task: { id: string; title: string; stageName: string; mode?: 'task' | 'code'; category?: string; startedAt: number }
 }
 
 export interface Change { path: string; status: 'A' | 'M' | 'D'; added: number | null; removed: number | null; binary: boolean }
@@ -74,6 +82,7 @@ export type AstroEvent =
   | { type: 'question'; payload: Question }
   | { type: 'question-closed'; payload: { id: string; reason: 'answered' | 'lost' | 'aborted'; answers?: Answer[] } }
   | { type: 'queued'; payload: { id: string; text: string } }
+  | { type: 'background'; payload: BgTask[] }
   | { type: 'notify'; payload: { level: number; kind: 'done' | 'ask' | 'error'; title: string; body: string } }
   | { type: 'warn'; payload: string }
   | { type: 'library'; payload: LibSource[] }
@@ -140,6 +149,8 @@ export interface AstroApi {
     start(input: StartInput): Promise<Task>; send(text: string, extra?: { skills?: string[]; files?: string[] }): Promise<void>; stop(): Promise<{ ms: number; unsent: string[] }>; resume(text?: string): Promise<void>
     answer(id: string, answers: Answer[]): Promise<boolean>; reset(): Promise<void>
     open(id: string): Promise<{ task: Task; items: Item[] }>; history(): Promise<Task[]>
+    /** 只读查看，不切换当前任务 */
+    peek(id: string): Promise<{ task: Task; items: Item[]; current: boolean }>
   }
   review: {
     changes(): Promise<Change[]>; file(path: string): Promise<FileVersions>

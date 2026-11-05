@@ -14,7 +14,6 @@ const S: Record<string, string> = { done: '待审核', stopped: '已停止', err
 export function HistoryView() {
   const run = useStore((s) => s.run)
   const ts = useStore((s) => s.ts)
-  const setView = useStore((s) => s.setView)
   const app = useStore((s) => s.app)
   const [list, setList] = useState<Task[]>([])
   const [cat, setCat] = useState('全部')
@@ -27,18 +26,14 @@ export function HistoryView() {
   useEffect(() => { void run((api) => api.task.history()).then((h) => setList(h || [])) }, [run, ts?.task?.id, ts?.status])
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
   // 打开到任务所属的模式（代码任务在代码模式里看对话和改动）
-  const open = async (t: Task) => {
-    const target = modeOf(t) === 'code' ? 'code' : 'task'
-    if (ts?.task?.id === t.id) { setView(target); return }
-    const s = await run(async (api) => { await api.task.open(t.id); return api.getState() }, '打不开这个任务')
-    if (s) { useStore.getState().applyAppState(s); setView(target) }
-  }
+  // 当前任务进行中时，其他任务只读查看（store.openTask）
+  const open = (t: Task) => useStore.getState().openTask(t)
   return (
     <div className="history-layout">
       <div className="page-head pad-x">
         <div><h1>任务历史</h1><div className="sub">{ts?.project?.name} · 共 {list.length} 个任务</div></div>
       </div>
-      {busy && <div className="note-line muted small pad-x"><span className="led" />任务进行中，可以查看它；其他任务要等它结束后才能打开</div>}
+      {busy && <div className="note-line muted small pad-x"><span className="led" />任务进行中：其他任务可以点开只读查看，要继续或审核它们，等当前任务结束后再打开</div>}
       <div className="cat-filter pad-x" role="tablist" aria-label="按类别筛选">
         {cats.map((c) => (
           <button key={c} type="button" role="tab" aria-selected={cat === c} className={`cat-chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(c)}>
@@ -48,7 +43,7 @@ export function HistoryView() {
       </div>
       <div className="history-list card">
         {shown.map((t) => (
-          <Button key={t.id} className="hist-row" isDisabled={busy && ts?.task?.id !== t.id} onPress={() => void open(t)}>
+          <Button key={t.id} className="hist-row" onPress={() => void open(t)}>
             <Icon name={iconOf(t)} size={18} stroke={1.7} />
             <span className="hist-stage">{t.stageName}</span>
             <span className={`hist-mode ${modeOf(t)}`}>{modeOf(t) === 'code' ? '代码' : '任务'}</span>

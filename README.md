@@ -2,7 +2,7 @@
 
 > **2026-10-29 起的读法：**部门用户用的是 **AstroLab 工作台**（`app/`，说明见 [app/README.md](app/README.md)），装在每台开发机上，离线安装包见 [packaging/README.md](packaging/README.md)。本文写的是工作台底下共用的那一层：技能、工具服务、示例和评测；“三步跑起来”的 DSH 网页界面路线现在只用来开发调试技能和工具服务。项目现状、关键决定和待办见 [项目上下文.md](项目上下文.md)。
 
-在一台 Windows 笔记本上把 DSH（DeepSeek Harness）跑起来，并接入部门工具（Cppcheck 静态分析、Word/Excel/PDF 文档读取、按 Word 模板生成文档、单元测试编译运行与覆盖率统计）和部门 Skill（代码走查、需求分析、概要设计、详细设计、单元测试设计）。这是《部门级智能体落地实施方案》中“领域能力层”的最小样板，以后的 Skill 和 MCP 服务都按同样的方式添加。
+在一台 Windows 笔记本上把 DSH（DeepSeek Harness）跑起来，并接入部门工具（Cppcheck 静态分析、Word/Excel/PDF 文档读取、按 Word 模板生成文档、单元测试编译运行与覆盖率统计）和部门 Skill（需求分析、概要设计、详细设计、编码、单元测试设计、代码走查、静态分析、确认测试、研制总结）。这是《部门级智能体落地实施方案》中“领域能力层”的最小样板，以后的 Skill 和 MCP 服务都按同样的方式添加。
 
 > **注意：**现阶段接的是 DeepSeek 官方 API，代码会发送到云端。只能用 `sample` 里的示例代码或非敏感代码测试，**不要打开任何型号的真实代码**。以后切到内网模型只需改一行配置（见最后一节）。
 
@@ -15,11 +15,12 @@ astrolab-agent/
 ├── spike/sdk/          阶段 0 的 sdk 模式技术验证（最小界面、S1～S6 场景）
 ├── dsh-dept/           DSH 官方桌面端的部门组合包（试点，并行维护，见其中的试点记录）
 ├── 项目上下文.md        项目现状、关键决定、规矩、待办（接手先看这个）
+├── 文档模板/            部门各阶段文档模板（Word/Excel 和原件照片）及模板勘误清单，Skill 的文档结构以它为准
 ├── scripts/            安装、自检、启动、评测脚本（PowerShell；DSH 网页界面路线）
 ├── config/
 │   ├── local.env.example        本地环境变量模板（API Key 等）
 │   ├── cordis.patch.yml.template  DSH 部门补丁模板（注册 MCP 服务）
-│   └── templates/               Word 模板（现为演示模板；内网放部门正式模板，说明见其中 README）
+│   └── templates/               Word 模板：由部门模板生成的“部门-*.docx”（make-dept-templates.mjs）和演示模板，说明见其中 README
 ├── mcp/cppcheck/       Cppcheck 静态分析 MCP 服务（Node.js）
 ├── mcp/docreader/      文档读取 MCP 服务：Word/Excel/PDF 转 Markdown（只读）
 ├── mcp/docgen/         文档生成 MCP 服务：Markdown 套 Word 模板生成 .docx，表格导出 .xlsx
@@ -28,11 +29,14 @@ astrolab-agent/
 ├── mcp/common/         上面几个服务共用的 ZIP/XML/路径模块（只用 Node 自带模块）
 ├── skills/coding/               编码 Skill（按详细设计写代码、提出矛盾、编译和静态检查、编码说明，含自查脚本）
 ├── skills/skill-authoring/、plugin-authoring/  和用户一起做技能、做插件（工作台的“创作”用）
-├── skills/code-walkthrough/     代码走查 Skill（含检查表）
-├── skills/requirements-analysis/ 需求分析 Skill（检查表、质量规则、报告格式、GJB 438B SRS 章节要求）
+├── skills/code-walkthrough/     代码走查 Skill（GJB 8114 规则表、部门检查表、规则扫描/度量/报告生成/检查脚本）
+├── skills/static-analysis/      静态分析 Skill（度量和规则检查，按部门模板生成静态分析报告）
+├── skills/confirmation-test/    确认测试 Skill（按需求和测试要点设计用例，导出执行记录表，导入结果后按部门模板 05 出报告）
+├── skills/dev-summary/          研制总结 Skill（研制信息表 + 按Ⅰ类/Ⅲ、Ⅳ类部门模板出研制总结报告，评审要点检查）
+├── skills/requirements-analysis/ 需求分析 Skill（按部门模板出软件需求规格说明和需求分析记录，检查脚本）
 ├── skills/preliminary-design/   概要设计 Skill（文档结构、体系结构检查表、时序分析方法、流程图写法、检查脚本）
 ├── skills/detailed-design/      详细设计 Skill（正向/逆向，文档结构、函数格式、设计检查表、流程图写法、检查脚本）
-├── skills/unit-test-design/     单元测试设计 Skill（用例设计方法、驱动和桩约定、报告格式、gtest 说明、报告检查脚本）
+├── skills/unit-test-design/     单元测试设计 Skill（用例设计方法、驱动和桩约定、单元测试记录格式、按部门模板生成报告、检查脚本）
 ├── sample/src/         示例代码：遥测帧打包/解析，故意埋了约 10 个缺陷
 ├── sample/docs/        示例软件研制任务书（虚构，.docx 由同名 .md 生成），埋了 20 个需求问题
 ├── sample/design/      设计示例（虚构）：tcu 热控单元软件（概要设计的输入）；oc_ctrl OC 指令输出（详细设计的输入）
@@ -85,10 +89,10 @@ powershell -ExecutionPolicy Bypass -File scripts\start-web.ps1
 然后在对话框里输入：
 
 ```text
-对 src 目录做代码走查，目标平台是 SPARC（BM3803），把报告保存到 review 目录。
+对 src 目录做代码走查，目标平台是 SPARC（BM3803），软件名称 TMU 遥测软件，版本 V1.00，安全关键等级 B 级，结果保存到 review 目录。
 ```
 
-预期过程：智能体加载 `code-walkthrough` Skill，调用 `mcp__cppcheck__run_cppcheck` 做静态分析，然后逐个函数按检查表阅读源码，输出问题清单，并写入 `sample\review\`。
+预期过程：智能体加载 `code-walkthrough` Skill，运行 Cppcheck、GJB 8114 规则扫描（`gjb-scan.mjs`）和代码度量（`metrics.mjs`），逐条甄别告警，逐个函数按 GJB 8114 规则表和部门检查表阅读源码，做数据访问冲突等专项检查，写走查记录，用 `check-wt.mjs` 自查，再用 `gen-wt-report.mjs` 按部门模板 11 生成走查报告（每个问题一张问题报告单），都在 `sample\review\`。
 
 **怎么判断效果：**`sample\src\tm_frame.c` 中每个缺陷旁都有“缺陷：”注释，共约 10 处。Cppcheck 只能报出其中 1 处（未初始化变量）。其余（越界、除零、缺 `volatile`、无超时、字节序、非对齐访问等）都要靠模型按检查表找。把报告和注释对照，就能直观看到“工具 + Skill + 模型”各自的贡献。
 
@@ -103,28 +107,28 @@ powershell -ExecutionPolicy Bypass -File scripts\start-web.ps1
 同样在 `sample` 工作区中新建会话，输入：
 
 ```text
-对 docs\软件研制任务书-示例.docx 做需求分析，软件简称 TMUS，目标平台 SPARC（BM3803），只出需求分析报告，保存到 req 目录。
+对 docs\软件研制任务书-示例.docx 做需求分析，软件简称 TMUS，目标平台 SPARC（BM3803），出软件需求规格说明和需求分析记录，保存到 req 目录。
 ```
 
-预期过程：智能体加载 `requirements-analysis` Skill，调用 `mcp__docreader__read_document` 读取 Word 任务书，摘录任务书条款，划分配置项和功能模块，梳理 RS-422 接口，按检查表逐项分析，输出需求条目、追溯矩阵和待确认问题清单，并写入 `sample\req\`。
+预期过程：智能体加载 `requirements-analysis` Skill，调用 `mcp__docreader__read_document` 读取 Word 任务书，摘录任务书条款，划分配置项和功能模块，梳理 RS-422 接口，按检查表逐项分析，按部门模板 01 写软件需求规格说明（需求标识 XXYY-FREQ/PREQ/RREQ/SREQ/IREQ、IPO 格式、附录 B 双向追踪），条款摘录、覆盖分析和待确认问题写进需求分析记录，都写入 `sample\req\`。
 
 **怎么判断效果：**任务书中埋了 20 个问题（模糊表述、前后矛盾、帧容量算不下、引用的 ICD 未提供、隐含需求缺失等），任务书里**没有提示**。对照表在 `evals\requirements-analysis\示例任务书-埋入问题.md`，放在工作区之外，避免智能体读到。重点看两点：必检的 14 个问题提出了多少；有没有**编造**数值，比如任务书没给初始化时间，报告却写了“不大于 500 ms”。编造比漏检更严重。第一次运行的评分和问题清单见 `evals\requirements-analysis\评估记录-20261024.md`。
 
-**自查脚本：**`skills\requirements-analysis\scripts\check-report.mjs` 用固定规则扫描需求分析报告，列出疑似自行裁决（替上级做决定）、依据可疑、数值无出处、覆盖状态偏乐观、统计不一致的地方。Skill 要求智能体写完报告后运行它；人工评审前也可以自己跑一遍：
+**自查脚本：**`skills\requirements-analysis\scripts\check-report.mjs` 核对规格说明的章节结构是否与部门模板一致、需求标识和 IPO、追踪矩阵与记录是否一致，并列出疑似自行裁决（替上级做决定）、依据可疑、数值无出处、覆盖状态偏乐观、照抄模板示例、统计不一致的地方。Skill 要求智能体写完后运行它；人工评审前也可以自己跑一遍：
 
 ```powershell
-node skills\requirements-analysis\scripts\check-report.mjs sample\req\需求分析报告-20261024.md
+node skills\requirements-analysis\scripts\check-report.mjs sample\req\软件需求规格说明-<日期>.md --record sample\req\需求分析记录-<日期>.md
 ```
 
 **改了 Skill 之后：不用重新运行 `setup.ps1`，新建会话即可。**DSH 直接读取本工程的 `skills\` 目录（`runtime\dsh-home\cordis.patch.yml` 中的 `customSkillDirs`），每次加载 Skill 都重新读取文件，新增或改名的 Skill 也会自动出现。但同一会话中已经加载过的 Skill 内容留在上下文里，智能体会照着旧版本和上下文中的旧报告做，所以测试改动要新建会话。改了 `mcp\` 下的工具实现（各服务的 `tools.mjs`、`lib\`、`mcp\common\`）也不用重启：下一次调用工具时自动加载新版本（`mcp\common\hot.mjs`）。只有改了 `server.mjs`（工具名称、说明、参数）或新增服务时，才要重启 `start-web.ps1`。
 
-需求分析报告满意后，可以接着输入：
+规格说明满意后，可以接着输入：
 
 ```text
-按 GJB 438B 生成软件需求规格说明初稿，生成 Word；需求条目表、追溯矩阵和待确认问题清单导出 Excel。
+把软件需求规格说明生成 Word；追踪矩阵和待确认问题清单导出 Excel。
 ```
 
-智能体先写 Markdown，再调用 `mcp__docgen__render_docx` 套用 `config\templates` 中的模板生成 `.docx`，调用 `mcp__docgen__export_xlsx` 导出 `.xlsx`。打开 Word 时会提示“是否更新域”，选“是”生成目录。【待确认】【待补充】处是黄色高亮，评审前必须全部清除。
+智能体调用 `mcp__docgen__render_docx` 套用 `config\templates\部门-软件需求规格说明.docx` 生成 `.docx`（封面编号、密级、编写、审核等留给人填），调用 `mcp__docgen__export_xlsx` 导出 `.xlsx`。打开 Word 时会提示“是否更新域”，选“是”生成目录。【待确认】【待补充】处是黄色高亮，评审前必须全部清除。
 
 ### 需求分析：示例 2（1553B RT，含 ICD）
 
@@ -136,10 +140,10 @@ node skills\requirements-analysis\scripts\check-report.mjs sample\req\需求分�
 2. 在 DSH 界面**新建会话**，输入：
 
 ```text
-对 docs\PCU软件研制任务书-示例2.docx 和 docs\PCU-1553B接口控制文件-示例2.xlsx 做需求分析，软件简称 PCUS，目标平台 SPARC（BM3823），只出需求分析报告，保存到 req 目录。
+对 docs\PCU软件研制任务书-示例2.docx 和 docs\PCU-1553B接口控制文件-示例2.xlsx 做需求分析，软件简称 PCUS，目标平台 SPARC（BM3823），出软件需求规格说明和需求分析记录，保存到 req 目录。
 ```
 
-3. 对照 `evals\requirements-analysis\示例2\示例2-埋入问题.md` 评分：18 个必检问题、4 个加分问题，以及 10 个**误报陷阱**。误报陷阱是材料里已经写清楚的内容（如看门狗参数、ICD 已提供、1553B 自带字校验），报告把它们当作“缺失”提出，说明智能体在套用示例 1 的结论。
+3. 对照 `evals\requirements-analysis\示例2\示例2-埋入问题.md` 评分：18 个必检问题、4 个加分问题，以及 10 个**误报陷阱**。误报陷阱是材料里已经写清楚的内容（如看门狗参数、ICD 已提供、1553B 自带字校验），记录或规格说明把它们当作“缺失”提出，说明智能体在套用示例 1 的结论。
 
 任务书和 ICD 的 Markdown 原稿也放在 `evals\requirements-analysis\示例2\` 下，不在工作区内。
 
@@ -201,10 +205,10 @@ pacman -S mingw-w64-ucrt-x86_64-gtest    # 可选：测 D2000 Linux 代码时用
 在 `sample` 工作区中**新建会话**，输入：
 
 ```text
-对 utest\cmd_check 做单元测试。被测代码在 src，详细设计是 doc\cmd_check-详细设计.md，目标平台 BM3803，用手写驱动和桩，测试代码放在 utest\cmd_check\test，最后写单元测试报告。
+对 utest\cmd_check 做单元测试。被测代码在 src，详细设计是 doc\cmd_check-详细设计.md，目标平台 BM3803，用手写驱动和桩，测试代码放在 utest\cmd_check\test，最后写单元测试记录并生成单元测试报告。
 ```
 
-预期过程：智能体加载 `unit-test-design` Skill，按详细设计设计用例（等价类、边界值、判定和 MC/DC、检查优先级、计数回绕和饱和），用 `utest.h` 写驱动，调用 `mcp__utest__run_unit_tests` 编译运行，根据未覆盖的行补用例，对复合判定写 MC/DC 分析表并用 `mcp__utest__check_mcdc` 核对，最后写报告并运行 `check-ut.mjs` 自查。
+预期过程：智能体加载 `unit-test-design` Skill，按详细设计设计用例（等价类、边界值、判定和 MC/DC、检查优先级、计数回绕和饱和），用 `utest.h` 写驱动，调用 `mcp__utest__run_unit_tests` 编译运行，根据未覆盖的行补用例，对复合判定写 MC/DC 分析表并用 `mcp__utest__check_mcdc` 核对，最后写单元测试记录并运行 `check-ut.mjs` 自查，再用 `gen-ut-report.mjs` 按部门模板 02-4 生成单元测试报告（数字取自运行记录）。
 
 **怎么判断效果：**`src\cmd_check.c` 中埋了 6 个缺陷（边界写错、缺括号、计数回绕、同步字只查一半等），代码里没有提示。好的测试应当有用例失败，并把它们列为疑似缺陷，而不是把预期改成代码的实际输出。智能体完成后，在本目录运行评分：
 
@@ -217,7 +221,7 @@ node evals\unit-test\score.mjs cmd_check
 **示例 2：串口驱动 uart_drv。**cmd_check 没有寄存器、下层函数和等待循环。`utest\uart_drv` 是一个 RS-422 串口收发驱动：寄存器通过读写宏访问，调用 `sys_ticks`（系统时间）和 `irq_lock`/`irq_unlock`（关中断），发送时带超时等待，接收在中断服务程序中进行。智能体要自己替换寄存器头文件、写寄存器模型和桩，主机上才能运行。埋了 7 个缺陷，其中写入顺序错误、tick 回绕、关中断不配对等，只看返回值和寄存器最终值是发现不了的。
 
 ```text
-对 utest\uart_drv 做单元测试。被测代码在 src，头文件在 include，详细设计是 doc\uart_drv-详细设计.md，目标平台 BM3803，用手写驱动和桩，测试代码放在 utest\uart_drv\test，最后写单元测试报告。
+对 utest\uart_drv 做单元测试。被测代码在 src，头文件在 include，详细设计是 doc\uart_drv-详细设计.md，目标平台 BM3803，用手写驱动和桩，测试代码放在 utest\uart_drv\test，最后写单元测试记录并生成单元测试报告。
 ```
 
 ```powershell
@@ -245,8 +249,8 @@ node evals\unit-test\score.mjs uart_drv --run sample\.utest\uart_drv\last-run.js
 两个文档服务也可以单独使用，例如：
 
 - `读一下 docs\软件研制任务书-示例.docx 的目录结构` — 只看章节结构，适合长文档
-- `把 req 下的需求分析报告生成 Word，模板用 demo-gjb438b` — 生成 Word
-- `把需求分析报告里的待确认问题清单导出成 Excel` — 导出单个表格
+- `把 req 下的软件需求规格说明生成 Word，模板用 部门-软件需求规格说明` — 生成 Word
+- `把需求分析记录里的待确认问题清单导出成 Excel` — 导出单个表格
 
 | 服务 | 工具 | 说明 |
 |---|---|---|
@@ -257,7 +261,7 @@ node evals\unit-test\score.mjs uart_drv --run sample\.utest\uart_drv\last-run.js
 
 **写入范围：**MCP 服务运行在 DSH 沙箱之外，所以 `docgen` 自己限制写入目录：默认只能写启动 DSH 时的工作区（`sample`），且不覆盖已有文件。在界面里换了其他工作区时，要在 `config\local.env` 的 `DOC_ALLOWED_ROOTS` 中加上该目录，然后重启 `start-web.ps1`。`docreader` 只读。
 
-**进内网后换模板：**把部门正式模板放进 `config\templates`，在模板中加 `{{正文}}`、`{{目录}}`、`{{字段名}}` 占位符。部门模板使用自定义样式名时，另配一个同名 `.json` 映射文件。详见 [config\templates\README.md](config/templates/README.md)。
+**部门模板：**`config\templates\部门-*.docx` 由 `node mcp\docgen\make-dept-templates.mjs` 从 `文档模板\` 生成（保留封面、内容提要页、修改历史、目录页和样式，正文换成 `{{正文}}`，封面各栏换成字段）。部门模板更新后重新运行该命令。详见 [config\templates\README.md](config/templates/README.md)。
 
 **依赖：**两个服务的 docx/xlsx 读写只用 Node 自带模块，额外依赖只有 Cppcheck 服务已在用的 MCP SDK 和 zod，导入内网时不增加需要审查的包。读 PDF 需要可选依赖 `pdfjs-dist`，内网 npm 镜像没有这个包时只影响 PDF，Word 和 Excel 照常可用。演示模板可用 `node mcp\docgen\make-demo-template.mjs` 重新生成。
 
@@ -319,7 +323,7 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 模型说“工作区下没有 src”，然后到处找文件 | 会话开在了默认工作区。在界面左侧添加 `sample` 文件夹作为工作区，在其中新建会话 |
 | 想清空所有会话重新开始 | 停止服务后删除 `runtime\dsh-home\sessions` |
 
-## 当前进度（2026-10-29）
+## 当前进度（2026-11-03）
 
 按需求规格说明关口的整体进度和待办见 [项目上下文.md](项目上下文.md) 第 7、8 节。下表是各环节技能的情况。
 
@@ -329,10 +333,17 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 | 概要设计 | preliminary-design（正向） | docgen（Mermaid 流程图转 Word 图形） | tcu（热控单元软件） | 已评测：F 5/5、G 10/10、0 误报，检查脚本 check-hld.mjs；用其输出跑 htr_out 详细设计，两个 Skill 能衔接 |
 | 详细设计 | detailed-design（正向、逆向） | docgen（Mermaid 流程图转 Word 图形） | oc_ctrl（OC 指令输出） | 正向已评测；逆向需在修复 prepare.mjs 后重测一次 |
 | 单元测试 | unit-test-design | utest（编译运行、gcov 覆盖率、MC/DC；同目录头文件替换；地址映射 ut_map.h） | cmd_check、uart_drv、rt1553（多单元） | cmd_check、uart_drv、rt1553 已评测（智能体均达到参考测试水平）；评分脚本 score.mjs 支持多单元 |
-| 编码 | coding | utest（编译）、cppcheck；自查脚本 check-code.mjs | thm_ctrl（加热回路控制，隐藏测试 16 个、变体 26 个） | 第 1 次已评测（10-28）；加了读取围栏和精简后待重跑，补测 Q2 |
-| 代码走查 | code-walkthrough | cppcheck | 8 个评测用例 | 已有基线 |
+| 编码 | coding | utest（编译）、cppcheck；自查脚本 check-code.mjs，GJB 8114 扫描 gjb-scan.mjs，追踪表 trace-dd-code.mjs | thm_ctrl（加热回路控制，隐藏测试 16 个、变体 26 个） | 第 1 次已评测（10-28）；加了读取围栏和精简后待重跑，补测 Q2 |
+| 代码走查 | code-walkthrough | cppcheck；gjb-scan.mjs、metrics.mjs、check-wt.mjs、gen-wt-report.mjs | 8 个评测用例 | 已有基线；11-03 改为走查记录 + 部门模板走查报告、GJB 8114 规则表，待重跑评测 |
+| 静态分析 | static-analysis | cppcheck；gjb-scan.mjs、metrics.mjs、check-sa.mjs、gen-sa-report.mjs | 复用走查评测用例的代码 | 11-03 新增，待试用；部门 TESTBED 结果按 CSV 接入 |
+| 确认测试 | confirmation-test | docreader、docgen；ct-results.mjs（导出执行记录表、导入结果）、check-ct.mjs、gen-ct-report.mjs | 虚构 TCU 需求片段（脚本自测） | 11-03 新增，待试用；智能体不执行测试，结果由测试人员填表导入 |
+| 研制总结 | dev-summary | docreader、docgen；info-sheet.mjs、check-summary.mjs、gen-summary.mjs | 虚构 TCU（Ⅰ、Ⅲ、Ⅳ类各生成一次） | 11-03 新增，待试用；只做Ⅰ、Ⅲ、Ⅳ类 |
 
-技能方面的待办：编码评测重跑；地址映射、工具热更新在 Windows 上确认（运行 check.ps1）；用部门历史问题单改编更难的单元测试示例；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
+**全流程验收 G3（2026-11-04 准备好材料，待跑）：**`evals\g3-pdus`，一个虚构的Ⅲ类软件从需求分析走到研制总结（11 个任务），每个环节埋了陷阱，覆盖 11-03 改造后的全部技能。步骤见其中的 README。
+
+**2026-11-03 按部门模板改造：**各环节的正式输出改为部门模板的结构（需求规格说明、概要设计说明、详细设计说明、单元测试报告、走查报告、静态分析报告、详细设计与代码追踪表、确认测试报告、研制总结报告），分析过程放在单独的工作底稿（需求分析记录、设计记录、单元测试记录、走查记录、静态分析记录、确认测试记录、研制信息表）中，检查脚本同时核对两份。模板文字的识别错误、批注和修订的处理见 `文档模板\模板勘误清单-20261103.md`。改造后各环节的评测都要重跑一次。
+
+技能方面的待办：按部门模板改造后重跑各环节评测；编码评测重跑；地址映射、工具热更新在 Windows 上确认（运行 check.ps1）；用部门历史问题单改编更难的单元测试示例；gtest 实测；流程图在 Word/WPS 中的显示确认。各环节的评估记录在 `evals\` 对应目录下。
 
 ## 版本说明
 

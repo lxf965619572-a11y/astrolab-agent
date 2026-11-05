@@ -24,15 +24,15 @@ export function TitleBar() {
       if (s) useStore.getState().applyAppState(s)
       return
     }
-    const s = await run((api) => api.project.open(String(key)), '切换项目失败')
-    if (s) { useStore.getState().applyAppState(s); useStore.getState().setView('launch') }
+    await useStore.getState().openProject(String(key))
   }
+  const bgIds = new Set((app?.background || []).filter((b) => ['starting', 'running', 'asking'].includes(b.status)).map((b) => b.projectId))
   return (
     <header className="titlebar">
       <div className="tb-brand"><AppIcon size={26} /><span className="tb-name">AstroLab</span></div>
       <span className="tb-sep">/</span>
       <MenuTrigger>
-        <Button className="tb-project" isDisabled={busy} aria-label={busy ? '任务进行中，结束后才能切换项目' : '切换项目'}>
+        <Button className="tb-project" aria-label={busy ? '切换项目（当前任务在后台接着做）' : '切换项目'}>
           <span className="tb-project-name">{project ? project.name : '打开项目'}</span>
           {project?.git && <span className="tb-branch"><Icon name="branch" size={12} stroke={2} />{project.branch || 'Git'}</span>}
           <Icon name="chevron" size={12} stroke={2} />
@@ -41,7 +41,7 @@ export function TitleBar() {
           <Menu className="menu" onAction={onAction} aria-label="项目">
             {(app?.projects || []).map((p) => (
               <MenuItem key={p.id} id={p.id} className="menu-item" textValue={p.name}>
-                <Icon name="folder" size={15} /><span className="menu-text">{p.name}<small>{p.path}</small></span>
+                <Icon name="folder" size={15} /><span className="menu-text">{p.name}{bgIds.has(p.id) && <span className="led" aria-label="有任务在进行" />}<small>{p.path}</small></span>
               </MenuItem>
             ))}
             <Separator className="menu-sep" />
@@ -199,6 +199,7 @@ export function Sidebar() {
   const run = useStore((s) => s.run)
   const [list, setList] = useState<Task[]>([])
   const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
+  const bg = useStore((s) => s.app?.background || [])
   useEffect(() => { void run((api) => api.task.history()).then((h) => setList(h || [])) }, [run, ts?.project?.id, ts?.task?.id, ts?.status, ts?.task?.commit?.sha])
   const curId = ts?.task?.id
   const all = curId && ts?.task && !list.some((t) => t.id === curId) ? [ts.task, ...list] : list
@@ -208,12 +209,9 @@ export function Sidebar() {
     ? (items.length ? [{ label: ts?.project?.name || '项目', items: items.slice(0, 40).sort((a, b) => b.startedAt - a.startedAt) }] : [])
     : groupByDay(items.slice(0, 40))
   const newView = mode === 'code' ? 'code-launch' : 'launch'
-  const open = async (t: Task) => {
-    const target = modeOf(t) === 'code' ? 'code' : 'task'
-    if (curId === t.id) { setView(target); return }
-    const st = await run(async (api) => { await api.task.open(t.id); return api.getState() }, '打不开这个任务')
-    if (st) { useStore.getState().applyAppState(st); setView(target) }
-  }
+  // 当前任务进行中时，点别的任务只读查看（store.openTask）
+  const open = (t: Task) => useStore.getState().openTask(t)
+  const peekId = useStore((s) => (s.view === 'peek' ? s.peek?.task.id : null))
   return (
     <nav className="sidebar side2" aria-label="任务">
       <SideTop />
@@ -224,6 +222,24 @@ export function Sidebar() {
       <Button className={`nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={17} stroke={1.7} /><span className="nav-name">知识库</span></Button>
       <Button className={`nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={17} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
       <div className="side-scroll">
+        {/* 其他项目在后台进行（或做完等审核）的任务：两种模式都显示，点一下切到那个项目 */}
+        {!!bg.length && (
+          <div className="side-group">
+            <div className="nav-label"><Icon name="folder" size={12} stroke={1.8} />其他项目</div>
+            {bg.map((b) => {
+              const live = ['starting', 'running', 'asking'].includes(b.status)
+              return (
+                <Button key={b.task.id} className="nav side-item" onPress={() => void useStore.getState().openProject(b.projectId)} aria-label={`${b.projectName}：${b.task.title}`}>
+                  <span className="side-title">{b.task.title}</span>
+                  <span className="side-meta">
+                    {live ? <span className={`led ${b.asking || b.status === 'asking' ? 'ask' : ''}`} /> : <span className={`dot st-${b.status}`} />}
+                    {b.projectName}<span className="side-dot">·</span>{b.asking ? '等你决定' : statusText[b.status] || ''}
+                  </span>
+                </Button>
+              )
+            })}
+          </div>
+        )}
         {groups.map((g) => (
           <div key={g.label} className="side-group">
             <div className="nav-label">{mode === 'code' && <Icon name="folder" size={12} stroke={1.8} />}{g.label}{mode === 'code' && ts?.project?.branch ? <span className="side-branch mono">{ts.project.branch}</span> : null}</div>
@@ -232,10 +248,10 @@ export function Sidebar() {
               // 不是当前任务却记着“进行中”：上次关闭软件时它还没做完，实际已经中断（打开后可以继续）
               const status = isCur ? ts!.status : ['starting', 'running', 'asking'].includes(t.status) ? 'interrupted' : t.status
               const live = isCur && busy
-              const on = isCur && ['task', 'code'].includes(view)
+              const on = (isCur && ['task', 'code'].includes(view)) || peekId === t.id
               const committed = isCur ? !!ts?.task?.commit : !!t.commit
               return (
-                <Button key={t.id} className={`nav side-item ${on ? 'on' : ''}`} isDisabled={busy && !isCur} onPress={() => void open(t)}
+                <Button key={t.id} className={`nav side-item ${on ? 'on' : ''}`} onPress={() => void open(t)}
                   aria-label={`${t.title}，${t.stageName}`}>
                   <span className="side-title">{t.title}</span>
                   <span className="side-meta">
