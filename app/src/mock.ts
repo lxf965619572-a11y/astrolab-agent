@@ -528,6 +528,7 @@ export function createMockApi(): AstroApi {
       platform: 'win32', mock: true, installed: false,
       model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 },
       engineReady: true, projects: [...projects], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem), update: { ...up },
+      user: 'zhangsan', versions: { app: '0.1.0', electron: '44.9.3', node: '22.20.0' }, dataDir: 'C:\\Users\\demo\\AppData\\Local\\AstroLab', logDir: 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\logs',
     }
   }
 
@@ -713,7 +714,15 @@ export function createMockApi(): AstroApi {
       async remove(pid, id) { if (task?.id === id) { if (['starting', 'running', 'asking'].includes(status)) throw new Error('任务进行中，先停止再删除'); task = null; act = createActivity(); status = 'idle'; pushState() } const l = historyOf(pid); const i = l.findIndex((h) => h.id === id); if (i >= 0) l.splice(i, 1); return true },
       async recent(limit = 12) { return Object.fromEntries(projects.filter((p) => !p.hidden).map((p) => [p.id, historyOf(p.id).slice(0, limit)])) },
       async peek(id) { const t = historyOf(project.id).find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem), current: false } },
+      async search(q, scope = 'all') {
+        const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
+        const ps = projects.filter((p) => !p.hidden && (scope === 'all' || p.id === project.id))
+        const tasks = ps.flatMap((p) => historyOf(p.id).filter((t) => terms.length && terms.every((x) => `${t.title}\n${t.prompt}`.toLowerCase().includes(x))).map((t) => ({ pid: p.id, pname: p.name, task: t, inTitle: terms.every((x) => t.title.toLowerCase().includes(x)) })))
+        const fileList = ps.flatMap((p) => historyOf(p.id).flatMap((t) => [`doc/${t.stageName}-${t.id.slice(-4)}.md`, `doc/${t.stageName}-${t.id.slice(-4)}.docx`].map((path) => ({ pid: p.id, pname: p.name, taskId: t.id, taskTitle: t.title, path }))))
+        return { tasks: tasks.slice(0, 30), files: terms.length ? fileList.filter((f) => terms.every((x) => f.path.toLowerCase().includes(x))).slice(0, 30) : [] }
+      },
     },
+    model: { async test() { await new Promise((r) => setTimeout(r, 600)); return { ok: true, ms: 600, model: 'deepseek-flash', reply: '连接正常（模拟）' } } },
     review: {
       async changes(): Promise<Change[]> {
         return [...files.entries()].map(([path, f]) => {

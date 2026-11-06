@@ -65,6 +65,8 @@ export interface AppState {
   platform: string; mock: boolean; installed: boolean
   model: { provider: string; model: string; baseURL: string; hasKey: boolean; contextWindow?: number }
   engineReady: boolean; projects: Project[]; stages: Stage[]; skills?: SkillCard[]; notes: string[]; libraryDir?: string
+  /** 本机用户名（侧栏账户区）、版本、数据和日志目录（设置页） */
+  user?: string; versions?: { app: string; electron: string; node: string }; dataDir?: string; logDir?: string
   update?: UpdateState | null
   task: TaskState; items: Item[]
   /** 其他项目在后台的任务（多个项目可以同时各做一个任务） */
@@ -137,6 +139,11 @@ export interface CatalogItem {
 export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string; reason?: string; rejectedBy?: string; rejectedAt?: number }
 export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[]; superseded?: boolean }
 
+export interface SearchResult {
+  tasks: { pid: string; pname: string; task: Task; inTitle: boolean }[]
+  files: { pid: string; pname: string; taskId: string; taskTitle: string; path: string }[]
+}
+
 export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean }; mode?: 'task' | 'code' }
 
 export interface AstroApi {
@@ -160,7 +167,11 @@ export interface AstroApi {
     rename(projectId: string, id: string, title: string): Promise<Task>; archive(projectId: string, id: string, on: boolean): Promise<Task>; remove(projectId: string, id: string): Promise<boolean>
     /** 只读查看，不切换当前任务 */
     peek(id: string): Promise<{ task: Task; items: Item[]; current: boolean }>
+    /** 搜索任务（标题、描述）和产出文件名；scope 'current' 只搜当前工程 */
+    search(q: string, scope?: 'all' | 'current'): Promise<SearchResult>
   }
+  /** 设置页“测试连接” */
+  model: { test(): Promise<{ ok: boolean; ms: number; model: string; reply?: string; error?: string }> }
   review: {
     changes(): Promise<Change[]>; file(path: string): Promise<FileVersions>
     commit(message: string, paths?: string[]): Promise<string>; undo(): Promise<void>; restore(): Promise<number>

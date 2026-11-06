@@ -3,12 +3,13 @@
 
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, protocol, shell } from 'electron'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
+import { userInfo } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
-import { deleteTaskRecord, patchTaskRecord, readHistory, STAGES, TaskController } from './task.mjs'
+import { deleteTaskRecord, patchTaskRecord, readHistory, searchTasks, STAGES, TaskController } from './task.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -112,6 +113,10 @@ function appState() {
     stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),
     skills: lib.skillCards(),
     libraryDir: lib.sources()[0].dir,
+    // 设置页和侧栏账户区用：本机用户名（没有登录）、版本、数据和日志目录
+    user: (() => { try { return userInfo().username } catch { return '' } })(),
+    versions: { app: app.getVersion(), electron: process.versions.electron, node: process.versions.node },
+    dataDir: P.data, logDir: P.logs,
     notes: [...bootNotes, ...notes],
     update: updates ? updates.state() : null,
     task: ctl.snapshotState(),
@@ -358,6 +363,23 @@ function registerIpc() {
   // 侧栏按工作区列最近的任务：每个工作区（没移出列表的）各取最近几个；“全部任务”页取到 500 个
   handle('task:recent', (limit) => Object.fromEntries(store.list().filter((p) => !p.hidden).map((p) => [p.id, readHistory(P.data, p.id, Math.max(1, Math.min(500, Number(limit) || 12)))])))
   handle('task:peek', (id) => ctl.peekTask(id))
+  // 搜索（Ctrl K）：所有工程（没移出列表的），或只搜当前工程
+  handle('task:search', (q, scope) => searchTasks(P.data, store.list().filter((p) => !p.hidden && (scope !== 'current' || p.id === ctl.project?.id)), q))
+  // 设置页“测试连接”：用部门模型回一句话，量用时；密钥只在主进程里用
+  handle('model:test', async () => {
+    if (P.mock) return { ok: true, ms: 0, model: '模拟引擎', reply: '（模拟引擎不调用模型）' }
+    const env = engineEnv(P)
+    const m = modelConfig(env)
+    const apiKey = env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY || ''
+    if (!apiKey) return { ok: false, ms: 0, model: m.model, error: '没有配置密钥（config/local.env）' }
+    const t0 = Date.now()
+    try {
+      const r = await chat({ baseURL: m.baseURL, apiKey, model: m.model, messages: [{ role: 'system', content: '只回复“连接正常”四个字。' }, { role: 'user', content: '测试' }], maxTokens: 64, timeoutMs: 30000 })
+      return { ok: true, ms: Date.now() - t0, model: m.model, reply: String(r?.content || '').slice(0, 40) }
+    } catch (e) {
+      return { ok: false, ms: Date.now() - t0, model: m.model, error: String(e?.message || e).replace(/(sk|key)[-_a-z0-9]{8,}/gi, '***').slice(0, 200) }
+    }
+  })
   // 编辑对话（侧栏和任务历史里的“⋯”菜单）：任何一个工作区的任务都能改，不用先切过去
   handle('task:rename', (pid, id, title) => {
     const t = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 120)

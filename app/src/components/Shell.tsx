@@ -1,7 +1,7 @@
 // 外壳：标题栏（玻璃，可拖动窗口）、任务侧栏、状态栏、提示条。
 
 import { useEffect, useRef, useState } from 'react'
-import { Button, Dialog, DialogTrigger, Heading, Menu, MenuItem, MenuTrigger, Modal, ModalOverlay, Popover, Separator } from 'react-aria-components'
+import { Button, Dialog, Heading, Menu, MenuItem, MenuTrigger, Modal, ModalOverlay, Popover, Separator } from 'react-aria-components'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore, type Theme } from '../store'
 import type { BgTask, Project, Task, UpdateState } from '../api'
@@ -23,51 +23,29 @@ export async function projectAction(key: string) {
   if (key !== st.ts?.project?.id) await st.openProject(key)
 }
 
-// 标题栏只放品牌和全局开关；工作区（项目文件夹）在侧栏和输入框下面切换（和 Claude 一样）
+// 标题栏只放品牌和拖动区（和 Claude 一样）；模型状态、更新、皮肤、提示音在侧栏底部的账户区和设置页
 export function TitleBar() {
   return (
     <header className="titlebar">
       <div className="tb-brand"><AppIcon size={26} /><span className="tb-name">AstroLab</span></div>
       <div className="tb-drag" />
-      <ModelStatus />
-      <UpdateButton />
-      <ThemePicker />
-      <SoundToggle />
       <div className="tb-controls-space" />
     </header>
   )
 }
 
-function ModelStatus() {
-  const app = useStore((s) => s.app)
-  if (!app) return null
+/** 模型状态的一句话：账户区菜单和设置页用 */
+export function modelText(app: { mock: boolean; engineReady: boolean; model: { model: string; hasKey: boolean } } | null) {
+  if (!app) return { ok: false, text: '' }
   const ok = app.engineReady && (app.mock || app.model.hasKey)
   const text = app.mock ? '模拟引擎（不调用模型）' : !app.engineReady ? '引擎未安装' : !app.model.hasKey ? '模型未配置' : `部门模型 · ${app.model.model}`
-  return <span className={`tb-model ${ok ? 'ok' : 'bad'}`} title={app.model.baseURL}><span className="dot" />{text}</span>
+  return { ok, text }
 }
 
 const mb = (n: number) => `${(n / 1048576).toFixed(n < 10485760 ? 1 : 0)} MB`
 
-/** 软件更新：平时是个图标（看版本、检查更新）；有新版本或已准备好时变成带字的提示 */
-function UpdateButton() {
-  const up = useStore((s) => s.app?.update)
-  const ts = useStore((s) => s.ts)
-  if (!up) return null
-  const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
-  const next = up.staged?.version || (up.check?.available ? up.check.latest?.version : '')
-  return (
-    <DialogTrigger>
-      {next
-        ? <Button className="tb-update-pill" aria-label={up.staged ? `新版本 ${next} 已准备好` : `有新版本 ${next}`}><Icon name={up.staged ? 'refresh' : 'download'} size={14} stroke={2} />{up.staged ? '重启更新' : `新版本 ${next}`}</Button>
-        : <Button className="tb-icon" aria-label={`版本 ${up.version}，检查更新`}><Icon name="download" size={17} /></Button>}
-      <Popover className="pop up-pop" placement="bottom end">
-        <Dialog className="up-dialog" aria-label="软件更新"><UpdatePanel up={up} busy={busy} /></Dialog>
-      </Popover>
-    </DialogTrigger>
-  )
-}
-
-function UpdatePanel({ up, busy }: { up: UpdateState; busy: boolean }) {
+/** 软件更新面板：设置页“关于与更新”里用 */
+export function UpdatePanel({ up, busy }: { up: UpdateState; busy: boolean }) {
   const [err, setErr] = useState('')
   const act = async (f: (api: NonNullable<ReturnType<typeof useStore.getState>['api']>) => Promise<unknown>) => {
     const api = useStore.getState().api
@@ -127,44 +105,11 @@ function UpdatePanel({ up, busy }: { up: UpdateState; busy: boolean }) {
   )
 }
 
-const THEMES: { id: Theme; name: string; desc: string; sw: [string, string, string] }[] = [
+export const THEMES: { id: Theme; name: string; desc: string; sw: [string, string, string] }[] = [
   { id: 'lavender', name: '浅紫', desc: '冷静的浅紫，默认', sw: ['#F3F1F9', '#C4B5FD', '#8B7CF6'] },
   { id: 'cream', name: '奶油', desc: '暖奶油面板，钴蓝点缀', sw: ['#E8E2D8', '#F5F1EA', '#2F45D8'] },
   { id: 'mars', name: '黑橙', desc: '纯黑底，火星橙线框', sw: ['#060504', '#2A140A', '#FF6A1F'] },
 ]
-
-/** 换皮肤：只改颜色，界面结构不变；立刻生效，下次打开记住 */
-function ThemePicker() {
-  const theme = useStore((s) => s.settings.theme)
-  const set = useStore((s) => s.setSettings)
-  return (
-    <DialogTrigger>
-      <Button className="tb-icon" aria-label="换皮肤"><Icon name="palette" size={17} /></Button>
-      <Popover className="pop theme-pop" placement="bottom end">
-        <Dialog className="theme-dialog" aria-label="皮肤">
-          <div className="theme-title">皮肤</div>
-          {THEMES.map((t) => (
-            <Button key={t.id} className={`theme-opt ${theme === t.id ? 'on' : ''}`} aria-pressed={theme === t.id} onPress={() => { set({ theme: t.id }); play('tick') }}>
-              <span className="theme-sw" aria-hidden="true">{t.sw.map((c) => <i key={c} style={{ background: c }} />)}</span>
-              <span className="theme-text"><span className="strong">{t.name}</span><span className="muted small">{t.desc}</span></span>
-              {theme === t.id && <Icon name="check" size={15} stroke={2.4} className="accent" />}
-            </Button>
-          ))}
-        </Dialog>
-      </Popover>
-    </DialogTrigger>
-  )
-}
-
-function SoundToggle() {
-  const settings = useStore((s) => s.settings)
-  const set = useStore((s) => s.setSettings)
-  return (
-    <Button className="tb-icon" aria-label={settings.sound ? '关闭提示音' : '打开提示音'} onPress={() => { set({ sound: !settings.sound }); if (!settings.sound) setTimeout(() => play('send'), 30) }}>
-      <Icon name={settings.sound ? 'volume' : 'mute'} size={17} />
-    </Button>
-  )
-}
 
 const NOBG: BgTask[] = []
 const NOPROJ: Project[] = []
@@ -254,6 +199,7 @@ export function Sidebar() {
         <Button className={`nav s-nav ${view === newView ? 'on' : ''}`} onPress={() => setView(newView)}>
           <Icon name="newTask" size={16} stroke={1.8} /><span className="nav-name">{mode === 'code' ? '新的代码任务' : '新任务'}</span><span className="side-kbd">Ctrl N</span>
         </Button>
+        <Button className="nav s-nav" onPress={() => useStore.getState().setSearchOpen(true)}><Icon name="search" size={16} stroke={1.7} /><span className="nav-name">搜索</span><span className="side-kbd">Ctrl K</span></Button>
         <Button className={`nav s-nav ${view === 'projects' ? 'on' : ''}`} onPress={() => setView('projects')}><Icon name="folder" size={16} stroke={1.7} /><span className="nav-name">工程</span></Button>
         <Button className={`nav s-nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={16} stroke={1.7} /><span className="nav-name">知识库</span></Button>
         <Button className={`nav s-nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={16} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
@@ -298,10 +244,7 @@ export function Sidebar() {
         )}
         {!all.length && !!projects.length && <div className="side-empty muted small">{mode === 'code' ? '还没有代码任务。编码、单元测试、代码走查在这里做。' : '还没有任务。需求、设计、文档和图在这里做。'}</div>}
       </div>
-      <div className="nav-foot" title="智能体只能写工作区（项目文件夹），不能提交 Git；提交由你在审核后完成">
-        <Icon name="shield" size={13} />
-        <span>只写工作区 · 不提交 Git</span>
-      </div>
+      <AccountRow />
       <SideResizer />
     </nav>
   )
@@ -551,6 +494,57 @@ export function ModeSwitch() {
       <button type="button" role="tab" aria-selected={mode === 'code'} className={`mode-btn ${mode === 'code' ? 'on' : ''}`} onClick={() => setMode('code')} title="代码模式：编码、单元测试、代码走查">
         <Icon name="coding" size={15} stroke={1.8} />代码
       </button>
+    </div>
+  )
+}
+
+/** 侧栏底部账户区（和 Claude 一样）：本机用户名，点开是设置、模型状态、更新、皮肤、提示音、关于。
+ *  有新版本时名字右边亮蓝点，模型连不上时亮红点。右边小盾牌提示“只写工作区、不提交 Git”。 */
+function AccountRow() {
+  const app = useStore((s) => s.app)
+  const sound = useStore((s) => s.settings.sound)
+  const theme = useStore((s) => s.settings.theme)
+  const set = useStore((s) => s.setSettings)
+  const openSettings = useStore((s) => s.openSettings)
+  const up = app?.update
+  const next = up?.staged?.version || (up?.check?.available ? up.check.latest?.version : '') || ''
+  const m = modelText(app)
+  const name = app?.user || '本机用户'
+  const dot = app && !m.ok ? 'bad' : next ? 'new' : ''
+  return (
+    <div className="side-account">
+      <MenuTrigger>
+        <Button className="acct-btn" aria-label={`${name}：设置和更多${dot === 'bad' ? '（模型连不上）' : dot === 'new' ? `（有新版本 ${next}）` : ''}`}>
+          <span className="acct-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
+          <span className="acct-name">{name}</span>
+          {dot && <span className={`acct-dot ${dot}`} aria-hidden="true" />}
+          <Icon name="chevron" size={12} stroke={2.2} className="acct-chev" />
+        </Button>
+        <Popover className="menu-pop" placement="top start">
+          <Menu className="menu acct-menu" aria-label="设置和更多" onAction={(k) => {
+            if (k === 'settings') openSettings('general')
+            if (k === 'model') openSettings('model')
+            if (k === 'update' || k === 'about') openSettings('about')
+            if (k === 'sound') { set({ sound: !sound }); if (!sound) setTimeout(() => play('send'), 30) }
+            if (typeof k === 'string' && k.startsWith('theme:')) { set({ theme: k.slice(6) as Theme }); play('tick') }
+          }}>
+            <MenuItem id="settings" className="menu-item" textValue="设置"><Icon name="settings" size={15} /><span className="menu-text">设置</span><span className="menu-kbd">Ctrl ,</span></MenuItem>
+            <MenuItem id="model" className="menu-item" textValue="模型"><span className={`dot ${m.ok ? 'ok' : 'bad'}`} /><span className="menu-text">{m.text || '模型'}</span></MenuItem>
+            <MenuItem id="update" className="menu-item" textValue="软件更新"><Icon name={up?.staged ? 'refresh' : 'download'} size={15} /><span className="menu-text">{up?.staged ? `新版本 ${next} 已准备好` : next ? `有新版本 ${next}` : '检查更新'}</span></MenuItem>
+            <Separator className="menu-sep" />
+            {THEMES.map((t) => (
+              <MenuItem key={t.id} id={`theme:${t.id}`} className="menu-item" textValue={`皮肤：${t.name}`}>
+                <span className="theme-sw sm" aria-hidden="true">{t.sw.map((c) => <i key={c} style={{ background: c }} />)}</span>
+                <span className="menu-text">皮肤：{t.name}</span>{theme === t.id && <Icon name="check" size={14} stroke={2.4} className="accent" />}
+              </MenuItem>
+            ))}
+            <MenuItem id="sound" className="menu-item" textValue={sound ? '关闭提示音' : '打开提示音'}><Icon name={sound ? 'volume' : 'mute'} size={15} /><span className="menu-text">{sound ? '关闭提示音' : '打开提示音'}</span></MenuItem>
+            <Separator className="menu-sep" />
+            <MenuItem id="about" className="menu-item" textValue="关于 AstroLab"><Icon name="sparkle" size={15} /><span className="menu-text">关于 AstroLab<small>{app?.versions?.app || up?.version || ''}</small></span></MenuItem>
+          </Menu>
+        </Popover>
+      </MenuTrigger>
+      <span className="acct-shield" title="智能体只能写工作区（项目文件夹），不能提交 Git；提交由你在审核后完成" aria-label="只写工作区，不提交 Git"><Icon name="shield" size={14} /></span>
     </div>
   )
 }

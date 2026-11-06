@@ -6,8 +6,8 @@ import { play, setSoundSettings } from './sound'
 import { modeOf, type Mode } from './modes'
 
 // launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面：
-// project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程）
-export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek'
+// project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程），settings 设置
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek' | 'settings'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'
@@ -64,6 +64,12 @@ interface Store {
   archiveTask(projectId: string, t: import('./api').Task, on: boolean): Promise<void>
   removeTask(projectId: string, t: import('./api').Task): Promise<void>
   histVer: number
+  /** 搜索弹层（Ctrl K） */
+  searchOpen: boolean
+  setSearchOpen(on: boolean): void
+  /** 设置页当前分栏 */
+  settingsTab: string
+  openSettings(tab?: string): void
   /** 需要确认的操作（删除）：显示一个对话框，点确定才做 */
   confirm: null | { title: string; body: string; ok: string; danger?: boolean; run: () => void | Promise<void> }
   askConfirm(c: NonNullable<Store['confirm']>): void
@@ -194,6 +200,10 @@ export const useStore = create<Store>((set, get) => ({
     if (s) { get().applyAppState(s); void get().loadRecent() }
   },
   histVer: 0,
+  searchOpen: false,
+  setSearchOpen(on) { set({ searchOpen: on }) },
+  settingsTab: 'general',
+  openSettings(tab) { set({ settingsTab: tab || get().settingsTab || 'general', searchOpen: false }); get().setView('settings') },
   confirm: null,
   askConfirm(c) { set({ confirm: c }) },
   closeConfirm() { set({ confirm: null }) },

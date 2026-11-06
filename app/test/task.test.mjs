@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge } from '../engine/engine.mjs'
-import { TaskController, composeFollowUp, followUpDisplay } from '../main/task.mjs'
+import { TaskController, composeFollowUp, followUpDisplay, searchTasks } from '../main/task.mjs'
 import * as git from '../main/git.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -361,4 +361,29 @@ test('列步骤：一轮里做了几步还没列就提醒一次；新一轮的�
   assert.ok(follow && /todo_write/.test(follow), '新一轮的话带列步骤的提示')
   const users = ctl.activity.items.filter((i) => i.kind === 'user').map((i) => i.text)
   assert.ok(users.includes('[noplan] 再看一遍'), `对话里只显示用户写的那句：${JSON.stringify(users)}`)
+})
+
+test('搜索：按标题和描述找任务，按文件名找产出（工程内相对路径，去重，不要临时文件和工程外的）', () => {
+  const data = mkdtempSync(join(tmpdir(), 'astro-search-'))
+  try {
+    const dir = join(data, 'projects', 'p1', 'tasks')
+    mkdirSync(dir, { recursive: true })
+    const calls = [
+      { name: 'edit', path: 'out/a.md', added: 3 },
+      { name: 'write', path: 'D:\\ws\\sample\\out\\a.md', added: 1 },
+      { name: 'write', path: '.tmp_x.py', added: 1 },
+      { name: 'write', path: 'E:\\other\\b.md', added: 1 },
+      { name: 'mcp__docgen__render_docx', result: '已生成 d:\\ws\\sample\\out\\研制总结报告.docx（模板：部门）' },
+    ]
+    writeFileSync(join(dir, 't-1.json'), JSON.stringify({ task: { id: 't-1', title: '写研制总结', prompt: '数据包在 package', startedAt: 1 }, items: [{ kind: 'tools', calls }] }))
+    writeFileSync(join(dir, 't-2.json'), JSON.stringify({ task: { id: 't-2', title: '确认测试', prompt: '按研制要求设计用例', startedAt: 2 }, items: [] }))
+    const ps = [{ id: 'p1', name: '示例', path: 'D:\\ws\\sample' }]
+    const r = searchTasks(data, ps, '研制')
+    assert.deepEqual(r.tasks.map((x) => x.task.id), ['t-1', 't-2'])
+    assert.equal(r.tasks[0].inTitle, true)
+    assert.deepEqual(r.files.map((f) => f.path), ['out/研制总结报告.docx'])
+    assert.deepEqual(searchTasks(data, ps, 'out').files.map((f) => f.path), ['out/a.md', 'out/研制总结报告.docx'])
+    assert.equal(searchTasks(data, ps, '').tasks.length, 0)
+    assert.equal(searchTasks(data, ps, '研制 用例').tasks.length, 1)
+  } finally { rmSync(data, { recursive: true, force: true }) }
 })

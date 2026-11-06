@@ -118,11 +118,13 @@ export function SideRail() {
       <B icon="coding" label="代码模式" on={code} onPress={() => setMode('code')} />
       <div className="rail-sep" />
       <B icon="newTask" label="新任务 · Ctrl N" on={view === 'launch' || view === 'code-launch'} onPress={() => setView(code ? 'code-launch' : 'launch')} />
+      <B icon="search" label="搜索 · Ctrl K" onPress={() => useStore.getState().setSearchOpen(true)} />
       <B icon="folder" label="工程" on={view === 'projects' || view === 'project'} onPress={() => setView('projects')} />
       <B icon="history" label="全部任务" on={view === 'history'} onPress={() => setView('history')} />
       <span className="grow" />
       <B icon="book" label="知识库" on={view === 'knowledge'} onPress={() => setView('knowledge')} />
       <B icon="puzzle" label="技能与插件" on={view === 'library'} onPress={() => setView('library')} />
+      <B icon="settings" label="设置 · Ctrl ," on={view === 'settings'} onPress={() => useStore.getState().openSettings()} />
     </nav>
   )
 }

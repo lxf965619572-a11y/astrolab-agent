@@ -11,8 +11,8 @@
 //   引擎意外退出后，下次用到时重启，并用 session/resume 恢复会话
 
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { isAbsolute, join, relative, win32 } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import * as git from './git.mjs'
@@ -78,6 +78,65 @@ export function readHistory(dataDir, projectId, limit = 50) {
   return readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, limit).map((f) => {
     try { return JSON.parse(readFileSync(join(dir, f), 'utf8')).task } catch { return null }
   }).filter(Boolean)
+}
+
+// ---------- 搜索（Ctrl K）：所有工程的任务标题、任务描述、产出文件名 ----------
+// 任务记录可能很大（含全部活动），按文件修改时间缓存摘要，只在记录变了时重读。
+const searchCache = new Map()
+/** 一个任务记录的摘要：标题、描述、写过的文件（edit/write 的 path，docgen 结果里“已生成 <路径>”），路径相对工程 */
+function taskDigest(file, projectPath) {
+  let mtime = 0
+  try { mtime = statSync(file).mtimeMs } catch { return null }
+  const hit = searchCache.get(file)
+  if (hit && hit.mtime === mtime) return hit.d
+  let rec
+  try { rec = JSON.parse(readFileSync(file, 'utf8')) } catch { return null }
+  if (!rec || !rec.task) return null
+  const files = new Set()
+  // 工程里的相对路径（统一用 /）；工程外的、隐藏的临时文件（.tmp_xxx）不算产出。Windows 路径按 Windows 规则比（盘符不分大小写）
+  const rel = (p) => {
+    const s = String(p || '').trim()
+    if (!s) return ''
+    const win = /^[A-Za-z]:[\\/]|^\\\\/.test(s) || /^[A-Za-z]:[\\/]/.test(String(projectPath || ''))
+    const P = win ? win32 : { isAbsolute, relative }
+    let r = s
+    if (P.isAbsolute(s)) { r = P.relative(projectPath || '', s); if (!r || r.startsWith('..') || P.isAbsolute(r)) return '' }
+    r = r.replace(/\\/g, '/').replace(/^\.\//, '')
+    return r.split('/').some((x) => x.startsWith('.')) ? '' : r
+  }
+  for (const it of rec.items || []) {
+    for (const c of it.calls || []) {
+      if (c.path && (c.added !== undefined || c.removed !== undefined || /^(write|edit)$/.test(c.name || ''))) { const r = rel(c.path); if (r) files.add(r) }
+      if (typeof c.result === 'string') for (const m of c.result.matchAll(/已(?:生成|导出|写入)\s*(\S+?\.(?:docx|xlsx|md|svg|png|html|pdf))/g)) { const r = rel(m[1]); if (r) files.add(r) }
+    }
+  }
+  const d = { task: rec.task, text: `${rec.task.title || ''}\n${rec.task.prompt || ''}`.toLowerCase(), files: [...files] }
+  searchCache.set(file, { mtime, d })
+  return d
+}
+
+/** 按关键词（空格分开，都要出现）搜任务和产出文件。projects：[{ id, name, path }] */
+export function searchTasks(dataDir, projects, query, limit = 30) {
+  const terms = String(query || '').toLowerCase().split(/\s+/).filter(Boolean).slice(0, 6)
+  const out = { tasks: [], files: [] }
+  if (!terms.length) return out
+  for (const p of projects) {
+    const dir = join(dataDir, 'projects', p.id, 'tasks')
+    if (!existsSync(dir)) continue
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort().reverse()) {
+      const d = taskDigest(join(dir, f), p.path)
+      if (!d) continue
+      if (terms.every((t) => d.text.includes(t))) out.tasks.push({ pid: p.id, pname: p.name, task: d.task, inTitle: terms.every((t) => String(d.task.title || '').toLowerCase().includes(t)) })
+      for (const path of d.files) if (terms.every((t) => path.toLowerCase().includes(t))) out.files.push({ pid: p.id, pname: p.name, taskId: d.task.id, taskTitle: d.task.title, path })
+    }
+  }
+  // 标题命中的在前，其余按时间（新的在前）；同一个文件只留最近一次
+  out.tasks.sort((a, b) => Number(b.inTitle) - Number(a.inTitle) || b.task.startedAt - a.task.startedAt)
+  const seen = new Set()
+  out.files = out.files.filter((x) => { const k = `${x.pid}:${x.path}`; if (seen.has(k)) return false; seen.add(k); return true })
+  out.tasks = out.tasks.slice(0, limit)
+  out.files = out.files.slice(0, limit)
+  return out
 }
 
 // ---------- 编辑对话：改名、归档、删除（只动任务记录；项目里的文件、Git 提交和快照都不动） ----------
