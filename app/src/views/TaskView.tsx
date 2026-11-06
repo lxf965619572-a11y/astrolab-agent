@@ -17,6 +17,7 @@ import { TaskSide } from './TaskSide'
 import { FilePicker, MAX_SKILLS, SkillPickerButton, filterSkills } from '../components/Pickers'
 import { categoryOf, skillIcon } from '../skills'
 import { modeOf } from '../modes'
+import { RenameInput, TaskMenu } from '../components/Shell'
 import type { SkillCard } from '../api'
 
 export function useNow(active: boolean, ms = 1000) {
@@ -90,6 +91,10 @@ function ConvHead({ inCode }: { inCode: boolean }) {
   const setView = useStore((s) => s.setView)
   const hasDraft = useStore((s) => !!s.chatDraft.trim())
   const task = ts.task!
+  const [renaming, setRenaming] = useState(false)
+  const pinned = useStore((s) => s.settings.pinned)
+  const setSettings = useStore((s) => s.setSettings)
+  const pid = ts.project?.id
   // 提交后标题也要跟着变（左栏、历史早就显示“已提交”）
   const st = ts.status === 'done' && task.commit ? { label: '已提交', cls: 'ok' } : STATUS[ts.status] || STATUS.idle
   const live = LIVE.includes(ts.status)
@@ -105,7 +110,16 @@ function ConvHead({ inCode }: { inCode: boolean }) {
     <header className={`conv-head ${live ? 'live' : ''}`}>
       <div className="conv-head-row">
         <div className="conv-title">
-          <h1 title={task.title}>{task.title}</h1>
+          <div className="conv-title-row">
+            {renaming && pid
+              ? <RenameInput value={task.title} className="conv-rename" onDone={(v) => { setRenaming(false); if (v !== null) void useStore.getState().renameTask(pid, task, v) }} />
+              : <h1 title={`${task.title}\n双击改名`} onDoubleClick={() => setRenaming(true)}>{task.title}</h1>}
+            {!renaming && pid && (
+              <TaskMenu pid={pid} task={task} live={live} className="conv-menu-btn" pinned={pinned.includes(task.id)}
+                onPin={() => setSettings({ pinned: pinned.includes(task.id) ? pinned.filter((x) => x !== task.id) : [task.id, ...pinned] })}
+                onRename={() => setRenaming(true)} />
+            )}
+          </div>
           <div className="conv-meta">
             <span className={`pill sm ${st.cls}`}><span className={`dot ${live && ts.status !== 'starting' ? 'breathe' : ''}`} />{st.label}</span>
             <span className="conv-stage">{task.stageName}</span>

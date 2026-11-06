@@ -1,19 +1,21 @@
-// 发起任务（和 Claude 一样的输入框）：说清楚要做什么，按需选技能，带上相关文件，按“开始”。
-// 选技能有三种方式：点下面的常用技能卡片；输入框里打“/”；点“技能”按钮搜。
+// 发起任务（和 Claude 一样的输入框）：说清楚要做什么，按需选技能，带上相关文件，按发送（Ctrl Enter）。
+// 输入框下面是工作区（在哪个项目文件夹里做，可以切换）和提醒开关。
+// 选技能有三种方式：点下面的常用技能；输入框里打“/”；点左下角“+”。
 // 不选也行：工作台按描述在本地推荐（不靠模型），智能体做到一半需要别的技能也会自己加载。
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from 'react-aria-components'
+import { Autocomplete, Button, Dialog, DialogTrigger, Header, Input, Menu, MenuItem, MenuSection, MenuTrigger, Popover, SearchField, Separator, SubmenuTrigger, ToggleButton, useFilter } from 'react-aria-components'
 import { motion } from 'motion/react'
 import { useStore } from '../store'
-import { Icon } from '../components/Icon'
-import { Key, Kbd, Toggle } from '../components/Keys'
+import { AppIcon, Icon } from '../components/Icon'
+import { projectAction, visibleProjects } from '../components/Shell'
+import { Key, Kbd } from '../components/Keys'
 import { play } from '../sound'
-import type { Mention, SkillCard } from '../api'
+import type { Mention, Project, SkillCard } from '../api'
 import { elapsed } from '../format'
 import { useNow } from './TaskView'
 import { categoryOf, skillIcon, suggestSkills } from '../skills'
-import { FilePicker, MAX_SKILLS, SOURCE, SkillPickerButton, filterSkills } from '../components/Pickers'
+import { FilePanel, FilePicker, MAX_SKILLS, SkillPanel, SkillPickerButton, filterSkills } from '../components/Pickers'
 import { categoryMode, modeOf } from '../modes'
 
 
@@ -22,8 +24,9 @@ function greeting() {
   return h < 11 ? '上午好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好'
 }
 
-/** 两种模式各有一个新任务页：常用技能只列这个模式的；compact 是代码模式（右边有代码面板），窄一点 */
-export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
+/** 两种模式各有一个新任务页：常用技能只列这个模式的；compact 是代码模式（右边有代码面板），窄一点。
+ *  inProject：嵌在工程主页上半部分（没有问候语和背景，工程固定，不显示切换工作区） */
+export function LaunchView({ compact = false, inProject = false }: { compact?: boolean; inProject?: boolean } = {}) {
   const mode = useStore((s) => s.mode)
   const app = useStore((s) => s.app)
   const ts = useStore((s) => s.ts)
@@ -107,30 +110,51 @@ export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
   // 常用技能只列这个模式的（全部技能里两种都能选）；这个模式一个常用的都没有时列它的全部技能
   const ofMode = skills.filter((s) => categoryMode(categoryOf(s).name) === mode)
   const pinned = ofMode.some((s) => s.pinned) ? ofMode.filter((s) => s.pinned) : ofMode.slice(0, 7)
-  const placeholder = first?.placeholder || (mode === 'code'
-    ? '说说要改哪里，例如：给 rt_drv.c 的复位超时补单元测试。输入 / 选技能'
-    : '说说要做什么，例如：根据任务书和 ICD 画 PCU 软件的信息流图。输入 / 选技能')
+  const placeholder = first?.placeholder || (inProject
+    ? `在 ${project.name} 里新建${mode === 'code' ? '代码' : ''}任务：说说要做什么。输入 / 选技能`
+    : mode === 'code'
+      ? '说说要改哪里，例如：给 rt_drv.c 的复位超时补单元测试。输入 / 选技能'
+      : '说说要做什么，例如：根据任务书和 ICD 画 PCU 软件的信息流图。输入 / 选技能')
+
+  const addFile = (f: string) => { if (!files.includes(f)) setDraft({ files: [...files, f] }) }
+  const hasChips = !!(chosen.length || files.length || auto.length || ambiguous.length)
+  const canStart = !busy && !!prompt.trim() && !prompt.startsWith('/') && !starting
 
   return (
-    <div className={`launch launch2 ${compact ? 'compact' : ''}`}>
-      <div className="launch-bg" aria-hidden="true"><div className="launch-blob a" /><div className="launch-blob b" /></div>
-      <motion.div className="launch-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-        <h1>{mode === 'code' ? `在 ${project.name} 上写代码` : `${greeting()}，要做什么？`}</h1>
-        <p>{mode === 'code' ? '编码、单元测试、代码走查。右边是项目文件和改动；看中的文件点“加到新任务”。' : '需求、设计、文档与图。说清楚要做什么，按需选一个技能；过程中随时可以插话或停止。'}</p>
-      </motion.div>
+    <div className={`launch launch3 ${compact ? 'compact' : ''} ${inProject ? 'in-project' : ''}`}>
+      {!inProject && <div className="launch-bg" aria-hidden="true"><div className="launch-blob a" /><div className="launch-blob b" /></div>}
+      {!inProject && (
+        <motion.div className="launch-hero" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
+          <h1><AppIcon size={compact ? 28 : 34} /><span>{mode === 'code' ? `在 ${project.name} 上写代码` : `${greeting()}，要做什么？`}</span></h1>
+          {mode === 'code' && <p>右边是项目文件和改动；看中的文件点“加到新任务”。</p>}
+        </motion.div>
+      )}
 
       {!!app?.notes?.length && <div className="notes">{app.notes.map((n) => <div key={n} className="note warn"><Icon name="warn" size={14} />{n}</div>)}</div>}
       {busy ? <RunningBanner /> : <UnreviewedNote />}
 
-      <motion.section className="composer-card composer2" aria-label="新任务" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, delay: 0.04 }}>
-        <div className="ask-box">
-          {!!chosen.length && (
-            <div className="skill-picked">
+      <motion.section className="cmp" aria-label="新任务" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.32, delay: 0.04 }}>
+        <div className="cmp-box" onClick={(e) => { if (e.target === e.currentTarget) ta.current?.focus() }}>
+          {hasChips && (
+            <div className="cmp-chips">
               {chosen.map((s) => (
                 <span key={s.name} className="chip skill" title={s.description}>
                   <Icon name={skillIcon(s)} size={14} stroke={1.8} /><span>{s.title}</span>
                   <Button className="chip-x" aria-label={`不用 ${s.title}`} onPress={() => unpick(s.name)}><Icon name="x" size={11} stroke={2.4} /></Button>
                 </span>
+              ))}
+              {files.map((f) => (
+                <span key={f} className="chip"><Icon name="file" size={13} /><span className="mono">{f}</span>
+                  <Button className="chip-x" aria-label={`移除 ${f}`} onPress={() => setDraft({ files: files.filter((x) => x !== f) })}><Icon name="x" size={11} stroke={2.4} /></Button>
+                </span>
+              ))}
+              {auto.map((f) => (
+                <span key={f} className="chip auto" title={`描述里提到了它，会作为相关文件交给智能体：${f}`}><Icon name="file" size={13} /><span className="mono">{f}</span><span className="chip-tag">识别</span>
+                  <Button className="chip-x" aria-label={`不带上 ${f}`} onPress={() => setDraft({ dismissed: [...dismissed, f] })}><Icon name="x" size={11} stroke={2.4} /></Button>
+                </span>
+              ))}
+              {ambiguous.map((m) => (
+                <FilePicker key={m.name} label={`${m.name} 有 ${m.paths.length} 个同名文件，选一个`} className="chip warn" initialQuery={m.name} onPick={addFile} />
               ))}
             </div>
           )}
@@ -150,72 +174,152 @@ export function LaunchView({ compact = false }: { compact?: boolean } = {}) {
               {!slashList.length && <div className="pad muted small">没有匹配的技能</div>}
             </div>
           )}
-          <div className="chips">
-            <SkillPickerButton skills={skills} picked={picked} onPick={pick} />
-            {files.map((f) => (
-              <span key={f} className="chip"><Icon name="file" size={13} /><span className="mono">{f}</span>
-                <Button className="chip-x" aria-label={`移除 ${f}`} onPress={() => setDraft({ files: files.filter((x) => x !== f) })}><Icon name="x" size={11} stroke={2.4} /></Button>
-              </span>
-            ))}
-            {auto.map((f) => (
-              <span key={f} className="chip auto" title={`描述里提到了它，会作为相关文件交给智能体：${f}`}><Icon name="file" size={13} /><span className="mono">{f}</span><span className="chip-tag">识别</span>
-                <Button className="chip-x" aria-label={`不带上 ${f}`} onPress={() => setDraft({ dismissed: [...dismissed, f] })}><Icon name="x" size={11} stroke={2.4} /></Button>
-              </span>
-            ))}
-            {ambiguous.map((m) => (
-              <FilePicker key={m.name} label={`${m.name} 有 ${m.paths.length} 个同名文件，选一个`} className="chip warn" initialQuery={m.name} onPick={(f) => { if (!files.includes(f)) setDraft({ files: [...files, f] }) }} />
-            ))}
-            <FilePicker onPick={(f) => { if (!files.includes(f)) setDraft({ files: [...files, f] }) }} />
+          {first && (first.hint || first.description) && <div className="cmp-hint"><Icon name="sparkle" size={13} className="accent" />{first.hint || firstSentence(first.description)}</div>}
+          <div className="cmp-bar">
+            <PlusMenu skills={skills} common={pinned} picked={picked} onPick={pick} onFile={addFile} />
+            {suggestions.length > 0 && (
+              <div className="cmp-suggest" aria-label="推荐技能">
+                <span className="muted small">推荐</span>
+                {suggestions.map((x, i) => (
+                  <Button key={x.skill.name} className="suggest-chip" onPress={() => pick(x.skill.name)}>
+                    <Icon name={skillIcon(x.skill)} size={13} stroke={1.8} />{x.skill.title}{i === 0 && <Kbd>Tab</Kbd>}
+                  </Button>
+                ))}
+              </div>
+            )}
+            <span className="grow" />
+            <Button className="cmp-send" isDisabled={!canStart} onPress={() => void start()}
+              aria-label={busy ? '等当前任务结束后才能开始' : '开始（Ctrl Enter）'}>
+              {starting ? <span className="cmp-spin" aria-hidden="true" /> : <Icon name="arrowUp" size={18} stroke={2.2} />}
+              <span className="rail-tip cmp-tip" aria-hidden="true">{busy ? '等当前任务结束' : '开始 · Ctrl Enter'}</span>
+            </Button>
           </div>
-          {suggestions.length > 0 ? (
-            <div className="ask-hint suggest">
-              <Icon name="sparkle" size={14} className="accent" />推荐技能：
-              {suggestions.map((x, i) => (
-                <Button key={x.skill.name} className="suggest-chip" onPress={() => pick(x.skill.name)}>
-                  <Icon name={skillIcon(x.skill)} size={13} stroke={1.8} />{x.skill.title}{i === 0 && <Kbd>Tab</Kbd>}
-                </Button>
-              ))}
-            </div>
-          ) : (
-            <div className="ask-hint"><Icon name="sparkle" size={14} className="accent" />
-              {first ? first.hint || first.description : '不选技能也可以：智能体会按描述自己判断用哪个技能'}
-            </div>
-          )}
         </div>
 
-        <div className="launch-foot">
-          {first?.report && <Toggle isSelected={report} onChange={(v) => setDraft({ report: v })}>{first.report}</Toggle>}
-          <Toggle isSelected={settings.notify} onChange={(v) => setSettings({ notify: v })}>完成或需要我决定时提醒</Toggle>
+        <div className="cmp-under">
+          {!inProject && <WorkspacePicker />}
           <span className="grow" />
-          {busy
-            ? <Key variant="primary" size="lg" isDisabled>等当前任务结束</Key>
-            : <Key variant="primary" size="lg" isDisabled={!prompt.trim() || prompt.startsWith('/') || starting} onPress={() => void start()}>
-                {starting ? '启动中…' : '开始'}<Kbd>Ctrl Enter</Kbd>
-              </Key>}
+          {first?.report && (
+            <ToggleButton className="cmp-opt" isSelected={report} onChange={(v) => setDraft({ report: v })} aria-label={first.report}>
+              <Icon name={report ? 'check' : 'file'} size={13} stroke={2} />{first.report}
+            </ToggleButton>
+          )}
+          <ToggleButton className="cmp-opt" isSelected={settings.notify} onChange={(v) => setSettings({ notify: v })}
+            aria-label="完成或需要我决定时提醒">
+            <Icon name={settings.notify ? 'bell' : 'bellOff'} size={14} stroke={1.8} />{settings.notify ? '完成时提醒' : '不提醒'}
+          </ToggleButton>
         </div>
       </motion.section>
 
-      <section className="skill-cards-wrap" aria-label="常用技能">
-        <div className="skill-cards-head">
-          <span className="strong">{mode === 'code' ? '代码模式的常用技能' : '任务模式的常用技能'}</span>
-          <span className="muted small">点一下选用；在“技能与插件”里可以安装更多、设为常用</span>
-        </div>
-        <div className="skill-cards">
-          {pinned.map((s) => (
-            <Button key={s.name} className={`skill-card ${picked.includes(s.name) ? 'on' : ''}`} onPress={() => (picked.includes(s.name) ? unpick(s.name) : pick(s.name))}>
-              <span className="skill-card-top">
-                <span className="skill-ico"><Icon name={skillIcon(s)} size={18} stroke={1.7} /></span>
-                <span className="skill-card-name">{s.title}</span>
-                {picked.includes(s.name) && <Icon name="check" size={15} stroke={2.4} className="accent" />}
-              </span>
-              <span className="skill-card-desc">{s.summary || firstSentence(s.description)}</span>
-              <span className="skill-card-meta">{categoryOf(s).name} · {SOURCE[s.source]}</span>
-            </Button>
-          ))}
-          <SkillPickerButton skills={skills} picked={picked} onPick={pick} variant="card" />
-        </div>
+      <section className="cmp-skills" aria-label="常用技能">
+        {pinned.map((s) => (
+          <Button key={s.name} className={`cmp-skill ${picked.includes(s.name) ? 'on' : ''}`} aria-pressed={picked.includes(s.name)}
+            onPress={() => (picked.includes(s.name) ? unpick(s.name) : pick(s.name))}>
+            <Icon name={picked.includes(s.name) ? 'check' : skillIcon(s)} size={14} stroke={1.8} /><span>{s.title}</span>
+            <span className="cmp-skill-tip" aria-hidden="true">{s.summary || firstSentence(s.description)}</span>
+          </Button>
+        ))}
+        <SkillPickerButton skills={skills} picked={picked} onPick={pick} variant="chip" placement="bottom start" label="全部技能" />
       </section>
+      {!inProject && <div className="cmp-foot muted small">不选技能也可以：智能体会按描述自己判断用哪个；在“技能与插件”里可以安装更多、设为常用</div>}
     </div>
+  )
+}
+
+/** 输入框左下角的“+”：添加文件、选技能（常用的直接列出来，其余在“全部技能”里搜） */
+function PlusMenu({ skills, common, picked, onPick, onFile }: { skills: SkillCard[]; common: SkillCard[]; picked: string[]; onPick: (n: string) => void; onFile: (f: string) => void }) {
+  const ref = useRef<HTMLButtonElement>(null)
+  const [panel, setPanel] = useState<null | 'file' | 'skill'>(null)
+  return (
+    <>
+      <MenuTrigger>
+        <Button ref={ref} className="cmp-plus" aria-label="添加文件或技能"><Icon name="plus" size={18} stroke={2} /></Button>
+        <Popover className="menu-pop cmp-menu" placement="bottom start" offset={6}>
+          <Menu className="menu" aria-label="添加" onAction={(k) => { if (k === 'file' || k === 'skill') setPanel(k) }}>
+            <MenuItem id="file" className="menu-item" textValue="添加项目文件"><Icon name="file" size={15} /><span className="menu-text">添加项目文件…</span></MenuItem>
+            <Separator className="menu-sep" />
+            <SubmenuTrigger>
+              <MenuItem id="skills" className="menu-item" textValue="技能"><Icon name="skills" size={15} /><span className="menu-text">技能</span><Icon name="chevron" size={13} stroke={2} className="menu-sub" /></MenuItem>
+              <Popover className="menu-pop cmp-menu" offset={-2}>
+                <Menu className="menu" aria-label="常用技能" onAction={(k) => onPick(String(k))} disabledKeys={picked}>
+                  {common.map((s) => (
+                    <MenuItem key={s.name} id={s.name} className="menu-item" textValue={s.title}>
+                      <Icon name={skillIcon(s)} size={15} /><span className="menu-text">{s.title}<small>{s.summary || firstSentence(s.description)}</small></span>
+                      {picked.includes(s.name) && <Icon name="check" size={14} stroke={2.4} className="accent" />}
+                    </MenuItem>
+                  ))}
+                </Menu>
+              </Popover>
+            </SubmenuTrigger>
+            <MenuItem id="skill" className="menu-item" textValue="全部技能"><Icon name="search" size={15} /><span className="menu-text">全部技能…</span><span className="menu-kbd">/</span></MenuItem>
+          </Menu>
+        </Popover>
+      </MenuTrigger>
+      <Popover triggerRef={ref} isOpen={panel !== null} onOpenChange={(o) => { if (!o) setPanel(null) }} placement="bottom start" offset={6}
+        className={`pop ${panel === 'skill' ? 'skill-pop' : 'file-pop'}`}>
+        <Dialog className={panel === 'skill' ? 'skill-dialog' : 'file-dialog'} aria-label={panel === 'skill' ? '选技能' : '选择文件'}>
+          {panel === 'skill'
+            ? <SkillPanel skills={skills} picked={picked} onPick={onPick} close={() => setPanel(null)} />
+            : <FilePanel onPick={onFile} close={() => setPanel(null)} />}
+        </Dialog>
+      </Popover>
+    </>
+  )
+}
+
+/** 输入框下面的工作区（和 Claude 的“Project or folder”一样）：任务在哪个项目文件夹里做。
+ *  点开是一个可以搜的列表：置顶的在前，下面是其他工作区，最下面“打开项目文件夹…” */
+function WorkspacePicker() {
+  const app = useStore((s) => s.app)
+  const project = useStore((s) => s.ts?.project)
+  const { contains } = useFilter({ sensitivity: 'base' })
+  if (!project) return null
+  const list = visibleProjects(app?.projects || [], project.id)
+  const top = list.filter((p) => p.pinned)
+  const rest = list.filter((p) => !p.pinned)
+  const live = new Set((app?.background || []).filter((b) => ['starting', 'running', 'asking'].includes(b.status) || b.asking).map((b) => b.projectId))
+  const item = (p: Project) => (
+    <MenuItem key={p.id} id={p.id} className="menu-item ws-item" textValue={`${p.name} ${p.path}`}>
+      <Icon name="folder" size={15} />
+      <span className="menu-text">{p.name}<small>{p.path}</small></span>
+      {live.has(p.id) && <span className="led" aria-label="有任务在进行" />}
+      {p.id === project.id && <Icon name="check" size={14} stroke={2.4} className="accent menu-check" />}
+    </MenuItem>
+  )
+  return (
+    <DialogTrigger>
+      <Button className="cmp-ws" aria-label={`工作区：${project.name}，点击切换`}>
+        <Icon name="folder" size={14} stroke={1.8} />
+        <span className="cmp-ws-name">{project.name}</span>
+        {project.git && <span className="cmp-ws-branch"><Icon name="branch" size={11} stroke={2} />{project.branch || 'Git'}</span>}
+        <Icon name="chevron" size={12} stroke={2} />
+        <span className="rail-tip cmp-tip up" aria-hidden="true">{project.path}</span>
+      </Button>
+      <Popover className="menu-pop ws-pop" placement="bottom start" offset={6}>
+        <Dialog className="ws-dialog" aria-label="选择工作区">
+          {({ close }) => (
+            <>
+              <Autocomplete filter={contains}>
+                <SearchField className="ws-search" aria-label="搜索工作区" autoFocus>
+                  <Icon name="search" size={14} stroke={1.8} />
+                  <Input className="ws-input" placeholder="搜索工作区" />
+                </SearchField>
+                <Menu className="menu ws-menu" aria-label="工作区" onAction={(k) => { close(); void projectAction(String(k)) }}
+                  renderEmptyState={() => <div className="ws-empty muted small">没有找到；可以打开一个新的项目文件夹</div>}>
+                  {top.length > 0 && <MenuSection><Header className="menu-head">置顶</Header>{top.map(item)}</MenuSection>}
+                  {rest.length > 0 && <MenuSection><Header className="menu-head">{top.length ? '其他工作区' : '工作区'}</Header>{rest.map(item)}</MenuSection>}
+                </Menu>
+              </Autocomplete>
+              <div className="menu-sep" />
+              <Button className="ws-add" onPress={() => { close(); void projectAction('__add') }}>
+                <Icon name="folderPlus" size={15} /><span>打开项目文件夹…</span>
+              </Button>
+              <div className="ws-note muted small">智能体只在选中的文件夹里读写</div>
+            </>
+          )}
+        </Dialog>
+      </Popover>
+    </DialogTrigger>
   )
 }
 

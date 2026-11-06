@@ -8,7 +8,7 @@ import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
-import { STAGES, TaskController } from './task.mjs'
+import { deleteTaskRecord, patchTaskRecord, readHistory, STAGES, TaskController } from './task.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -171,6 +171,15 @@ async function openProject(id) {
   return appState()
 }
 
+/** 改任务记录：这个工作区开着（有控制器）就交给它，当前任务的标题会立刻更新；没开着就直接改记录文件 */
+function editTask(pid, id, patch) {
+  if (!store.get(pid)) throw new Error('项目不存在')
+  const c = ctls.get(pid)
+  const t = c && c.project ? c.patchTask(id, patch) : patchTaskRecord(P.data, pid, id, patch)
+  if (c && c !== ctl) sendBackground()
+  return t
+}
+
 function projectPath(rel) {
   if (!ctl.project) throw new Error('还没有打开项目')
   const abs = resolve(ctl.project.path, rel)
@@ -320,7 +329,18 @@ function registerIpc() {
     const r = await dialog.showOpenDialog(win, { title: '打开项目文件夹', properties: ['openDirectory'] })
     if (r.canceled || !r.filePaths[0]) return null
     const p = store.add(r.filePaths[0])
+    if (p.hidden) store.update(p.id, { hidden: false }) // 以前移出过列表的文件夹：重新打开就回来，任务记录还在
     return openProject(p.id)
+  })
+  // 工作区：置顶（侧栏和工作区菜单里排在前面）；移出列表（只是不显示，文件夹和任务记录都不动）
+  handle('project:pin', (id, on) => { if (!store.update(id, { pinned: !!on })) throw new Error('项目不存在'); return store.list() })
+  handle('project:hide', (id) => {
+    if (ctl.project && ctl.project.id === id) throw new Error('正在用的工作区不能移出，先切到别的工作区')
+    const c = ctls.get(id)
+    if (c && c.busy) throw new Error('这个工作区有任务在进行，等它结束再移出')
+    if (c) { ctls.delete(id); void c.dispose().catch((e) => mlog('dispose', e)); sendBackground() }
+    if (!store.update(id, { hidden: true, pinned: false })) throw new Error('项目不存在')
+    return appState()
   })
   handle('project:files', (q) => (ctl.project ? listFiles(ctl.project.path, q) : []))
   handle('project:mentions', (text) => (ctl.project ? findMentions(ctl.project.path, text) : []))
@@ -335,7 +355,27 @@ function registerIpc() {
   handle('task:new', () => ctl.reset())
   handle('task:open', (id) => ctl.openTask(id))
   handle('task:history', () => ctl.history())
+  // 侧栏按工作区列最近的任务：每个工作区（没移出列表的）各取最近几个；“全部任务”页取到 500 个
+  handle('task:recent', (limit) => Object.fromEntries(store.list().filter((p) => !p.hidden).map((p) => [p.id, readHistory(P.data, p.id, Math.max(1, Math.min(500, Number(limit) || 12)))])))
   handle('task:peek', (id) => ctl.peekTask(id))
+  // 编辑对话（侧栏和任务历史里的“⋯”菜单）：任何一个工作区的任务都能改，不用先切过去
+  handle('task:rename', (pid, id, title) => {
+    const t = String(title || '').replace(/\s+/g, ' ').trim().slice(0, 120)
+    if (!t) throw new Error('名字不能为空')
+    return editTask(pid, id, { title: t })
+  })
+  handle('task:archive', (pid, id, on) => editTask(pid, id, { archived: !!on }))
+  handle('task:remove', async (pid, id) => {
+    if (!store.get(pid)) throw new Error('项目不存在')
+    const c = ctls.get(pid)
+    if (c && c.task && c.task.id === id) {
+      if (c.busy) throw new Error('任务进行中，先停止再删除')
+      await c.reset() // 正在看的任务：先回到新任务页
+    }
+    deleteTaskRecord(P.data, pid, id)
+    if (c && c !== ctl) sendBackground()
+    return true
+  })
   handle('review:changes', () => ctl.changes())
   handle('review:file', (path) => ctl.fileVersions(path))
   handle('review:commit', (message, paths) => ctl.commit(message, paths))

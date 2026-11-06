@@ -11,7 +11,7 @@
 //   引擎意外退出后，下次用到时重启，并用 session/resume 恢复会话
 
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
@@ -69,6 +69,37 @@ function stamp() {
   const d = new Date()
   const p = (n) => String(n).padStart(2, '0')
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+}
+
+/** 一个项目最近的任务记录（新的在前）；侧栏按工作区列任务时，没打开的项目也从这里读 */
+export function readHistory(dataDir, projectId, limit = 50) {
+  const dir = join(dataDir, 'projects', projectId, 'tasks')
+  if (!existsSync(dir)) return []
+  return readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, limit).map((f) => {
+    try { return JSON.parse(readFileSync(join(dir, f), 'utf8')).task } catch { return null }
+  }).filter(Boolean)
+}
+
+// ---------- 编辑对话：改名、归档、删除（只动任务记录；项目里的文件、Git 提交和快照都不动） ----------
+const SAFE_ID = /^[\w.-]{1,80}$/
+function taskFile(dataDir, projectId, id) {
+  const ok = (x) => SAFE_ID.test(String(x)) && !/^\.+$/.test(String(x)) // 只许字母数字和 . _ -，不许 . 或 .. 这种
+  if (!ok(projectId) || !ok(id)) throw new Error('任务编号不对')
+  const f = join(dataDir, 'projects', projectId, 'tasks', `${id}.json`)
+  if (!existsSync(f)) throw new Error('找不到这个任务的记录')
+  return f
+}
+/** 改一个任务记录里的字段（标题、归档标记），返回改后的任务 */
+export function patchTaskRecord(dataDir, projectId, id, patch) {
+  const f = taskFile(dataDir, projectId, id)
+  const rec = JSON.parse(readFileSync(f, 'utf8'))
+  Object.assign(rec.task, patch)
+  writeFileSync(f, JSON.stringify(rec, null, 1))
+  return rec.task
+}
+/** 删掉一个任务记录 */
+export function deleteTaskRecord(dataDir, projectId, id) {
+  rmSync(taskFile(dataDir, projectId, id), { force: true })
 }
 
 export class TaskController extends EventEmitter {
@@ -672,11 +703,7 @@ export class TaskController extends EventEmitter {
 
   history(limit = 50) {
     if (!this.project) return []
-    const dir = this.tasksDir()
-    if (!existsSync(dir)) return []
-    return readdirSync(dir).filter((f) => f.endsWith('.json')).sort().reverse().slice(0, limit).map((f) => {
-      try { return JSON.parse(readFileSync(join(dir, f), 'utf8')).task } catch { return null }
-    }).filter(Boolean)
+    return readHistory(this.o.dataDir, this.project.id, limit)
   }
 
   /** 打开历史任务（只读查看；继续对话时恢复会话） */
@@ -703,6 +730,17 @@ export class TaskController extends EventEmitter {
     const rec = JSON.parse(readFileSync(join(this.tasksDir(), `${id}.json`), 'utf8'))
     const task = { ...rec.task, status: ['running', 'asking', 'starting'].includes(rec.task.status) ? 'interrupted' : rec.task.status }
     return { task, items: rec.items, current: false }
+  }
+
+  /** 改任务的标题、归档标记：是当前任务就改内存里的并保存、通知界面；不是就直接改记录文件 */
+  patchTask(id, patch) {
+    if (this.task && this.task.id === id) {
+      Object.assign(this.task, patch)
+      this.save()
+      this.emit('state', this.snapshotState())
+      return this.task
+    }
+    return patchTaskRecord(this.o.dataDir, this.project.id, id, patch)
   }
 
   /** 回到“发起任务”：当前任务已结束或已停止时清空（记录已保存） */

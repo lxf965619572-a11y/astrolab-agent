@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight } from './api'
+import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import { categoryMode } from './modes'
@@ -346,7 +346,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 export function createMockApi(): AstroApi {
   const listeners = new Set<(e: AstroEvent) => void>()
   const emitUi = (e: AstroEvent) => listeners.forEach((l) => l(e))
-  const project = { id: 'p1', name: '示例工程', path: 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\workspace\\sample', sample: true, git: true, branch: 'main' }
+  // URL 带 ?multi：演示多个工作区（侧栏按工作区列任务、工作区菜单、置顶和移出）
+  const multi = new URLSearchParams(location.search).has('multi')
+  const projects: Project[] = [
+    { id: 'p1', name: '示例工程', path: 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\workspace\\sample', sample: true, git: true, branch: 'main', pinned: multi },
+    ...(multi ? [
+      { id: 'p2', name: 'g3-pdus', path: 'D:\\work\\g3-pdus', git: true, branch: 'dev', pinned: true },
+      { id: 'p3', name: 'oc_ctrl', path: 'D:\\work\\design\\oc_ctrl', git: true, branch: 'main' },
+      { id: 'p4', name: 'tcu', path: 'D:\\work\\design\\tcu', git: false },
+    ] : []),
+  ]
+  let project = projects[0]
   let act = createActivity()
   let task: Task | null = null
   let status: TaskState['status'] = 'idle'
@@ -370,6 +380,12 @@ export function createMockApi(): AstroApi {
     past(54, 'code-walkthrough', '走查 rt_msg.c，重点看中断和共享数据', 'done'),
     past(75, 'preliminary-design', '为 RT 通信软件划分模块并定义接口', 'done', 2),
   ]
+  const others: Record<string, Task[]> = multi ? {
+    p2: [past(2, 'code-walkthrough', '对 g3-pdus/dev/V1.01/src/ocp.c 中的 ocp_check 做走查', 'done'), past(6, 'requirements-analysis', '对 g3-pdus/dev/V1.01 做静态分析，出 GJB 8114 报告', 'done', 4), past(9, 'requirements-analysis', '按 g3-pdus/input 下的任务书、通信协议做需求分析', 'done', 2)].map((t, i) => ({ ...t, id: `p2-${i}` })),
+    p3: [past(200, 'detailed-design', '按 design/oc_ctrl/docs 下的需求规格做详细设计', 'done', 3)].map((t) => ({ ...t, id: 'p3-0' })),
+    p4: [past(220, 'preliminary-design', '按 design/tcu/docs 下的软件需求规格做概要设计', 'done', 2)].map((t) => ({ ...t, id: 'p4-0' })),
+  } : {}
+  const historyOf = (id: string) => (id === 'p1' ? history : others[id] || [])
   let seq = 0
   let turn = 0
   let run = 0 // 每次停止加一，旧剧本发现后退出
@@ -511,7 +527,7 @@ export function createMockApi(): AstroApi {
     return {
       platform: 'win32', mock: true, installed: false,
       model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 },
-      engineReady: true, projects: [project], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem), update: { ...up },
+      engineReady: true, projects: [...projects], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem), update: { ...up },
     }
   }
 
@@ -580,8 +596,14 @@ export function createMockApi(): AstroApi {
     async getState() { return appState() },
     onEvent(cb) { listeners.add(cb); return () => listeners.delete(cb) },
     project: {
-      async open() { return appState() },
+      async open(id) {
+        const p = projects.find((x) => x.id === id)
+        if (p && p !== project) { project = p; task = null; act = createActivity(); status = 'idle'; questions = []; queued = [] }
+        return appState()
+      },
       async add() { return null },
+      async pin(id, on) { const p = projects.find((x) => x.id === id); if (p) p.pinned = on; return [...projects] },
+      async hide(id) { if (id === project.id) throw new Error('正在用的工作区不能移出，先切到别的工作区'); const p = projects.find((x) => x.id === id); if (p) { p.hidden = true; p.pinned = false }; return appState() },
       async files(q) { const t = q.toLowerCase(); return FILES.filter((f) => f.toLowerCase().includes(t)) },
       async tree() { return [...new Set([...FILES, ...files.keys()])].sort() },
       async read(path) {
@@ -614,7 +636,7 @@ export function createMockApi(): AstroApi {
         questions = []
         queued = []
         task = { id: `t-${Date.now()}`, sessionId: 's', stage: stage.id, stageName: stage.name, skill: stage.skill, skills: picked.map((x) => x.name), category: first?.category, mode: input.mode || categoryMode(first?.category || '其他'), title: input.prompt.split('\n')[0].slice(0, 60), prompt: input.prompt, files: input.files, startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: { commit: 'abc', tree: 'def' }, commit: null }
-        history.unshift(task)
+        historyOf(project.id).unshift(task)
         status = 'starting'
         pushState()
         await wait(700)
@@ -684,9 +706,13 @@ export function createMockApi(): AstroApi {
         return true
       },
       async reset() { task = null; act = createActivity(); status = 'idle'; questions = []; queued = []; pushState() },
-      async open(id) { const t = history.find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem) } },
-      async history() { return history },
-      async peek(id) { const t = history.find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem), current: false } },
+      async open(id) { const t = historyOf(project.id).find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem) } },
+      async history() { return historyOf(project.id) },
+      async rename(pid, id, title) { const t = (task?.id === id ? task : null) || historyOf(pid).find((h) => h.id === id); if (!t) throw new Error('找不到这个任务的记录'); t.title = title; if (task?.id === id) { task.title = title; pushState() } return t },
+      async archive(pid, id, on) { const t = (task?.id === id ? task : null) || historyOf(pid).find((h) => h.id === id); if (!t) throw new Error('找不到这个任务的记录'); t.archived = on; return t },
+      async remove(pid, id) { if (task?.id === id) { if (['starting', 'running', 'asking'].includes(status)) throw new Error('任务进行中，先停止再删除'); task = null; act = createActivity(); status = 'idle'; pushState() } const l = historyOf(pid); const i = l.findIndex((h) => h.id === id); if (i >= 0) l.splice(i, 1); return true },
+      async recent(limit = 12) { return Object.fromEntries(projects.filter((p) => !p.hidden).map((p) => [p.id, historyOf(p.id).slice(0, limit)])) },
+      async peek(id) { const t = historyOf(project.id).find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem), current: false } },
     },
     review: {
       async changes(): Promise<Change[]> {

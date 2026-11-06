@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld('astro', {
     mentions: (text) => invoke('project:mentions', text),
     tree: () => invoke('project:tree'),
     read: (rel) => invoke('project:read', rel),
+    pin: (id, on) => invoke('project:pin', id, on),
+    hide: (id) => invoke('project:hide', id),
   },
   task: {
     start: (input) => invoke('task:start', input),
@@ -32,6 +34,10 @@ contextBridge.exposeInMainWorld('astro', {
     reset: () => invoke('task:new'),
     open: (id) => invoke('task:open', id),
     history: () => invoke('task:history'),
+    recent: (limit) => invoke('task:recent', limit),
+    rename: (pid, id, title) => invoke('task:rename', pid, id, title),
+    archive: (pid, id, on) => invoke('task:archive', pid, id, on),
+    remove: (pid, id) => invoke('task:remove', pid, id),
     peek: (id) => invoke('task:peek', id),
   },
   review: {

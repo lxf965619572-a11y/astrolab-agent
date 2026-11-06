@@ -3,7 +3,9 @@
 
 export type Status = 'idle' | 'starting' | 'running' | 'asking' | 'done' | 'stopped' | 'error'
 
-export interface Project { id: string; path: string; name: string; sample?: boolean; library?: boolean; git?: boolean; branch?: string; lastOpenedAt?: number }
+export interface Project { id: string; path: string; name: string; sample?: boolean; library?: boolean; git?: boolean; branch?: string; lastOpenedAt?: number; addedAt?: number
+  /** 工作区置顶；hidden：移出了列表（文件夹和任务记录都还在，重新打开这个文件夹就回来） */
+  pinned?: boolean; hidden?: boolean }
 export interface Stage { id: string; name: string; skill: string; hasSkill: boolean; hidden?: boolean }
 /** 发起任务时可选的技能（内置、已安装、我做的）；category 是研制环节类别，只用于筛选和图标 */
 export interface SkillCard {
@@ -43,6 +45,8 @@ export interface Task {
   commit: { sha: string; message: string; at: number; files: number } | null
   restoredAt?: number
   usage?: Usage | null
+  /** 归档了：侧栏不再列出，任务历史里“已归档”能找到 */
+  archived?: boolean
 }
 
 export interface QuestionItem { id: string; header?: string; question: string; options?: { label: string; description?: string }[]; multiSelect?: boolean }
@@ -142,6 +146,7 @@ export interface AstroApi {
   project: {
     open(id: string): Promise<AppState>; add(): Promise<AppState | null>; files(q: string): Promise<string[]>
     tree(): Promise<string[]>; read(path: string): Promise<{ path: string; binary: boolean; text: string | null; size: number; tooLarge?: boolean }>
+    pin(id: string, on: boolean): Promise<Project[]>; hide(id: string): Promise<AppState>
     /** 一段话里提到的项目文件（按文件名匹配） */
     mentions(text: string): Promise<Mention[]>
   }
@@ -149,6 +154,10 @@ export interface AstroApi {
     start(input: StartInput): Promise<Task>; send(text: string, extra?: { skills?: string[]; files?: string[] }): Promise<void>; stop(): Promise<{ ms: number; unsent: string[] }>; resume(text?: string): Promise<void>
     answer(id: string, answers: Answer[]): Promise<boolean>; reset(): Promise<void>
     open(id: string): Promise<{ task: Task; items: Item[] }>; history(): Promise<Task[]>
+    /** 每个工作区最近的几个任务（按项目 id） */
+    recent(limit?: number): Promise<Record<string, Task[]>>
+    /** 编辑对话：改名、归档 / 取消归档、删除记录（项目文件和 Git 都不动） */
+    rename(projectId: string, id: string, title: string): Promise<Task>; archive(projectId: string, id: string, on: boolean): Promise<Task>; remove(projectId: string, id: string): Promise<boolean>
     /** 只读查看，不切换当前任务 */
     peek(id: string): Promise<{ task: Task; items: Item[]; current: boolean }>
   }

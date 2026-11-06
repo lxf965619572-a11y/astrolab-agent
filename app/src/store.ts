@@ -5,8 +5,9 @@ import type { AppState, AstroApi, AstroEvent, Item, KbMeta, LibSource, Question,
 import { play, setSoundSettings } from './sound'
 import { modeOf, type Mode } from './modes'
 
-// launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面
-export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'history' | 'knowledge' | 'library' | 'peek'
+// launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面：
+// project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程）
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'
@@ -16,17 +17,21 @@ interface Settings {
   sideW: number; sideCollapsed: boolean; codeW: number
   /** 右边的面板（任务模式：进度和产出；代码模式：环境和改动）开着还是收起 */
   panel: boolean
+  /** 侧栏：置顶的任务 id；折叠起来的分组（'pinned' | 'recent' | 'other'） */
+  pinned: string[]; sideFold: string[]
 }
 /** 发起页写了一半的任务：切到别的页面再回来还在（任务进行中可以先写好下一个） */
 export interface Draft { prompt: string; files: string[]; report: boolean; dismissed: string[]; skills: string[] }
 
 function loadSettings(): Settings {
-  const d: Settings = { sound: true, volume: 0.3, notify: true, theme: 'lavender', reviewer: false, sideW: 248, sideCollapsed: false, codeW: 540, panel: true }
+  const d: Settings = { sound: true, volume: 0.3, notify: true, theme: 'lavender', reviewer: false, sideW: 248, sideCollapsed: false, codeW: 540, panel: true, pinned: [], sideFold: [] }
   try {
     const v = { ...d, ...JSON.parse(localStorage.getItem('astrolab.settings') || '{}') }
     if (!['lavender', 'cream', 'mars'].includes(v.theme)) v.theme = v.theme === 'clay' ? 'mars' : 'lavender' // 旧的“陶土”换成“黑橙”
     const n = (x: unknown, lo: number, hi: number, def: number) => (typeof x === 'number' && isFinite(x) ? Math.max(lo, Math.min(hi, x)) : def)
     v.sideW = n(v.sideW, 200, 420, 248); v.codeW = n(v.codeW, 480, 1400, 540); delete v.chatW; v.sideCollapsed = !!v.sideCollapsed; v.panel = v.panel !== false
+    const strs = (x: unknown) => (Array.isArray(x) ? x.filter((i): i is string => typeof i === 'string') : [])
+    v.pinned = strs(v.pinned).slice(0, 50); v.sideFold = strs(v.sideFold)
     return v
   } catch { return d }
 }
@@ -46,6 +51,24 @@ interface Store {
   openTask(t: import('./api').Task): Promise<void>
   /** 切到另一个项目：它有任务（进行中或刚做完）就打开那个任务，没有就到新任务页。原项目进行中的任务在后台接着做 */
   openProject(id: string): Promise<void>
+  /** 进工程主页：不是当前工程就先切过去（原工程进行中的任务在后台接着做） */
+  openProjectHome(id: string): Promise<void>
+  /** 侧栏：每个工作区最近的任务（按项目 id）；recentVer 变了侧栏就重新取 */
+  recent: Record<string, import('./api').Task[]>
+  loadRecent(): Promise<void>
+  /** 打开某个工作区里的任务：不是当前工作区就先切过去 */
+  openTaskIn(projectId: string, t: import('./api').Task): Promise<void>
+  pinProject(id: string, on: boolean): Promise<void>
+  /** 编辑对话：改名、归档、删除；改完侧栏和任务历史都重新取（histVer 加一） */
+  renameTask(projectId: string, t: import('./api').Task, title: string): Promise<boolean>
+  archiveTask(projectId: string, t: import('./api').Task, on: boolean): Promise<void>
+  removeTask(projectId: string, t: import('./api').Task): Promise<void>
+  histVer: number
+  /** 需要确认的操作（删除）：显示一个对话框，点确定才做 */
+  confirm: null | { title: string; body: string; ok: string; danger?: boolean; run: () => void | Promise<void> }
+  askConfirm(c: NonNullable<Store['confirm']>): void
+  closeConfirm(): void
+  hideProject(id: string): Promise<void>
   /** 当前模式：跟着视图走（知识库、技能这些共用页面保持进来前的模式） */
   mode: Mode
   setMode(m: Mode): void
@@ -141,6 +164,68 @@ export const useStore = create<Store>((set, get) => ({
     get().applyAppState(s)
     const t = s.task.task
     get().setView(t ? (modeOf(t) === 'code' ? 'code' : 'task') : 'launch')
+  },
+  async openProjectHome(id) {
+    if (get().ts?.project?.id !== id) {
+      await get().openProject(id)
+      if (get().ts?.project?.id !== id) return
+    }
+    get().setView('project')
+  },
+  recent: {},
+  async loadRecent() {
+    const r = await get().api?.task.recent(12).catch(() => null)
+    if (r) set({ recent: r })
+  },
+  async openTaskIn(projectId, t) {
+    if (get().ts?.project?.id !== projectId) {
+      await get().openProject(projectId)
+      if (get().ts?.project?.id !== projectId) return
+    }
+    await get().openTask(t)
+  },
+  async pinProject(id, on) {
+    const list = await get().run((api) => api.project.pin(id, on), on ? '置顶失败' : '取消置顶失败')
+    const app = get().app
+    if (list && app) set({ app: { ...app, projects: list } })
+  },
+  async hideProject(id) {
+    const s = await get().run((api) => api.project.hide(id), '移出工作区失败')
+    if (s) { get().applyAppState(s); void get().loadRecent() }
+  },
+  histVer: 0,
+  confirm: null,
+  askConfirm(c) { set({ confirm: c }) },
+  closeConfirm() { set({ confirm: null }) },
+  async renameTask(pid, t, title) {
+    const name = title.replace(/\s+/g, ' ').trim()
+    if (!name || name === t.title) return false
+    const r = await get().run((api) => api.task.rename(pid, t.id, name), '改名失败')
+    if (!r) return false
+    set({ histVer: get().histVer + 1 })
+    void get().loadRecent()
+    return true
+  },
+  async archiveTask(pid, t, on) {
+    const r = await get().run((api) => api.task.archive(pid, t.id, on), on ? '归档失败' : '取消归档失败')
+    if (!r) return
+    set({ histVer: get().histVer + 1 })
+    void get().loadRecent()
+    if (on) get().toast({ text: `已归档：${t.title}`, tone: 'ok', action: { label: '撤销', run: () => void get().archiveTask(pid, t, false) } }, 6000)
+  },
+  async removeTask(pid, t) {
+    const st = get()
+    const wasCur = st.ts?.project?.id === pid && st.ts?.task?.id === t.id
+    const ok = await st.run((api) => api.task.remove(pid, t.id), '删除失败')
+    if (!ok) return
+    if (wasCur) {
+      const s = await get().run((api) => api.getState())
+      if (s) get().applyAppState(s)
+      if (['task', 'code', 'peek'].includes(get().view)) get().setView(get().mode === 'code' ? 'code-launch' : 'launch')
+    } else if (get().view === 'peek' && get().peek?.task.id === t.id) get().setView(get().mode === 'code' ? 'code-launch' : 'launch')
+    set({ histVer: get().histVer + 1 })
+    void get().loadRecent()
+    get().toast({ text: `已删除：${t.title}`, tone: 'ok' })
   },
   async openTask(t) {
     const st = get()

@@ -1,13 +1,14 @@
 import { useEffect } from 'react'
 import { useStore } from './store'
 import { getApi } from './api'
-import { Sidebar, StatusBar, TitleBar, Toasts } from './components/Shell'
+import { ConfirmDialog, Sidebar, StatusBar, TitleBar, Toasts } from './components/Shell'
 import { SideRail } from './components/Panels'
 import { modeOf } from './modes'
 import { LaunchView } from './views/LaunchView'
 import { PeekView, TaskView } from './views/TaskView'
 import { CodeView } from './views/CodeView'
 import { HistoryView } from './views/HistoryView'
+import { ProjectView, ProjectsView } from './views/ProjectView'
 import { KbEditor, KnowledgeView } from './views/KnowledgeView'
 import { LibraryView } from './views/LibraryView'
 import { AppIcon } from './components/Icon'
@@ -49,6 +50,8 @@ export function App() {
           {v === 'launch' && <LaunchView />}
           {v === 'task' && <TaskView />}
           {(v === 'code' || v === 'code-launch') && <CodeView fresh={v === 'code-launch'} />}
+          {v === 'project' && <ProjectView />}
+          {v === 'projects' && <ProjectsView />}
           {v === 'history' && <HistoryView />}
           {v === 'peek' && <PeekView />}
           {v === 'knowledge' && <KnowledgeView />}
@@ -57,6 +60,7 @@ export function App() {
       </div>
       <StatusBar />
       <KbEditor />
+      <ConfirmDialog />
       <Toasts />
     </div>
   )
