@@ -21,7 +21,9 @@ import { buildRefIndex, listDocs, loadGlossary, searchRef } from '../../mcp/know
 const P = resolvePaths()
 mkdirSync(P.data, { recursive: true })
 app.setPath('userData', join(P.data, 'electron'))
-app.setAppUserModelId('AstroLab')
+// 任务栏分组和图标用的 ID。开发时用单独的 ID：不和安装版混在一组，也避开 Windows 缓存过的旧图标（Electron 的）
+const AUMID = P.installed ? 'AstroLab' : 'AstroLab.Dev'
+app.setAppUserModelId(AUMID)
 const DEV_URL = process.env.ASTROLAB_DEV_URL || ''
 
 // 预览项目里的 HTML（比如信息流插件的交互版）：走单独的 astro-preview: 地址，带自己的 CSP——
@@ -544,6 +546,19 @@ function appIcon() {
   return undefined
 }
 
+// Windows 任务栏不用窗口的 icon，而是按 ID 找开始菜单快捷方式，找不到就用 exe 的图标（开发时是 electron.exe，显示成 Electron 的）。
+// 直接在窗口上写任务栏属性（图标 + 重新启动命令，三项都要有 Windows 才认），开发时没有快捷方式也显示自己的图标。
+function setTaskbarDetails(w) {
+  if (process.platform !== 'win32') return
+  const icon = join(P.appDir, 'build', 'icon.ico')
+  if (!existsSync(icon)) return
+  const q = (x) => `"${x}"`
+  const relaunchCommand = process.defaultApp ? `${q(process.execPath)} ${q(P.appDir)}` : q(process.execPath)
+  try {
+    w.setAppDetails({ appId: AUMID, appIconPath: icon, appIconIndex: 0, relaunchCommand, relaunchDisplayName: 'AstroLab' })
+  } catch (e) { mlog('任务栏图标', e) }
+}
+
 async function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1280, minHeight: 720,
@@ -556,6 +571,7 @@ async function createWindow() {
       contextIsolation: true, sandbox: true, nodeIntegration: false, spellcheck: false,
     },
   })
+  setTaskbarDetails(win)
   win.once('ready-to-show', () => win.show())
   win.on('focus', () => win.flashFrame(false))
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
@@ -684,7 +700,6 @@ app.on('window-all-closed', async () => {
 // ---------- 安装后：快捷方式、首次运行的设置文件 ----------
 // 任务栏图标：Windows 按 AppUserModelID 找开始菜单里同一个 ID 的快捷方式，用它的图标和名字（没有就用 exe 的，开发时是 Electron 的）。
 // 所以安装后的程序每次启动都确认开始菜单里有带 ID 和图标的快捷方式；安装脚本用 --install-shortcuts 顺带建桌面快捷方式。
-const AUMID = 'AstroLab'
 function shortcutPaths() {
   return {
     menu: join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'AstroLab.lnk'),
