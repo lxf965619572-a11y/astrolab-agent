@@ -5,7 +5,9 @@ export type Status = 'idle' | 'starting' | 'running' | 'asking' | 'done' | 'stop
 
 export interface Project { id: string; path: string; name: string; sample?: boolean; library?: boolean; git?: boolean; branch?: string; lastOpenedAt?: number; addedAt?: number
   /** 工作区置顶；hidden：移出了列表（文件夹和任务记录都还在，重新打开这个文件夹就回来） */
-  pinned?: boolean; hidden?: boolean }
+  pinned?: boolean; hidden?: boolean
+  /** 工程主页右栏：工程说明（写进每个任务的第一条消息）、参考资料（工程内相对路径） */
+  notes?: string; refs?: string[] }
 export interface Stage { id: string; name: string; skill: string; hasSkill: boolean; hidden?: boolean }
 /** 发起任务时可选的技能（内置、已安装、我做的）；category 是研制环节类别，只用于筛选和图标 */
 export interface SkillCard {
@@ -139,6 +141,8 @@ export interface CatalogItem {
 export interface Submission { branch: string; library: string; path: string; title: string; at: number; status: string; reason?: string; rejectedBy?: string; rejectedAt?: number }
 export interface Pending { ref: string; branch: string; author: string; at: number; title: string; files: { status: string; path: string }[]; superseded?: boolean }
 
+export interface OutputFile { pid: string; pname: string; taskId: string; taskTitle: string; stageName: string; startedAt: number; path: string; exists: boolean; size: number; mtime: number }
+
 export interface SearchResult {
   tasks: { pid: string; pname: string; task: Task; inTitle: boolean }[]
   files: { pid: string; pname: string; taskId: string; taskTitle: string; path: string }[]
@@ -154,6 +158,7 @@ export interface AstroApi {
     open(id: string): Promise<AppState>; add(): Promise<AppState | null>; files(q: string): Promise<string[]>
     tree(): Promise<string[]>; read(path: string): Promise<{ path: string; binary: boolean; text: string | null; size: number; tooLarge?: boolean }>
     pin(id: string, on: boolean): Promise<Project[]>; hide(id: string): Promise<AppState>
+    setInfo(id: string, info: { notes?: string; refs?: string[] }): Promise<Project[]>
     /** 一段话里提到的项目文件（按文件名匹配） */
     mentions(text: string): Promise<Mention[]>
   }
@@ -169,6 +174,8 @@ export interface AstroApi {
     peek(id: string): Promise<{ task: Task; items: Item[]; current: boolean }>
     /** 搜索任务（标题、描述）和产出文件名；scope 'current' 只搜当前工程 */
     search(q: string, scope?: 'all' | 'current'): Promise<SearchResult>
+    /** 产出页：所有工程的任务写过的文件 */
+    outputs(): Promise<OutputFile[]>
   }
   /** 设置页“测试连接” */
   model: { test(): Promise<{ ok: boolean; ms: number; model: string; reply?: string; error?: string }> }
@@ -200,7 +207,7 @@ export interface AstroApi {
     submissions(): Promise<Submission[]>; pending(id: string): Promise<Pending[]>; pendingFile(id: string, ref: string, path: string): Promise<{ path: string; before: string | null; after: string | null }>
     approve(id: string, ref: string): Promise<{ branch: string; title: string; merged: boolean }>; reject(id: string, ref: string, reason?: string): Promise<{ branch: string; title: string; rejected: boolean; reasonSaved?: boolean }>; create(kind: 'skill' | 'plugin', prompt: string): Promise<Task>
   }
-  sys: { copy?(text: string): Promise<void>; openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
+  sys: { copy?(text: string): Promise<void>; openPath(rel: string): Promise<void>; showItem(rel: string): Promise<void>; openIn?(pid: string, rel: string, how?: 'open' | 'show'): Promise<void>; titlebar?(c: { color: string; symbolColor: string }): Promise<void>; previewUrl?(rel: string): string }
 }
 
 declare global { interface Window { astro?: AstroApi } }

@@ -1,7 +1,7 @@
 // 工程主页（界面设计 v2 第 6 节，对应 Claude 的项目页）：点侧栏的工程名进来。
 //   上：在这个工程里新建任务的输入框（进来就聚焦，点工程名后可以直接写）；
 //   下：这个工程的全部任务；
-//   右：工程信息（路径、Git 分支、任务数）。
+//   右：工程信息（路径、Git 分支、任务数），工程说明（写进每个任务的第一条消息），参考资料（每个任务都告诉智能体的文件）。
 // 工程列表（ProjectsView）：侧栏“工程”入口，所有打开过的工程，点一行进它的主页。
 
 import { useEffect, useState } from 'react'
@@ -9,10 +9,11 @@ import { Button } from 'react-aria-components'
 import { useStore } from '../store'
 import { Icon } from '../components/Icon'
 import { Key } from '../components/Keys'
+import { FilePicker } from '../components/Pickers'
 import { projectAction, visibleProjects } from '../components/Shell'
 import { LaunchView } from './LaunchView'
 import { ProjectTasks } from './HistoryView'
-import type { Task } from '../api'
+import type { Project, Task } from '../api'
 
 const LIVE = ['starting', 'running', 'asking']
 
@@ -53,6 +54,8 @@ export function ProjectView() {
             <Key size="sm" variant="ghost" onPress={() => void run(async (api) => { if (api.sys.copy) await api.sys.copy(p.path); else await navigator.clipboard.writeText(p.path); return true }, '复制失败').then((ok) => { if (ok) useStore.getState().toast({ text: '路径已复制', tone: 'ok' }, 2000) })}>复制路径</Key>
           </div>
         </section>
+        <ProjectNotes project={p} />
+        <ProjectRefs project={p} />
       </aside>
     </div>
   )
@@ -91,5 +94,61 @@ export function ProjectsView() {
         {!projects.length && <div className="pad muted">还没有工程：点右上角“打开项目文件夹”。</div>}
       </div>
     </div>
+  )
+}
+
+/** 设置后同步到界面的工程列表（主进程也更新了正在用的控制器，下一个任务就用上） */
+async function saveInfo(id: string, info: { notes?: string; refs?: string[] }) {
+  const list = await useStore.getState().run((api) => api.project.setInfo(id, info), '保存失败')
+  const app = useStore.getState().app
+  if (list && app) useStore.setState({ app: { ...app, projects: list } })
+  return !!list
+}
+const infoOf = (p: Project) => useStore.getState().app?.projects.find((x) => x.id === p.id) || p
+
+/** 工程说明：这个工程每个任务都适用的约定（目标平台、编码规范、文档放哪），写进每个任务的第一条消息 */
+function ProjectNotes({ project }: { project: Project }) {
+  useStore((s) => s.app?.projects)
+  const cur = infoOf(project).notes || ''
+  const [edit, setEdit] = useState(false)
+  const [text, setText] = useState(cur)
+  useEffect(() => { if (!edit) setText(cur) }, [cur, edit])
+  return (
+    <section className="proj-card card">
+      <div className="proj-card-head"><h3>工程说明</h3>{!edit && <Button className="proj-card-act" onPress={() => setEdit(true)}>{cur ? '编辑' : '添加'}</Button>}</div>
+      {edit ? (
+        <>
+          <textarea className="field proj-notes-input" rows={6} value={text} autoFocus onChange={(e) => setText(e.target.value)}
+            placeholder={'这个工程每个任务都适用的约定，例如：\n目标平台 BM3803，C 语言，B 级软件\n文档产出放在 doc/ 下\n需求标识前缀 PDUS'} />
+          <div className="proj-actions">
+            <Key size="sm" variant="primary" onPress={() => void saveInfo(project.id, { notes: text.trim() }).then((ok) => { if (ok) setEdit(false) })}>保存</Key>
+            <Key size="sm" variant="ghost" onPress={() => { setText(cur); setEdit(false) }}>取消</Key>
+          </div>
+        </>
+      ) : cur ? <div className="proj-notes">{cur}</div> : <div className="muted small">写下这个工程每个任务都适用的约定，智能体每次开始任务时都会看到。</div>}
+    </section>
+  )
+}
+
+/** 参考资料：这个工程常用的文件（任务书、接口说明等），每个任务都告诉智能体“需要时读” */
+function ProjectRefs({ project }: { project: Project }) {
+  useStore((s) => s.app?.projects)
+  const refs = infoOf(project).refs || []
+  const set = (next: string[]) => void saveInfo(project.id, { refs: next })
+  return (
+    <section className="proj-card card">
+      <div className="proj-card-head"><h3>参考资料</h3><FilePicker label="添加" className="proj-card-act" onPick={(f) => { if (!refs.includes(f)) set([...refs, f]) }} /></div>
+      {refs.length ? (
+        <ul className="proj-refs">
+          {refs.map((f) => (
+            <li key={f}>
+              <Icon name="file" size={13} />
+              <Button className="proj-ref mono" onPress={() => useStore.getState().run((api) => api.sys.openPath(f), '打不开文件')} aria-label={`打开 ${f}`}>{f.split('/').pop()}</Button>
+              <Button className="proj-ref-x" aria-label={`不再作为参考资料：${f}`} onPress={() => set(refs.filter((x) => x !== f))}><Icon name="x" size={11} stroke={2.4} /></Button>
+            </li>
+          ))}
+        </ul>
+      ) : <div className="muted small">任务书、接口说明这类常用文件加在这里，每个任务都会告诉智能体“需要时读”。</div>}
+    </section>
   )
 }

@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('astro', {
     read: (rel) => invoke('project:read', rel),
     pin: (id, on) => invoke('project:pin', id, on),
     hide: (id) => invoke('project:hide', id),
+    setInfo: (id, info) => invoke('project:setInfo', id, info),
   },
   task: {
     start: (input) => invoke('task:start', input),
@@ -40,6 +41,7 @@ contextBridge.exposeInMainWorld('astro', {
     remove: (pid, id) => invoke('task:remove', pid, id),
     peek: (id) => invoke('task:peek', id),
     search: (q, scope) => invoke('task:search', q, scope),
+    outputs: () => invoke('task:outputs'),
   },
   model: {
     test: () => invoke('model:test'),
@@ -112,5 +114,6 @@ contextBridge.exposeInMainWorld('astro', {
     /** 项目里 HTML 文件的预览地址（主进程的 astro-preview: 协议，带自己的 CSP） */
     previewUrl: (rel) => `astro-preview://project/${String(rel).split('/').map(encodeURIComponent).join('/')}?t=${Date.now()}`,
     showItem: (rel) => invoke('sys:showItem', rel),
+    openIn: (pid, rel, how) => invoke('sys:openIn', pid, rel, how),
   },
 })

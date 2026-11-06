@@ -125,7 +125,7 @@ const LIVE = ['starting', 'running', 'asking']
 
 // 侧栏（和 Claude 一样，尽量少字；界面设计 v2 第 4 节）：
 //   顶上一行：收起按钮 + 模式切换；
-//   入口：新任务、工程、知识库、技能与插件（一行一个，不加粗不浮起）；
+//   入口：新任务、搜索、工程、产出、知识库、技能与插件（一行一个，不加粗不浮起）；
 //   分组：置顶的任务 / 工程（每个工程一行，下面缩进列它最近的任务） / 最近（所有工程），组名可以点击折叠（记住）。
 //   工程是容器：点工程名进工程主页（新建 + 它的全部任务），所以工程下面不放“查看全部”；
 //   最近是时间线：末尾放“查看全部”去全部任务。只有一个工程有任务时不显示最近（和工程下面那几条重复）。
@@ -201,6 +201,7 @@ export function Sidebar() {
         </Button>
         <Button className="nav s-nav" onPress={() => useStore.getState().setSearchOpen(true)}><Icon name="search" size={16} stroke={1.7} /><span className="nav-name">搜索</span><span className="side-kbd">Ctrl K</span></Button>
         <Button className={`nav s-nav ${view === 'projects' ? 'on' : ''}`} onPress={() => setView('projects')}><Icon name="folder" size={16} stroke={1.7} /><span className="nav-name">工程</span></Button>
+        <Button className={`nav s-nav ${view === 'outputs' ? 'on' : ''}`} onPress={() => setView('outputs')}><Icon name="file" size={16} stroke={1.7} /><span className="nav-name">产出</span></Button>
         <Button className={`nav s-nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={16} stroke={1.7} /><span className="nav-name">知识库</span></Button>
         <Button className={`nav s-nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={16} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
       </div>

@@ -6,8 +6,8 @@ import { play, setSoundSettings } from './sound'
 import { modeOf, type Mode } from './modes'
 
 // launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面：
-// project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程），settings 设置
-export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek' | 'settings'
+// project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程），outputs 产出（所有工程的文件），settings 设置
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek' | 'settings' | 'outputs'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'

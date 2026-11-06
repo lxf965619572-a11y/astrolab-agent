@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge } from '../engine/engine.mjs'
-import { TaskController, composeFollowUp, followUpDisplay, searchTasks } from '../main/task.mjs'
+import { TaskController, composeFollowUp, followUpDisplay, listOutputs, searchTasks } from '../main/task.mjs'
 import * as git from '../main/git.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -385,5 +385,27 @@ test('搜索：按标题和描述找任务，按文件名找产出（工程内�
     assert.deepEqual(searchTasks(data, ps, 'out').files.map((f) => f.path), ['out/a.md', 'out/研制总结报告.docx'])
     assert.equal(searchTasks(data, ps, '').tasks.length, 0)
     assert.equal(searchTasks(data, ps, '研制 用例').tasks.length, 1)
+    // 产出：同一批记录，文件不在本机（工程路径是假的）也列出，标为不在
+    const outs = listOutputs(data, ps)
+    assert.deepEqual(outs.map((f) => f.path).sort(), ['out/a.md', 'out/研制总结报告.docx'])
+    assert.ok(outs.every((f) => !f.exists && f.pname === '示例'))
   } finally { rmSync(data, { recursive: true, force: true }) }
+})
+
+test('工程说明和参考资料写进第一条消息；产出列出任务写过的文件', async (t) => {
+  const { ctl, ws } = await setup(t)
+  Object.assign(ctl.project, { notes: '目标平台 BM3803\n计数器满了回绕', refs: ['doc/任务书.md', 'utest/rt1553/src/rt_drv.c'] })
+  const a = await ctl.start({ stage: 'utest', prompt: '做单元测试', files: ['utest/rt1553/src/rt_drv.c'] })
+  assert.match(a.firstMessage, /【工程说明】[^\n]*\n目标平台 BM3803\n计数器满了回绕/)
+  assert.match(a.firstMessage, /【参考资料】[^\n]*\n- doc\/任务书\.md/)
+  assert.doesNotMatch(a.firstMessage.split('【参考资料】')[1], /rt_drv\.c/, '已在相关文件里的不重复列')
+  await until(() => ctl.status === 'done')
+  const outs = listOutputs(ctl.o.dataDir, [{ id: 'p1', name: '示例', path: ws }])
+  assert.ok(outs.length >= 1, '列出写过的文件')
+  assert.ok(outs.every((f) => f.pid === 'p1' && f.taskId === a.id && !f.path.includes('\\')), JSON.stringify(outs[0]))
+  assert.ok(outs.some((f) => f.exists && f.size > 0))
+  Object.assign(ctl.project, { notes: '', refs: [] })
+  const b = await ctl.start({ stage: 'utest', prompt: '再测一遍' })
+  assert.doesNotMatch(b.firstMessage, /【工程说明】|【参考资料】/, '没写就不加')
+  await until(() => ctl.status === 'done')
 })

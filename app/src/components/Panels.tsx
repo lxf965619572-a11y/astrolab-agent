@@ -121,6 +121,7 @@ export function SideRail() {
       <B icon="search" label="搜索 · Ctrl K" onPress={() => useStore.getState().setSearchOpen(true)} />
       <B icon="folder" label="工程" on={view === 'projects' || view === 'project'} onPress={() => setView('projects')} />
       <B icon="history" label="全部任务" on={view === 'history'} onPress={() => setView('history')} />
+      <B icon="file" label="产出" on={view === 'outputs'} onPress={() => setView('outputs')} />
       <span className="grow" />
       <B icon="book" label="知识库" on={view === 'knowledge'} onPress={() => setView('knowledge')} />
       <B icon="puzzle" label="技能与插件" on={view === 'library'} onPress={() => setView('library')} />

@@ -70,7 +70,7 @@ export function QuestionCard({ q, onLater }: { q: Question; onLater: () => void 
                   return (
                     <Key key={o.label} variant="key" className={`q-opt ${on ? 'on' : ''}`} onPress={() => choose(it.id, o.label, it.multiSelect)} aria-pressed={on}>
                       <span className="q-num">{oi + 1}</span>
-                      <span className="q-label">{o.label}{o.description && <small>{o.description}</small>}</span>
+                      <span className="q-label"><OptLabel text={o.label} />{o.description && <small>{o.description}</small>}</span>
                       {on && <span className="q-check">已选</span>}
                     </Key>
                   )
@@ -88,4 +88,11 @@ export function QuestionCard({ q, onLater }: { q: Question; onLater: () => void 
       </motion.section>
     </motion.div>
   )
+}
+
+/** 选项文字：智能体标的“（推荐）”用浅色单独显示，免得不看内容就点（界面设计 v2 第 7.3 节） */
+function OptLabel({ text }: { text: string }) {
+  const m = /\s*[（(](推荐|建议|Recommended)[）)]\s*/i.exec(text)
+  if (!m) return <>{text}</>
+  return <span className="q-main">{text.slice(0, m.index) + text.slice(m.index + m[0].length)}<span className="q-rec">推荐</span></span>
 }

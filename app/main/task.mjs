@@ -139,6 +139,29 @@ export function searchTasks(dataDir, projects, query, limit = 30) {
   return out
 }
 
+/** 产出页：所有工程的任务写过的文件（工程内相对路径），带所属任务；同一文件只留最近一次。存在与否、大小、修改时间按工程文件夹查 */
+export function listOutputs(dataDir, projects, limit = 800) {
+  const out = []
+  const seen = new Set()
+  for (const p of projects) {
+    const dir = join(dataDir, 'projects', p.id, 'tasks')
+    if (!existsSync(dir)) continue
+    for (const f of readdirSync(dir).filter((x) => x.endsWith('.json')).sort().reverse()) {
+      const d = taskDigest(join(dir, f), p.path)
+      if (!d || d.task.archived) continue
+      for (const path of d.files) {
+        const k = `${p.id}:${path}`
+        if (seen.has(k)) continue
+        seen.add(k)
+        let st = null
+        try { st = statSync(join(p.path, path)) } catch { /* 文件已经不在了 */ }
+        out.push({ pid: p.id, pname: p.name, taskId: d.task.id, taskTitle: d.task.title, stageName: d.task.stageName || '', startedAt: d.task.startedAt, path, exists: !!st, size: st ? st.size : 0, mtime: st ? st.mtimeMs : 0 })
+      }
+    }
+  }
+  return out.sort((a, b) => (b.mtime || b.startedAt) - (a.mtime || a.startedAt)).slice(0, limit)
+}
+
 // ---------- 编辑对话：改名、归档、删除（只动任务记录；项目里的文件、Git 提交和快照都不动） ----------
 const SAFE_ID = /^[\w.-]{1,80}$/
 function taskFile(dataDir, projectId, id) {
@@ -425,8 +448,13 @@ export class TaskController extends EventEmitter {
     } else {
       parts.push('【技能】未指定。先看 skill 工具列出的部门技能里有没有适合这项工作的：有就加载它并按步骤做，没有就按通用方法做；开头用一句话说明用了哪个技能（或为什么不用）。')
     }
+    // 工程主页右栏的“工程说明”“参考资料”：这个工程每个任务都适用
+    const proj = this.project || {}
+    if (proj.notes && String(proj.notes).trim()) parts.push(`【工程说明】（这个工程的约定，每个任务都适用；和本次要求冲突时先问我）\n${String(proj.notes).trim()}`)
     parts.push(`【要求】${t.prompt}`)
     if (t.files && t.files.length) parts.push(`【相关文件】\n${t.files.map((f) => `- ${f}`).join('\n')}`)
+    const refs = (Array.isArray(proj.refs) ? proj.refs : []).filter((f) => !(t.files || []).includes(f))
+    if (refs.length) parts.push(`【参考资料】这个工程的常用资料，和本次工作相关时再读：\n${refs.map((f) => `- ${f}`).join('\n')}`)
     // 发起页的“生成 Word”开关：技能都写“用户要求时才生成 Word”，所以开着要明说；任务描述里自己提了 Word 的，以描述为准
     if (t.options && t.reportable !== false && !/word|docx/i.test(t.prompt || '')) {
       if (t.options.report === true) parts.push('完成后按部门模板生成 Word（先 mcp__docgen__list_templates 选模板，再 mcp__docgen__render_docx）。')

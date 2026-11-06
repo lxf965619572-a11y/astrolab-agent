@@ -9,7 +9,7 @@ import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
-import { deleteTaskRecord, patchTaskRecord, readHistory, searchTasks, STAGES, TaskController } from './task.mjs'
+import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, searchTasks, STAGES, TaskController } from './task.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -339,6 +339,18 @@ function registerIpc() {
   })
   // 工作区：置顶（侧栏和工作区菜单里排在前面）；移出列表（只是不显示，文件夹和任务记录都不动）
   handle('project:pin', (id, on) => { if (!store.update(id, { pinned: !!on })) throw new Error('项目不存在'); return store.list() })
+  // 工程主页右栏：工程说明（写进每个任务的第一条消息）、参考资料（工程内的相对路径）
+  handle('project:setInfo', (id, info) => {
+    const patch = {}
+    if (info && typeof info.notes === 'string') patch.notes = info.notes.slice(0, 4000)
+    if (info && Array.isArray(info.refs)) {
+      patch.refs = [...new Set(info.refs.map((x) => String(x || '').trim().replace(/\\/g, '/')).filter((x) => x && !isAbsolute(x) && !/^[A-Za-z]:/.test(x) && !x.split('/').includes('..')))].slice(0, 50)
+    }
+    const p = store.update(id, patch)
+    if (!p) throw new Error('项目不存在')
+    for (const c of allCtls()) if (c.project && c.project.id === id) Object.assign(c.project, patch)
+    return store.list()
+  })
   handle('project:hide', (id) => {
     if (ctl.project && ctl.project.id === id) throw new Error('正在用的工作区不能移出，先切到别的工作区')
     const c = ctls.get(id)
@@ -364,6 +376,8 @@ function registerIpc() {
   handle('task:recent', (limit) => Object.fromEntries(store.list().filter((p) => !p.hidden).map((p) => [p.id, readHistory(P.data, p.id, Math.max(1, Math.min(500, Number(limit) || 12)))])))
   handle('task:peek', (id) => ctl.peekTask(id))
   // 搜索（Ctrl K）：所有工程（没移出列表的），或只搜当前工程
+  // 产出页：所有工程的任务写过的文件
+  handle('task:outputs', () => listOutputs(P.data, store.list().filter((p) => !p.hidden)))
   handle('task:search', (q, scope) => searchTasks(P.data, store.list().filter((p) => !p.hidden && (scope !== 'current' || p.id === ctl.project?.id)), q))
   // 设置页“测试连接”：用部门模型回一句话，量用时；密钥只在主进程里用
   handle('model:test', async () => {
@@ -465,6 +479,18 @@ function registerIpc() {
   handle('skills:pin', (name, on) => lib.setPinned(String(name), !!on))
   handle('sys:openPath', async (rel) => { const err = await shell.openPath(projectPath(rel)); if (err) throw new Error(err) })
   handle('sys:showItem', (rel) => shell.showItemInFolder(projectPath(rel)))
+  // 产出页：打开任意工程（不一定是当前工程）里的文件，或在资源管理器里定位；路径不许越出那个工程
+  handle('sys:openIn', async (pid, rel, how) => {
+    const p = store.get(pid)
+    if (!p) throw new Error('工程不存在')
+    const abs = resolve(p.path, String(rel || ''))
+    const r = relative(p.path, abs)
+    if (r.startsWith('..') || isAbsolute(r)) throw new Error('路径越出工程')
+    if (!existsSync(abs)) throw new Error('文件已经不在了')
+    if (how === 'show') { shell.showItemInFolder(abs); return }
+    const err = await shell.openPath(abs)
+    if (err) throw new Error(err)
+  })
   // 皮肤：Windows 标题栏右侧的系统按钮区（最小化、关闭）跟着换底色
   handle('sys:titlebar', (c) => {
     const ok = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)

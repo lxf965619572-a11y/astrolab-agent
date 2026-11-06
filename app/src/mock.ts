@@ -604,6 +604,7 @@ export function createMockApi(): AstroApi {
       },
       async add() { return null },
       async pin(id, on) { const p = projects.find((x) => x.id === id); if (p) p.pinned = on; return [...projects] },
+      async setInfo(id, info) { const p = projects.find((x) => x.id === id); if (p) Object.assign(p, info); return [...projects] },
       async hide(id) { if (id === project.id) throw new Error('正在用的工作区不能移出，先切到别的工作区'); const p = projects.find((x) => x.id === id); if (p) { p.hidden = true; p.pinned = false }; return appState() },
       async files(q) { const t = q.toLowerCase(); return FILES.filter((f) => f.toLowerCase().includes(t)) },
       async tree() { return [...new Set([...FILES, ...files.keys()])].sort() },
@@ -714,6 +715,13 @@ export function createMockApi(): AstroApi {
       async remove(pid, id) { if (task?.id === id) { if (['starting', 'running', 'asking'].includes(status)) throw new Error('任务进行中，先停止再删除'); task = null; act = createActivity(); status = 'idle'; pushState() } const l = historyOf(pid); const i = l.findIndex((h) => h.id === id); if (i >= 0) l.splice(i, 1); return true },
       async recent(limit = 12) { return Object.fromEntries(projects.filter((p) => !p.hidden).map((p) => [p.id, historyOf(p.id).slice(0, limit)])) },
       async peek(id) { const t = historyOf(project.id).find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem), current: false } },
+      async outputs() {
+        const exts: Record<string, string[]> = { 需求分析: ['md', 'docx'], 概要设计: ['md', 'docx'], 详细设计: ['md', 'docx'], 单元测试: ['c', 'md'], 代码走查: ['md', 'xlsx'], 信息流梳理: ['svg', 'md'], 编码: ['c'] }
+        return projects.filter((p) => !p.hidden).flatMap((p) => historyOf(p.id).filter((t) => !t.archived).flatMap((t) => (exts[t.stageName] || ['md']).map((e, i) => ({
+          pid: p.id, pname: p.name, taskId: t.id, taskTitle: t.title, stageName: t.stageName, startedAt: t.startedAt,
+          path: `doc/${t.stageName}-${t.id.slice(-4)}.${e}`, exists: i < 2, size: 12000 + i * 3000, mtime: t.startedAt + 600000,
+        })))).sort((a, b) => b.mtime - a.mtime)
+      },
       async search(q, scope = 'all') {
         const terms = q.toLowerCase().split(/\s+/).filter(Boolean)
         const ps = projects.filter((p) => !p.hidden && (scope === 'all' || p.id === project.id))
@@ -835,7 +843,7 @@ export function createMockApi(): AstroApi {
       async reject(_id, ref) { await wait(600); return { branch: ref, title: '插件：crc-tools', rejected: true, reasonSaved: true } },
       async create(kind, prompt) { return api.task.start({ stage: kind, prompt, files: [], options: { report: false } }) },
     },
-    sys: { async openPath() {}, async showItem() {}, async copy() {} },
+    sys: { async openPath() {}, async showItem() {}, async copy() {}, async openIn() {} },
   }
 
   // 截图检查用：直接进入某个画面

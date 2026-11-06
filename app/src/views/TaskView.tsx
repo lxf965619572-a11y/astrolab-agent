@@ -110,6 +110,11 @@ function ConvHead({ inCode }: { inCode: boolean }) {
     <header className={`conv-head ${live ? 'live' : ''}`}>
       <div className="conv-head-row">
         <div className="conv-title">
+          {ts.project && (
+            <div className="conv-crumb">
+              <Button className="crumb-proj" onPress={() => void useStore.getState().openProjectHome(ts.project!.id)} aria-label={`回到工程 ${ts.project.name} 的主页`}><Icon name="folder" size={12} stroke={1.8} />{ts.project.name}</Button>
+            </div>
+          )}
           <div className="conv-title-row">
             {renaming && pid
               ? <RenameInput value={task.title} className="conv-rename" onDone={(v) => { setRenaming(false); if (v !== null) void useStore.getState().renameTask(pid, task, v) }} />
@@ -206,6 +211,7 @@ function Progress({ todos, live }: { todos: Todo[]; live: boolean }) {
 
 type Row =
   | { key: string; type: 'item'; item: Item }
+  | { key: string; type: 'run'; items: Item[] }
   | { key: string; type: 'queued'; id: string; text: string }
   | { key: 'live'; type: 'live' }
   | { key: 'status'; type: 'status' }
@@ -215,9 +221,15 @@ function Stream({ inCode }: { inCode: boolean }) {
   const items = useStore((s) => s.items)
   const ts = useStore((s) => s.ts)!
   const rows = useMemo<Row[]>(() => {
-    const r: Row[] = items
-      .filter((i) => i.kind !== 'tools' || !(i.hidden || i.calls.every((c) => c.hidden)))
-      .map((item) => ({ key: item.id, type: 'item', item }))
+    // 两句话之间连续的动作（读文件、改文件、运行命令、思考）合成一行摘要，点开看每一步；提问（ask）单独一行
+    const r: Row[] = []
+    const groupable = (i: Item) => i.kind === 'thinking' || (i.kind === 'tools' && i.group !== 'ask')
+    for (const item of items.filter((i) => i.kind !== 'tools' || !(i.hidden || i.calls.every((c) => c.hidden)))) {
+      const last = r[r.length - 1]
+      if (groupable(item) && last && last.type === 'run') last.items.push(item)
+      else if (groupable(item) && last && last.type === 'item' && groupable(last.item)) r[r.length - 1] = { key: `run-${last.item.id}`, type: 'run', items: [last.item, item] }
+      else r.push({ key: item.id, type: 'item', item })
+    }
     for (const q of ts.queued) r.push({ key: `q-${q.id}`, type: 'queued', id: q.id, text: q.text })
     if (ts.status === 'starting' || (['running', 'asking'].includes(ts.status) && ts.summary.current)) r.push({ key: 'live', type: 'live' })
     else if (['done', 'stopped', 'error'].includes(ts.status)) r.push({ key: 'status', type: 'status' })
@@ -226,15 +238,25 @@ function Stream({ inCode }: { inCode: boolean }) {
   const parent = useRef<HTMLDivElement>(null)
   const v = useVirtualizer({ count: rows.length, getScrollElement: () => parent.current, estimateSize: () => 48, overscan: 10, getItemKey: (i) => rows[i].key })
   const stick = useRef(true)
+  // 往上翻看记录时不自动跟随；右下角出现“回到最新”
+  const [away, setAway] = useState(false)
   useEffect(() => {
     const el = parent.current
     if (!el) return
-    const onScroll = () => { stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80 }
+    const onScroll = () => { const at = el.scrollHeight - el.scrollTop - el.clientHeight < 80; stick.current = at; setAway(!at) }
     el.addEventListener('scroll', onScroll)
     return () => el.removeEventListener('scroll', onScroll)
   }, [])
   useEffect(() => { if (stick.current && rows.length) v.scrollToIndex(rows.length - 1, { align: 'end' }) }, [rows, v])
+  const toLatest = () => { stick.current = true; setAway(false); if (rows.length) v.scrollToIndex(rows.length - 1, { align: 'end' }) }
+  // 动作摘要行展开与否：点过的按点的；没点过的，任务进行中时最后一组展开（看得到正在做什么），其余收起
+  const [openRuns, setOpenRuns] = useState<Record<string, boolean>>({})
+  const live = LIVE.includes(ts.status)
+  const lastRun = [...rows].reverse().find((x) => x.type === 'run' || x.type === 'item')
+  const isOpen = (key: string) => openRuns[key] ?? (live && lastRun?.key === key)
   return (
+    <div className="conv-scroll-wrap">
+    {away && <Button className="to-latest" onPress={toLatest}><Icon name="arrow" size={14} stroke={2} className="down" />回到最新</Button>}
     <div className="conv-scroll" ref={parent}>
       <div className="conv-col" style={{ height: v.getTotalSize() }}>
         {v.getVirtualItems().map((r) => {
@@ -242,12 +264,50 @@ function Stream({ inCode }: { inCode: boolean }) {
           return (
             <div key={r.key} data-index={r.index} ref={v.measureElement} className="conv-vrow" style={{ transform: `translateY(${r.start}px)` }}>
               {row.type === 'item' ? <ItemRow item={row.item} />
+                : row.type === 'run' ? <RunGroup items={row.items} open={isOpen(row.key)} onToggle={() => setOpenRuns((m) => ({ ...m, [row.key]: !isOpen(row.key) }))} />
                 : row.type === 'queued' ? <div className="queued"><div className="bubble user pending">{row.text}</div><div className="queued-chip"><Icon name="check" size={12} stroke={2.4} />{ts.status === 'starting' ? '已收到，任务开始后送到' : '已收到，下一步之前送到'}</div></div>
                   : row.type === 'live' ? <LiveRow />
                     : <StatusRow inCode={inCode} />}
             </div>
           )
         })}
+      </div>
+    </div>
+    </div>
+  )
+}
+
+/** 连续几步动作的摘要：“读了 12 个文件、改了 3 个文件、运行了 2 条命令、思考 20 秒”，点开逐步看 */
+function RunGroup({ items, open, onToggle }: { items: Item[]; open: boolean; onToggle: () => void }) {
+  const read = new Set<string>(); const write = new Set<string>()
+  let cmds = 0, search = 0, other = 0, think = 0, add = 0, rem = 0, err = false, running = false
+  for (const it of items) {
+    if (it.kind === 'thinking') { think += it.ms || 0; continue }
+    if (it.kind !== 'tools') continue
+    for (const c of it.calls.filter((x) => !x.hidden)) {
+      if (it.group === 'read') read.add(c.path || c.summary)
+      else if (it.group === 'write') { write.add(c.path || c.summary); add += c.added || 0; rem += c.removed || 0 }
+      else if (it.group === 'run') cmds++
+      else if (it.group === 'search') search++
+      else other++
+      if (c.status === 'error') err = true
+      if (c.status === 'running') running = true
+    }
+  }
+  const parts = [read.size && `读了 ${read.size} 个文件`, write.size && `改了 ${write.size} 个文件`, cmds && `运行了 ${cmds} 条命令`, search && `搜索 ${search} 次`, other && `用了 ${other} 次工具`, think && `思考 ${duration(think)}`].filter(Boolean) as string[]
+  const tone = running ? 'run' : err ? 'err' : 'ok'
+  return (
+    <div className={`act-row run-group ${tone}`}>
+      <span className={`act-icon ${tone}`}><Icon name={running ? 'clock' : err ? 'warn' : 'check'} size={13} stroke={2.2} /></span>
+      <div className="act-body">
+        <Button className="act-toggle" onPress={onToggle} aria-expanded={open}>
+          <span>{parts.join('、') || `${items.length} 步`}</span>
+          {add ? <span className="add mono small">+{add}</span> : null}
+          {rem ? <span className="rem mono small">−{rem}</span> : null}
+          <span className="muted small">{items.length} 步</span>
+          <Icon name="chevron" size={14} stroke={2} className={`chev ${open ? 'up' : ''}`} />
+        </Button>
+        {open && <div className="run-items">{items.map((it) => <ActRow key={it.id} item={it} />)}</div>}
       </div>
     </div>
   )
@@ -397,6 +457,7 @@ function Composer({ inputRef, pendingQuestion }: { inputRef: React.RefObject<HTM
   const text = useStore((s) => s.chatDraft)
   const setText = useStore((s) => s.setChatDraft)
   const live = LIVE.includes(ts.status)
+  const toggle = useToggle()
   // 追问也能带技能和文件（和发起页一样：输入 / 选技能、“技能”按钮、“添加文件”）
   const allSkills = useMemo(() => app?.skills || [], [app?.skills])
   const byName = useMemo(() => new Map(allSkills.map((s) => [s.name, s])), [allSkills])
@@ -433,6 +494,8 @@ function Composer({ inputRef, pendingQuestion }: { inputRef: React.RefObject<HTM
       if (e.key === 'Tab') { e.preventDefault(); pick(slashList[slashSel].name); return }
     }
     if (slash !== null && e.key === 'Escape') { e.preventDefault(); setText(''); return }
+    // 输入框是空的、任务在进行：Esc 停止（和 Claude 一样）
+    if (e.key === 'Escape' && !text && live) { e.preventDefault(); void toggle(); return }
     if (e.key === 'Backspace' && !text && picked.length) { e.preventDefault(); setPicked(picked.slice(0, -1)); return }
     if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); void send() }
   }
@@ -456,7 +519,7 @@ function Composer({ inputRef, pendingQuestion }: { inputRef: React.RefObject<HTM
         )}
         <label className="sr-only" htmlFor="chat-input">补充要求</label>
         <textarea id="chat-input" ref={inputRef} rows={2} value={text}
-          placeholder={ts.status === 'stopped' ? '补一句纠正说明，发送后接着做' : live ? '补充要求，下一步生效（不用等它做完）。输入 / 选技能' : '追问或提出修改。输入 / 选技能'}
+          placeholder={ts.status === 'stopped' ? '补一句纠正说明，发送后接着做' : live ? '补充要求，下一步生效（不用等它做完）。输入 / 选技能，Esc 停止' : '追问或提出修改。输入 / 选技能'}
           onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown} />
         <div className="chips conv-chips">
           {chosen.map((s) => (
