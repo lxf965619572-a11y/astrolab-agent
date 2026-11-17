@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1534" height="424" viewBox="0 0 1534 424" role="img" aria-label="PCU 软件总体信息流（示例） · 链路：间接指令（到 负载继电器）" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif">
+  <!-- info-flow-diagram:generated 1.1.0 -->
+  <defs>
+    <marker id="arrow-data" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2563eb"/></marker>
+    <marker id="arrow-data-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#2563eb"/></marker>
+    <marker id="arrow-command" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#d97706"/></marker>
+    <marker id="arrow-command-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#d97706"/></marker>
+    <marker id="arrow-event" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#7c3aed"/></marker>
+    <marker id="arrow-event-start" viewBox="0 0 10 10" refX="1" refY="5" markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto"><path d="M10,0 L0,5 L10,10 z" fill="#7c3aed"/></marker>
+  </defs>
+  <rect width="1534" height="424" fill="#ffffff"/>
+  <text x="32" y="46" font-size="20" font-weight="700" fill="#0f172a">PCU 软件总体信息流（示例） · 链路：间接指令（到 负载继电器）</text>
+  <g class="lane" data-group="L0">
+    <rect x="32" y="72" width="230" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <path d="M 32 86 Q 32 72 46 72 H 248 Q 262 72 262 86 V 118 H 32 Z" fill="#64748b" fill-opacity="0.12"/>
+    <text x="147" y="99.5" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">
+      <tspan x="147" y="99.5">起点</tspan>
+    </text>
+  </g>
+  <g class="lane" data-group="L1">
+    <rect x="329" y="72" width="230" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <path d="M 329 86 Q 329 72 343 72 H 545 Q 559 72 559 86 V 118 H 329 Z" fill="#64748b" fill-opacity="0.12"/>
+    <text x="444" y="99.5" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">
+      <tspan x="444" y="99.5">第 1 步</tspan>
+    </text>
+  </g>
+  <g class="lane" data-group="L2">
+    <rect x="623" y="72" width="230" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <path d="M 623 86 Q 623 72 637 72 H 839 Q 853 72 853 86 V 118 H 623 Z" fill="#64748b" fill-opacity="0.12"/>
+    <text x="738" y="99.5" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">
+      <tspan x="738" y="99.5">第 2 步</tspan>
+    </text>
+  </g>
+  <g class="lane" data-group="L3">
+    <rect x="930" y="72" width="230" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <path d="M 930 86 Q 930 72 944 72 H 1146 Q 1160 72 1160 86 V 118 H 930 Z" fill="#64748b" fill-opacity="0.12"/>
+    <text x="1045" y="99.5" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">
+      <tspan x="1045" y="99.5">第 3 步</tspan>
+    </text>
+  </g>
+  <g class="lane" data-group="L4">
+    <rect x="1271.5" y="72" width="230" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+    <path d="M 1271.5 86 Q 1271.5 72 1285.5 72 H 1487.5 Q 1501.5 72 1501.5 86 V 118 H 1271.5 Z" fill="#64748b" fill-opacity="0.12"/>
+    <text x="1386.5" y="99.5" text-anchor="middle" font-size="13" font-weight="700" fill="#64748b">
+      <tspan x="1386.5" y="99.5">第 4 步</tspan>
+    </text>
+  </g>
+  <g class="edges">
+    <path d="M 235 188.4 C 295.5 188.4 295.5 193.8 356 193.8" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 235 188.4 C 295.5 188.4 295.5 193.8 356 193.8" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n2" data-to="n7"/>
+    <path d="M 532 179.8 C 591 179.8 591 166 650 166" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 532 179.8 C 591 179.8 591 166 650 166" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n7" data-to="n12"/>
+    <path d="M 532 193.8 C 591 193.8 591 180 650 180" fill="none" stroke="#ffffff" stroke-width="4.8" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 532 193.8 C 591 193.8 591 180 650 180" fill="none" stroke="#2563eb" stroke-width="1.8" stroke-linecap="round" marker-end="url(#arrow-data)" data-from="n7" data-to="n12"/>
+    <path d="M 532 207.8 C 591 207.8 591 270 650 270" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 532 207.8 C 591 207.8 591 270 650 270" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n7" data-to="n13"/>
+    <path d="M 826 173 C 891.5 173 891.5 195.3 957 195.3" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 826 173 C 891.5 173 891.5 195.3 957 195.3" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n12" data-to="n18"/>
+    <path d="M 826 270 C 891.5 270 891.5 209.3 957 209.3" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 826 270 C 891.5 270 891.5 209.3 957 209.3" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n13" data-to="n18"/>
+    <path d="M 1133 202.3 C 1215.7 202.3 1215.7 194.7 1298.5 194.7" fill="none" stroke="#ffffff" stroke-width="5.6" stroke-opacity="0.85" stroke-linecap="round"/>
+    <path d="M 1133 202.3 C 1215.7 202.3 1215.7 194.7 1298.5 194.7" fill="none" stroke="#d97706" stroke-width="2.6" stroke-linecap="round" marker-end="url(#arrow-command)" data-from="n18" data-to="n19"/>
+  </g>
+  <g class="edge-labels">
+    <rect x="274" y="182.1" width="43" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="295.5" y="195.1" text-anchor="middle" font-size="11" fill="#d97706">指令码</text>
+    <rect x="575" y="163.9" width="32" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="591" y="176.9" text-anchor="middle" font-size="11" fill="#d97706">指令</text>
+    <rect x="539.8" y="183.9" width="32" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="555.8" y="196.9" text-anchor="middle" font-size="11" fill="#2563eb">参数</text>
+    <rect x="575" y="229.9" width="32" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="591" y="242.9" text-anchor="middle" font-size="11" fill="#d97706">档位</text>
+    <rect x="870" y="175.2" width="43" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="891.5" y="188.2" text-anchor="middle" font-size="11" fill="#d97706">加断电</text>
+    <rect x="865" y="230.7" width="53" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="891.5" y="243.7" text-anchor="middle" font-size="11" fill="#d97706">4 路档位</text>
+    <rect x="1172" y="189.5" width="87.4" height="18" rx="4" fill="#ffffff" fill-opacity="0.94" stroke="#e2e8f0"/>
+    <text x="1215.7" y="202.5" text-anchor="middle" font-size="11" fill="#d97706">80/160 ms 脉冲</text>
+  </g>
+  <g class="nodes">
+    <g class="node focus" data-id="n2">
+      <rect x="59" y="147.4" width="176" height="82" rx="8" fill="#ffffff" stroke="#0f766e" stroke-width="3"/>
+      <text x="67" y="161.4" font-size="10" font-weight="700" fill="#0f766e">起点 · 星务计算机（BC）</text>
+      <text x="147" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="147" y="181.1">间接指令</tspan>
+      </text>
+      <text x="147" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="147" y="211.1">子地址 2，1 字（任务书 4.3.2；</tspan>
+        <tspan x="147" y="225.1">ICD 表 2）</tspan>
+      </text>
+    </g>
+    <g class="node pending" data-id="n7">
+      <rect x="356" y="152.8" width="176" height="82" rx="8" fill="#fffbeb" stroke="#7c3aed" stroke-width="1.4" stroke-dasharray="5 3"/>
+      <circle cx="522" cy="162.8" r="3.2" fill="#d97706"/>
+      <text x="364" y="166.8" font-size="10" font-weight="700" fill="#7c3aed">1553B 总线（A/B）</text>
+      <text x="444" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="444" y="186.5">接收 BC 消息</tspan>
+      </text>
+      <text x="444" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="444" y="216.5">RT 地址 12/21【待确认】（任</tspan>
+        <tspan x="444" y="230.5">务书 6.1；ICD 表 1）</tspan>
+      </text>
+    </g>
+    <g class="node" data-id="n12">
+      <rect x="650" y="132" width="176" height="82" rx="8" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+      <text x="658" y="146" font-size="10" font-weight="700" fill="#b45309">应用软件</text>
+      <text x="738" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="738" y="165.7">遥控指令处理</tspan>
+      </text>
+      <text x="738" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="738" y="195.7">指令码执行（任务书 4.3.2；</tspan>
+        <tspan x="738" y="209.7">ICD 表 5）</tspan>
+      </text>
+    </g>
+    <g class="node" data-id="n13">
+      <rect x="650" y="236" width="176" height="68" rx="8" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+      <text x="658" y="250" font-size="10" font-weight="700" fill="#b45309">应用软件</text>
+      <text x="738" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="738" y="269.7">充电控制</tspan>
+      </text>
+      <text x="738" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="738" y="299.7">4 路档位 OC（任务书 4.5.1）</tspan>
+      </text>
+    </g>
+    <g class="node pending" data-id="n18">
+      <rect x="957" y="161.3" width="176" height="82" rx="8" fill="#fffbeb" stroke="#0369a1" stroke-width="1.4" stroke-dasharray="5 3"/>
+      <circle cx="1123" cy="171.3" r="3.2" fill="#d97706"/>
+      <text x="965" y="175.3" font-size="10" font-weight="700" fill="#0369a1">执行机构</text>
+      <text x="1045" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="1045" y="195">OC 指令输出</tspan>
+      </text>
+      <text x="1045" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="1045" y="225">24 路；80/160 ms【待确认】</tspan>
+        <tspan x="1045" y="239">（任务书 4.4、5、6.2）</tspan>
+      </text>
+    </g>
+    <g class="node" data-id="n19">
+      <rect x="1298.5" y="153.7" width="176" height="82" rx="8" fill="#ffffff" stroke="#0369a1" stroke-width="1.4"/>
+      <text x="1306.5" y="167.7" font-size="10" font-weight="700" fill="#0369a1">执行机构</text>
+      <text x="1386.5" text-anchor="middle" font-size="13" font-weight="600" fill="#0f172a">
+        <tspan x="1386.5" y="187.4">负载继电器</tspan>
+      </text>
+      <text x="1386.5" text-anchor="middle" font-size="11" fill="#475569">
+        <tspan x="1386.5" y="217.4">载荷 / 加热器 / OBC（任务书</tspan>
+        <tspan x="1386.5" y="231.4">4.4）</tspan>
+      </text>
+    </g>
+  </g>
+  <g class="legend">
+    <text x="32" y="360" font-size="11" font-weight="700" fill="#334155">图例</text>
+    <line x1="76" y1="356" x2="100" y2="356" stroke="#2563eb" stroke-width="1.8" marker-end="url(#arrow-data)"/>
+    <text x="106" y="360" font-size="11" fill="#475569">数据流</text>
+    <line x1="161" y1="356" x2="185" y2="356" stroke="#d97706" stroke-width="2.6" marker-end="url(#arrow-command)"/>
+    <text x="191" y="360" font-size="11" fill="#475569">控制流</text>
+    <rect x="246" y="349" width="24" height="14" rx="4" fill="#fffbeb" stroke="#b45309" stroke-dasharray="5 3"/>
+    <text x="276" y="360" font-size="11" fill="#475569">待确认</text>
+    <rect x="331" y="349" width="24" height="14" rx="4" fill="#ffffff" stroke="#334155" stroke-width="2.5"/>
+    <text x="361" y="360" font-size="11" fill="#475569">链路起点</text>
+  </g>
+  <text x="1502" y="412" text-anchor="end" font-size="10" fill="#64748b">依据：PCU 软件研制任务书 4.2～4.7、5、6.1、7；1553B ICD 表 1～5（虚构演示材料）</text>
+</svg>

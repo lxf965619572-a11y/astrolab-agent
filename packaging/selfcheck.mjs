@@ -120,6 +120,7 @@ const st = [
   ['单元测试服务 utest', 'utest', APP],
   ['文档服务 docgen + docreader', 'docgen', WS],
   ['静态分析服务 cppcheck', 'cppcheck', WS],
+  ['信息流图服务 infoflow', 'infoflow', WS],
 ]
 for (const [name, svc, cwd] of st) {
   const dir = join(APP, 'mcp', svc)

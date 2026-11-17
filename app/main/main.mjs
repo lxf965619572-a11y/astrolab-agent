@@ -728,6 +728,8 @@ async function boot() {
   })
   const upNote = updates.boot()
   if (upNote) bootNotes.push(upNote)
+  // 装过、后来并入内置的插件（如 info-flow-diagram）：已经不加载，提醒卸载
+  for (const x of lib.absorbedPlugins()) bootNotes.push(`插件“${x.title}”已经内置（技能 ${x.skills.join('、')}），现在用的是内置版本；可以在“技能与插件”里把这个插件卸载`)
   registerIpc()
   if (!store.list().length) {
     try {

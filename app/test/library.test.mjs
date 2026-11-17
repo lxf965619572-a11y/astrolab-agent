@@ -67,6 +67,25 @@ test('同步共享库、目录、安装技能和插件', async () => {
   assert.equal(lib.mcpServers('/n').length, 0)
 })
 
+test('插件里的技能已经内置：整个插件（技能和工具服务）不加载，也不能再装', async () => {
+  const { root, lib } = setup()
+  await lib.ensureMine()
+  await lib.sync('dept')
+  await lib.install('dept:plugin:crc-tools')
+  assert.equal(lib.mcpServers('/n').length, 1)
+  assert.deepEqual(lib.absorbedPlugins(), [])
+  // crc-check 改为内置（技能进 <root>/skills，工具服务进引擎配置）
+  put(root, 'skills/crc-check/SKILL.md', SKILL('crc-check', '核对报文 CRC（内置）'))
+  assert.equal(lib.mcpServers('/n').length, 0, '不再拉起插件的工具服务')
+  assert.ok(!lib.skillDirs().some((d) => d.includes('crc-tools')), '不再加载插件的技能目录')
+  const cards = lib.skillCards().filter((c) => c.name === 'crc-check')
+  assert.equal(cards.length, 1)
+  assert.equal(cards[0].source, 'builtin')
+  assert.deepEqual(lib.absorbedPlugins(), [{ name: 'crc-tools', title: 'CRC 工具', skills: ['crc-check'] }])
+  lib.uninstall('plugin', 'crc-tools')
+  await assert.rejects(lib.install('dept:plugin:crc-tools'), /已经内置/)
+})
+
 test('删掉没提交过的草稿（智能体只写了文件）：不报 pathspec 错误', async () => {
   const { lib } = setup()
   const mine = await lib.ensureMine()

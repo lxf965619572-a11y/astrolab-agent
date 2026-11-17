@@ -15,7 +15,7 @@ export function toolGroup(name) {
   if (name === 'skill') return 'skill'
   if (name === 'todo_write') return 'plan'
   if (name === 'ask_user_question') return 'ask'
-  if (name.startsWith('mcp__docgen__')) return 'doc'
+  if (name.startsWith('mcp__docgen__') || name.startsWith('mcp__infoflow__')) return 'doc'
   return 'other'
 }
 

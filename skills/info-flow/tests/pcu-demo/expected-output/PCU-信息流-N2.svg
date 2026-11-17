@@ -1,0 +1,581 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="2782" height="1502" viewBox="0 0 2782 1502" role="img" aria-label="PCU 软件总体信息流（示例） · N² 接口矩阵" font-family="Microsoft YaHei, PingFang SC, Noto Sans CJK SC, sans-serif">
+  <!-- info-flow-diagram:generated 1.2.0 -->
+  <rect width="2782" height="1502" fill="#ffffff"/>
+  <text x="32" y="46" font-size="20" font-weight="700" fill="#0f172a">PCU 软件总体信息流（示例） · N² 接口矩阵</text>
+  <text x="32" y="72" font-size="12" fill="#475569">行是发出方，列是接收方；第 i 行第 j 列写从 i 流向 j 的内容。对角线是节点本身。</text>
+  <rect x="62" y="96" width="768" height="24" rx="4" fill="#0f766e" fill-opacity="0.14"/>
+  <text x="446" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#0f766e">星务计算机（BC）</text>
+  <rect x="32" y="124" width="26" height="372" rx="4" fill="#0f766e" fill-opacity="0.14"/>
+  <text x="45" y="258" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">星</text>
+  <text x="45" y="272" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">务</text>
+  <text x="45" y="286" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">计</text>
+  <text x="45" y="300" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">算</text>
+  <text x="45" y="314" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">机</text>
+  <text x="45" y="328" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">（</text>
+  <text x="45" y="342" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">B</text>
+  <text x="45" y="356" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">C</text>
+  <text x="45" y="370" text-anchor="middle" font-size="11" font-weight="700" fill="#0f766e">）</text>
+  <rect x="830" y="96" width="384" height="24" rx="4" fill="#7c3aed" fill-opacity="0.14"/>
+  <text x="1022" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#7c3aed">1553B 总线（A/B）</text>
+  <rect x="32" y="496" width="26" height="186" rx="4" fill="#7c3aed" fill-opacity="0.14"/>
+  <text x="45" y="516" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">1</text>
+  <text x="45" y="530" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">5</text>
+  <text x="45" y="544" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">5</text>
+  <text x="45" y="558" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">3</text>
+  <text x="45" y="572" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">B</text>
+  <text x="45" y="586" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed"> </text>
+  <text x="45" y="600" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">总</text>
+  <text x="45" y="614" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">线</text>
+  <text x="45" y="628" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">（</text>
+  <text x="45" y="642" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">A</text>
+  <text x="45" y="656" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">/</text>
+  <text x="45" y="670" text-anchor="middle" font-size="11" font-weight="700" fill="#7c3aed">B</text>
+  <rect x="1214" y="96" width="768" height="24" rx="4" fill="#b45309" fill-opacity="0.14"/>
+  <text x="1598" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#b45309">应用软件</text>
+  <rect x="32" y="682" width="26" height="372" rx="4" fill="#b45309" fill-opacity="0.14"/>
+  <text x="45" y="851" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">应</text>
+  <text x="45" y="865" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">用</text>
+  <text x="45" y="879" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">软</text>
+  <text x="45" y="893" text-anchor="middle" font-size="11" font-weight="700" fill="#b45309">件</text>
+  <rect x="1982" y="96" width="256" height="24" rx="4" fill="#be123c" fill-opacity="0.14"/>
+  <text x="2110" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#be123c">采集电路</text>
+  <rect x="32" y="1054" width="26" height="124" rx="4" fill="#be123c" fill-opacity="0.14"/>
+  <text x="45" y="1099" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">采</text>
+  <text x="45" y="1113" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">集</text>
+  <text x="45" y="1127" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">电</text>
+  <text x="45" y="1141" text-anchor="middle" font-size="11" font-weight="700" fill="#be123c">路</text>
+  <rect x="2238" y="96" width="256" height="24" rx="4" fill="#0369a1" fill-opacity="0.14"/>
+  <text x="2366" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#0369a1">执行机构</text>
+  <rect x="32" y="1178" width="26" height="124" rx="4" fill="#0369a1" fill-opacity="0.14"/>
+  <text x="45" y="1223" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1">执</text>
+  <text x="45" y="1237" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1">行</text>
+  <text x="45" y="1251" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1">机</text>
+  <text x="45" y="1265" text-anchor="middle" font-size="11" font-weight="700" fill="#0369a1">构</text>
+  <rect x="2494" y="96" width="256" height="24" rx="4" fill="#4d7c0f" fill-opacity="0.14"/>
+  <text x="2622" y="112" text-anchor="middle" font-size="12" font-weight="700" fill="#4d7c0f">数据存储</text>
+  <rect x="32" y="1302" width="26" height="124" rx="4" fill="#4d7c0f" fill-opacity="0.14"/>
+  <text x="45" y="1347" text-anchor="middle" font-size="11" font-weight="700" fill="#4d7c0f">数</text>
+  <text x="45" y="1361" text-anchor="middle" font-size="11" font-weight="700" fill="#4d7c0f">据</text>
+  <text x="45" y="1375" text-anchor="middle" font-size="11" font-weight="700" fill="#4d7c0f">存</text>
+  <text x="45" y="1389" text-anchor="middle" font-size="11" font-weight="700" fill="#4d7c0f">储</text>
+  <rect x="64" y="126" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="126" y="146" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">遥测请求</text>
+  <text x="182" y="177" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="190" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="124" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="894" y="158" text-anchor="middle" font-size="11" fill="#d97706">遥测请求</text>
+  <rect x="958" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="124" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="192" y="188" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="254" y="208" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">间接指令</text>
+  <text x="310" y="239" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="318" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="186" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="894" y="220" text-anchor="middle" font-size="11" fill="#d97706">指令码</text>
+  <rect x="958" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="186" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="320" y="250" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="382" y="270" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">充电档位设置</text>
+  <text x="438" y="301" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="446" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="248" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="894" y="282" text-anchor="middle" font-size="11" fill="#d97706">档位</text>
+  <rect x="958" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="248" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="448" y="312" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="510" y="332" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">运行参数上注</text>
+  <text x="566" y="363" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="574" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="310" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="894" y="344" text-anchor="middle" font-size="11" fill="#2563eb">参数</text>
+  <rect x="958" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="310" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="576" y="374" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="638" y="394" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">时间同步广播</text>
+  <text x="694" y="425" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="702" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="372" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1150" y="406" text-anchor="middle" font-size="11" fill="#7c3aed">时间字</text>
+  <rect x="1214" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="372" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="704" y="436" width="124" height="58" rx="6" fill="#ffffff" stroke="#0f766e" stroke-width="1.4"/>
+  <text x="766" y="456" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">自测试 / 复位</text>
+  <text x="822" y="487" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="830" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="434" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1150" y="468" text-anchor="middle" font-size="11" fill="#d97706">方式码</text>
+  <rect x="1214" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="434" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="832" y="498" width="124" height="58" rx="6" fill="#fffbeb" stroke="#7c3aed" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="894" y="518" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">接收 BC 消息</text>
+  <rect x="958" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="496" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1406" y="530" text-anchor="middle" font-size="11" fill="#d97706">遥测请求</text>
+  <rect x="1470" y="496" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1534" y="523" text-anchor="middle" font-size="11" fill="#d97706">指令</text>
+  <text x="1534" y="537" text-anchor="middle" font-size="11" fill="#2563eb">参数</text>
+  <rect x="1598" y="496" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1662" y="530" text-anchor="middle" font-size="11" fill="#d97706">档位</text>
+  <rect x="1726" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="496" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="960" y="560" width="124" height="58" rx="6" fill="#fffbeb" stroke="#7c3aed" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="1022" y="580" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">发送遥测消息</text>
+  <text x="1078" y="611" text-anchor="end" font-size="10" fill="#b45309">无输出</text>
+  <rect x="1086" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="558" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1088" y="622" width="124" height="58" rx="6" fill="#ffffff" stroke="#7c3aed" stroke-width="1.4"/>
+  <text x="1150" y="642" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">方式码 / 广播</text>
+  <rect x="1214" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="620" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1406" y="654" text-anchor="middle" font-size="11" fill="#2563eb">时间码</text>
+  <rect x="1470" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="620" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1918" y="654" text-anchor="middle" font-size="11" fill="#d97706">启动自测试</text>
+  <rect x="1982" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="620" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1216" y="684" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1278" y="704" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">数据采集调度</text>
+  <rect x="1342" y="682" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1406" y="716" text-anchor="middle" font-size="11" fill="#2563eb">采集数据</text>
+  <rect x="1470" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="682" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1662" y="716" text-anchor="middle" font-size="11" fill="#2563eb">母线/蓄电池</text>
+  <rect x="1726" y="682" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1790" y="716" text-anchor="middle" font-size="11" fill="#2563eb">蓄电池电压</text>
+  <rect x="1854" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="682" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="744" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1022" y="778" text-anchor="middle" font-size="11" fill="#2563eb">遥测帧</text>
+  <rect x="1086" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1344" y="746" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1406" y="766" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">遥测组帧</text>
+  <rect x="1470" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="744" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2558" y="778" text-anchor="middle" font-size="11" fill="#2563eb">每 1 s 一帧</text>
+  <rect x="2622" y="744" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1472" y="808" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1534" y="828" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">遥控指令处理</text>
+  <rect x="1598" y="806" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1662" y="840" text-anchor="middle" font-size="11" fill="#d97706">充电档位</text>
+  <rect x="1726" y="806" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1790" y="840" text-anchor="middle" font-size="11" fill="#2563eb">过放门限</text>
+  <rect x="1854" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="806" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2302" y="840" text-anchor="middle" font-size="11" fill="#d97706">加断电</text>
+  <rect x="2366" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="806" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2558" y="840" text-anchor="middle" font-size="11" fill="#2563eb">参数三份写入</text>
+  <rect x="2622" y="806" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1600" y="870" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1662" y="890" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">充电控制</text>
+  <rect x="1726" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="868" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2302" y="902" text-anchor="middle" font-size="11" fill="#d97706">4 路档位</text>
+  <rect x="2366" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="868" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1728" y="932" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1790" y="952" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">过放保护</text>
+  <rect x="1854" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="930" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2302" y="964" text-anchor="middle" font-size="11" fill="#d97706">切除非关键负载</text>
+  <rect x="2366" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="930" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="992" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1022" y="1026" text-anchor="middle" font-size="11" fill="#2563eb">自检结果</text>
+  <rect x="1086" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1856" y="994" width="124" height="58" rx="6" fill="#ffffff" stroke="#b45309" stroke-width="1.4"/>
+  <text x="1918" y="1014" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">自检（BIT）</text>
+  <rect x="1982" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="992" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1054" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1278" y="1088" text-anchor="middle" font-size="11" fill="#2563eb">电压/电流</text>
+  <rect x="1342" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1984" y="1056" width="124" height="58" rx="6" fill="#ffffff" stroke="#be123c" stroke-width="1.4"/>
+  <text x="2046" y="1076" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">模拟量采集</text>
+  <text x="2102" y="1107" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="2110" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="1054" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1116" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1278" y="1150" text-anchor="middle" font-size="11" fill="#2563eb">温度</text>
+  <rect x="1342" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2112" y="1118" width="124" height="58" rx="6" fill="#ffffff" stroke="#be123c" stroke-width="1.4"/>
+  <text x="2174" y="1138" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">温度量采集</text>
+  <text x="2230" y="1169" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <rect x="2238" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="1116" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2240" y="1180" width="124" height="58" rx="6" fill="#fffbeb" stroke="#0369a1" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="2302" y="1200" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">OC 指令输出</text>
+  <rect x="2366" y="1178" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="2430" y="1212" text-anchor="middle" font-size="11" fill="#d97706">80/160 ms 脉冲</text>
+  <rect x="2494" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="1178" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2368" y="1242" width="124" height="58" rx="6" fill="#ffffff" stroke="#0369a1" stroke-width="1.4"/>
+  <text x="2430" y="1262" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">负载继电器</text>
+  <text x="2486" y="1293" text-anchor="end" font-size="10" fill="#b45309">无输出</text>
+  <rect x="2494" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2622" y="1240" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="1302" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1406" y="1336" text-anchor="middle" font-size="11" fill="#2563eb">历史遥测</text>
+  <rect x="1470" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1854" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2496" y="1304" width="124" height="58" rx="6" fill="#ffffff" stroke="#4d7c0f" stroke-width="1.4"/>
+  <text x="2558" y="1324" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">MRAM</text>
+  <rect x="2622" y="1302" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="62" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="190" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="318" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="446" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="574" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="702" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="830" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="958" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1086" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1214" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1342" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1470" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1598" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1726" y="1364" width="128" height="62" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.8"/>
+  <text x="1790" y="1398" text-anchor="middle" font-size="11" fill="#2563eb">默认门限</text>
+  <rect x="1854" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="1982" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2110" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2238" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2366" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2494" y="1364" width="128" height="62" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.8"/>
+  <rect x="2624" y="1366" width="124" height="58" rx="6" fill="#ffffff" stroke="#4d7c0f" stroke-width="1.4"/>
+  <text x="2686" y="1386" text-anchor="middle" font-size="12" font-weight="600" fill="#0f172a">EEPROM</text>
+  <text x="2742" y="1417" text-anchor="end" font-size="10" fill="#b45309">无输入</text>
+  <line x1="830" y1="124" x2="830" y2="1426" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="62" y1="496" x2="2750" y2="496" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="1214" y1="124" x2="1214" y2="1426" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="62" y1="682" x2="2750" y2="682" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="1982" y1="124" x2="1982" y2="1426" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="62" y1="1054" x2="2750" y2="1054" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="2238" y1="124" x2="2238" y2="1426" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="62" y1="1178" x2="2750" y2="1178" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="2494" y1="124" x2="2494" y2="1426" stroke="#94a3b8" stroke-width="1.2"/>
+  <line x1="62" y1="1302" x2="2750" y2="1302" stroke="#94a3b8" stroke-width="1.2"/>
+  <rect x="62" y="124" width="2688" height="1302" fill="none" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="32" y="1460" font-size="11" font-weight="700" fill="#334155">图例</text>
+  <text x="76" y="1460" font-size="11" fill="#2563eb">■ 数据流</text>
+  <text x="139.2" y="1460" font-size="11" fill="#d97706">■ 控制流</text>
+  <text x="202.5" y="1460" font-size="11" fill="#7c3aed">■ 事件流</text>
+  <text x="265.7" y="1460" font-size="11" fill="#b45309">无输入 / 无输出 / 孤立：请核对是否漏了接口</text>
+  <text x="2750" y="1486" text-anchor="end" font-size="10" fill="#64748b">依据：PCU 软件研制任务书 4.2～4.7、5、6.1、7；1553B ICD 表 1～5（虚构演示材料）</text>
+</svg>

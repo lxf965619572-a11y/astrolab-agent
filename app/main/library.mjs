@@ -547,6 +547,10 @@ export class Library {
     const info = kind === 'skill' ? skillInfo(src) : pluginInfo(src)
     if (!info) throw new Error(`${kind === 'skill' ? '技能缺 SKILL.md' : '插件缺 plugin.json'}：${dirName}`)
     if (existsSync(join(this.o.root, 'skills', info.name))) throw new Error(`“${info.name}”和内置技能同名，不能安装`)
+    if (kind === 'plugin') {
+      const dup = this.absorbed(src, info)
+      if (dup.length) throw new Error(`插件“${info.title}”里的技能 ${dup.join('、')} 已经内置，不用再安装`)
+    }
     const dest = join(this.installedDir, kind === 'skill' ? 'skills' : 'plugins', info.name)
     replaceDir(dest, (tmp) => cpSync(src, tmp, { recursive: true, filter: (p) => !/[\\/](\.git|\.utest)([\\/]|$)/.test(p) }))
     let commit = ''
@@ -562,12 +566,45 @@ export class Library {
     writeJson(join(this.installedDir, 'installed.json'), this.installed().filter((r) => !(r.kind === kind && r.name === name)))
   }
 
-  /** 引擎要加载的技能目录：内置、已安装的技能、已安装插件里的技能 */
+  /** 插件带的技能目录（绝对路径，已排除指到插件外和不存在的） */
+  pluginSkillDirs(dir, info) {
+    const out = []
+    for (const s of info ? info.skills : []) {
+      const p = resolve(dir, s)
+      if (relative(dir, p).startsWith('..') || !existsSync(p)) continue
+      out.push(...(existsSync(join(p, 'SKILL.md')) ? [p] : list(p).map((x) => join(p, x))))
+    }
+    return out
+  }
+
+  /**
+   * 插件里和内置技能同名的技能（返回名字列表）。非空表示这个插件已经并入内置
+   * （例如 info-flow-diagram 插件 2026-11 起内置为 skills/info-flow + mcp/infoflow）：
+   * 整个插件（技能和工具服务）都不再加载，免得同名技能和两套工具同时出现；也不能再安装。
+   */
+  absorbed(dir, info) {
+    return this.pluginSkillDirs(dir, info).map((d) => basename(d)).filter((n) => existsSync(join(this.o.root, 'skills', n, 'SKILL.md')))
+  }
+
+  /** 已安装、但已经并入内置的插件：[{ name, title, skills }]，启动时提醒用户卸载 */
+  absorbedPlugins() {
+    const out = []
+    for (const name of list(join(this.installedDir, 'plugins'))) {
+      const dir = join(this.installedDir, 'plugins', name)
+      const info = pluginInfo(dir)
+      const dup = info ? this.absorbed(dir, info) : []
+      if (dup.length) out.push({ name: info.name, title: info.title, skills: dup })
+    }
+    return out
+  }
+
+  /** 引擎要加载的技能目录：内置、已安装的技能、已安装插件里的技能（已并入内置的插件不算） */
   skillDirs() {
     const dirs = [join(this.o.root, 'skills'), join(this.installedDir, 'skills')]
     for (const name of list(join(this.installedDir, 'plugins'))) {
       const dir = join(this.installedDir, 'plugins', name)
       const info = pluginInfo(dir)
+      if (info && this.absorbed(dir, info).length) continue
       for (const s of info ? info.skills : []) {
         const p = resolve(dir, s)
         if (relative(dir, p).startsWith('..') || !existsSync(p)) continue
@@ -619,7 +656,7 @@ export class Library {
     for (const pn of list(join(this.installedDir, 'plugins'))) {
       const dir = join(this.installedDir, 'plugins', pn)
       const info = pluginInfo(dir)
-      if (!info) continue
+      if (!info || this.absorbed(dir, info).length) continue
       for (const s of info.skills) {
         const p = resolve(dir, s)
         if (relative(dir, p).startsWith('..') || !existsSync(p)) continue
@@ -641,6 +678,7 @@ export class Library {
     for (const name of list(join(this.installedDir, 'plugins'))) {
       const dir = join(this.installedDir, 'plugins', name)
       const info = pluginInfo(dir)
+      if (info && this.absorbed(dir, info).length) continue // 已并入内置：工具服务由引擎配置里的内置服务提供
       for (const m of info ? info.mcp : []) {
         const args = m.args.map((a) => (/\.(m?js|cjs)$/.test(a) && !isAbsolute(a) ? resolve(dir, a) : a))
         if (args.some((a) => isAbsolute(a) && relative(dir, a).startsWith('..') && /\.(m?js|cjs)$/.test(a))) continue // 不许指到插件外

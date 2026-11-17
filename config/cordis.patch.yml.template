@@ -44,6 +44,17 @@
         command: !!js process.execPath
         args: ['__STARTER_DIR__/mcp/knowledge/server.mjs']
 
+    # 信息流图服务：信息流模型 → 泳道信息流图（全图、总图、分图、链路图）、N² 接口矩阵、交互版 HTML（技能 skills/info-flow）
+    # 只用 Node 内置模块，不联网、不执行外部命令、不删除文件；只在工作区（DSH 的工作目录）里读写
+    - id: mcp-infoflow
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: infoflow
+        transport: stdio
+        command: !!js process.execPath
+        args: ['__STARTER_DIR__/mcp/infoflow/server.mjs']
+        toolCallTimeoutMs: 120000   # 300 个节点的模型一次出齐全部视图也在几秒内
+
     # 单元测试服务：主机上编译运行手写驱动/桩或 gtest，gcov 统计语句、分支、MC/DC 覆盖率
     # 编译器 UTEST_CC 等由 start-web.ps1 从 local.env 读入后继承；构建目录在工作区的 .utest 下
     - id: mcp-utest

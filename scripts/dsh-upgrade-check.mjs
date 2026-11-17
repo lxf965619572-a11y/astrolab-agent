@@ -209,7 +209,7 @@ for (const profile of ['sdk', 'web']) {
     const llm = map.get('llm-pi-ai')
     if (!llm || !/^\s+dept-llm:\s*$/m.test(llm.text)) must(area, 'llm-pi-ai 里没有 dept-llm 路由：模型连不上')
     else ok(area, 'llm-pi-ai 里有 dept-llm 路由')
-    for (const id of ['astrolab-bridge', 'astrolab-tool-ask-user', 'astrolab-read-fence', 'mcp-docgen', 'mcp-docreader', 'mcp-utest', 'mcp-cppcheck', 'mcp-knowledge']) {
+    for (const id of ['astrolab-bridge', 'astrolab-tool-ask-user', 'astrolab-read-fence', 'mcp-docgen', 'mcp-docreader', 'mcp-utest', 'mcp-cppcheck', 'mcp-knowledge', 'mcp-infoflow']) {
       if (!map.has(id)) must(area, `组合配置里没有 ${id}`)
     }
   }

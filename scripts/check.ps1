@@ -48,6 +48,10 @@ else {
     if ($LASTEXITCODE -ne 0) { $bad++ }
 }
 
+Write-Step '信息流图服务 infoflow（自测：布局、出图、N² 矩阵、交互版；不依赖 npm 包）'
+& node (Join-Path $Root 'mcp\infoflow\selftest.mjs')
+if ($LASTEXITCODE -ne 0) { $bad++ }
+
 Write-Step '单元测试服务 utest（编译运行自带的小例子）'
 if (-not (Test-Path (Join-Path $Root 'mcp\utest\node_modules'))) { Write-Fail '依赖未安装，运行 scripts\setup.ps1'; $bad++ }
 else {
@@ -61,7 +65,7 @@ if (Test-Path $DshBin) {
     $env:DSH_HOME = $DshHome
     Set-DshPrivacyEnv
     $dump = & node $DshBin --profile web --dump-config 2>$null | Out-String
-    foreach ($id in @('mcp-cppcheck', 'mcp-docreader', 'mcp-docgen', 'mcp-utest')) {
+    foreach ($id in @('mcp-cppcheck', 'mcp-docreader', 'mcp-docgen', 'mcp-utest', 'mcp-infoflow')) {
         if ($dump -match "id: $id") { Write-Ok "已加载 $id" } else { Write-Fail "组合配置中没有 $id，重新运行 setup.ps1 或检查 runtime\dsh-home\cordis.patch.yml"; $bad++ }
     }
     # Skill：DSH 直接读取本工程的 skills 目录（customSkillDirs），不再复制

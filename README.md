@@ -26,6 +26,7 @@ astrolab-agent/
 ├── mcp/docgen/         文档生成 MCP 服务：Markdown 套 Word 模板生成 .docx，表格导出 .xlsx
 ├── mcp/utest/          单元测试 MCP 服务：主机上编译运行手写驱动/桩或 gtest，gcov 统计语句、分支、MC/DC 覆盖率
 ├── mcp/knowledge/      知识库 MCP 服务：在我的库和共享库里检索、读取经验条目，记经验草稿（工作台用）
+├── mcp/infoflow/       信息流图 MCP 服务：信息流模型 → 泳道信息流图（全图、总图、分图、链路图）、N² 接口矩阵、交互版 HTML（不依赖 npm 包，说明见其中 README）
 ├── mcp/common/         上面几个服务共用的 ZIP/XML/路径模块（只用 Node 自带模块）
 ├── skills/coding/               编码 Skill（按详细设计写代码、提出矛盾、编译和静态检查、编码说明，含自查脚本）
 ├── skills/skill-authoring/、plugin-authoring/  和用户一起做技能、做插件（工作台的“创作”用）
@@ -37,6 +38,7 @@ astrolab-agent/
 ├── skills/preliminary-design/   概要设计 Skill（文档结构、体系结构检查表、时序分析方法、流程图写法、检查脚本）
 ├── skills/detailed-design/      详细设计 Skill（正向/逆向，文档结构、函数格式、设计检查表、流程图写法、检查脚本）
 ├── skills/unit-test-design/     单元测试设计 Skill（用例设计方法、驱动和桩约定、单元测试记录格式、按部门模板生成报告、检查脚本）
+├── skills/info-flow/            信息流梳理 Skill（任务书/需求/ICD → 信息流模型 → 总图、分图、链路图、N² 矩阵；原“我的库”插件 info-flow-diagram 1.2.0，11-17 改为内置）
 ├── sample/src/         示例代码：遥测帧打包/解析，故意埋了约 10 个缺陷
 ├── sample/docs/        示例软件研制任务书（虚构，.docx 由同名 .md 生成），埋了 20 个需求问题
 ├── sample/design/      设计示例（虚构）：tcu 热控单元软件（概要设计的输入）；oc_ctrl OC 指令输出（详细设计的输入）
@@ -348,6 +350,7 @@ node app/main/probe.mjs --base http://192.168.10.20:8000/v1        # 加 --write
 | 静态分析 | static-analysis | cppcheck；gjb-scan.mjs、metrics.mjs、check-sa.mjs、gen-sa-report.mjs | 复用走查评测用例的代码 | 11-03 新增，待试用；部门 TESTBED 结果按 CSV 接入 |
 | 确认测试 | confirmation-test | docreader、docgen；ct-results.mjs（导出执行记录表、导入结果）、check-ct.mjs、gen-ct-report.mjs | 虚构 TCU 需求片段（脚本自测） | 11-03 新增，待试用；智能体不执行测试，结果由测试人员填表导入 |
 | 研制总结 | dev-summary | docreader、docgen；info-sheet.mjs、check-summary.mjs、gen-summary.mjs | 虚构 TCU（Ⅰ、Ⅲ、Ⅳ类各生成一次） | 11-03 新增，待试用；只做Ⅰ、Ⅲ、Ⅳ类 |
+| 文档与图 | info-flow（信息流梳理） | docreader、infoflow（布局、出图、N² 矩阵、交互版） | PCU 任务书 + ICD（示例 2），`skills/info-flow/tests/pcu-demo` | 插件时期已试用（1.2.0）；11-17 改为内置，服务自测 44 项通过，待在工作台上用 PCU 用例走一遍 |
 
 **全流程验收 G3（2026-11-04 准备好材料，待跑）：**`evals\g3-pdus`，一个虚构的Ⅲ类软件从需求分析走到研制总结（11 个任务），每个环节埋了陷阱，覆盖 11-03 改造后的全部技能。步骤见其中的 README。
 
