@@ -9,7 +9,11 @@ $node = Get-NodeMajor
 if ($node) { Write-Ok $node.Text } else { Write-Fail '未找到 node'; $bad++ }
 
 Write-Step 'DSH'
-if (Test-Path $DshBin) { Write-Ok ("dsh " + (& node $DshBin --version)) } else { Write-Fail '未安装，运行 scripts\setup.ps1'; $bad++ }
+if (Test-Path $DshBin) {
+    $dshVer = "$(& node $DshBin --version)".Trim()
+    if ($dshVer -eq $DshVersion) { Write-Ok "dsh $dshVer" }
+    else { Write-Fail "装的是 $dshVer，config\dsh.json 锁定的是 $DshVersion，重新运行 scripts\setup.ps1"; $bad++ }
+} else { Write-Fail '未安装，运行 scripts\setup.ps1'; $bad++ }
 
 Write-Step 'PowerShell（DSH 在 Windows 上用它执行命令）'
 $pwsh7 = Get-Command pwsh -ErrorAction SilentlyContinue

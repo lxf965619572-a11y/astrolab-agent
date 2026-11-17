@@ -2,7 +2,9 @@
 //
 // 开发布局：<仓库>/app（本程序）、<仓库>/runtime/dsh、<仓库>/skills、<仓库>/config、<仓库>/sample
 // 安装布局：<安装目录>/app 与仓库相同（打包脚本复制），<安装目录>/tools（node、GCC、Cppcheck、Git）
-//   用户数据统一在 %LOCALAPPDATA%\AstroLab（设置、DSH 数据、任务记录、示例工作区），升级不会覆盖
+//   Windows：tools/node/node.exe、tools/ucrt64（GCC）、tools/cppcheck/cppcheck.exe
+//   Linux（麒麟等）：tools/node/bin/node；GCC、Cppcheck、Git、bubblewrap 用系统的（安装包可带离线 deb/rpm），或 tools/bin 下的
+//   用户数据统一在 %LOCALAPPDATA%\AstroLab（Linux：~/.local/share/AstroLab）（设置、DSH 数据、任务记录、示例工作区），升级不会覆盖
 // 环境变量可覆盖：ASTROLAB_ROOT、ASTROLAB_DATA、ASTROLAB_NODE、ASTROLAB_MOCK_ENGINE=1（不调用模型的模拟引擎）
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -30,7 +32,7 @@ export function resolvePaths(env = process.env) {
     mock,
     dshHome: join(data, 'dsh-home'),
     dshBin: mock ? join(APP_DIR, 'engine', 'mock-dsh.mjs') : join(root, 'runtime', 'dsh', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
-    nodePath: env.ASTROLAB_NODE || (installed ? join(tools, 'node', process.platform === 'win32' ? 'node.exe' : 'node') : findNode()),
+    nodePath: env.ASTROLAB_NODE || (installed ? bundledNode(tools) : findNode()),
     skillsDir: join(root, 'skills'),
     sampleSrc: join(root, 'sample'),
     template: join(root, 'config', 'cordis.patch.yml.template'),
@@ -42,6 +44,13 @@ export function resolvePaths(env = process.env) {
     logs: join(data, 'logs'),
     engineDir: join(data, 'engine'),
   }
+}
+
+/** 安装包里的 node：Windows 是 tools/node/node.exe；Linux 是官方压缩包的布局 tools/node/bin/node */
+export function bundledNode(tools, platform = process.platform) {
+  if (platform === 'win32') return join(tools, 'node', 'node.exe')
+  const bin = join(tools, 'node', 'bin', 'node')
+  return existsSync(bin) ? bin : join(tools, 'node', 'node')
 }
 
 function findNode() {
@@ -72,7 +81,9 @@ export function engineEnv(p, base = process.env) {
   if (!env.DEPT_LLM_API_KEY && env.DEEPSEEK_API_KEY) env.DEPT_LLM_API_KEY = env.DEEPSEEK_API_KEY
   if (p.tools) {
     const sepr = process.platform === 'win32' ? ';' : ':'
-    const extra = [join(p.tools, 'node'), join(p.tools, 'ucrt64', 'bin'), join(p.tools, 'cppcheck'), join(p.tools, 'git', 'cmd')].filter(existsSync)
+    const extra = (process.platform === 'win32'
+      ? [join(p.tools, 'node'), join(p.tools, 'ucrt64', 'bin'), join(p.tools, 'cppcheck'), join(p.tools, 'git', 'cmd')]
+      : [join(p.tools, 'node', 'bin'), join(p.tools, 'bin')]).filter(existsSync)
     const key = Object.keys(env).find((k) => k.toLowerCase() === 'path') || 'PATH'
     env[key] = [...extra, env[key] || ''].join(sepr)
     if (!env.UTEST_CC && existsSync(join(p.tools, 'ucrt64', 'bin', 'gcc.exe'))) env.UTEST_CC = join(p.tools, 'ucrt64', 'bin', 'gcc.exe')
@@ -95,6 +106,10 @@ export function modelConfig(env) {
     hasKey: !!(env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY),
     /** 和 cordis.patch.yml 里的 contextWindow 一致（vLLM 的 --max-model-len） */
     contextWindow: Number(env.DEPT_LLM_CONTEXT_WINDOW) || 1048576,
+    /** 和 cordis.patch.yml 里的 maxTokens 一致 */
+    maxTokens: Number(env.DEPT_LLM_MAX_TOKENS) || 65536,
+    /** 思考参数的写法（cordis.patch.yml 的 compat.thinkingFormat）：deepseek、chat-template、qwen-chat-template… */
+    thinkingFormat: env.DEPT_LLM_THINKING_FORMAT || 'deepseek',
   }
 }
 

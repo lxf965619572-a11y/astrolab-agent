@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=AstroLab
+Name[zh_CN]=AstroLab 研发智能体工作台
+GenericName=Agent Workbench
+GenericName[zh_CN]=部门研发智能体工作台
+Comment=部门研发智能体工作台
+Exec="@DEST@/start.sh" %U
+Icon=@DEST@/app/app/build/icon.png
+Terminal=false
+Categories=Development;IDE;
+StartupWMClass=AstroLab
+StartupNotify=true

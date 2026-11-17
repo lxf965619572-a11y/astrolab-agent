@@ -55,7 +55,7 @@ async function walk(root, dir = root, out = []) {
 }
 
 /** 给安装目录（或打好的包）生成清单；清单自己不列在里面 */
-export async function makeManifest(dir, { version, commit = '', date = new Date().toISOString() } = {}) {
+export async function makeManifest(dir, { version, commit = '', date = new Date().toISOString(), platform = '' } = {}) {
   if (!version) throw new Error('缺少版本号')
   const files = {}
   for (const rel of (await walk(dir)).sort()) {
@@ -63,7 +63,8 @@ export async function makeManifest(dir, { version, commit = '', date = new Date(
     const p = join(dir, ...rel.split('/'))
     files[rel] = { size: (await stat(p)).size, sha256: await hashFile(p) }
   }
-  return { version, date, commit, files }
+  // platform（如 linux-arm64）：Linux 安装包写上，更新时核对，免得把别的平台的包换进来；Windows 的包历来不写
+  return { version, date, commit, ...(platform ? { platform } : {}), files }
 }
 
 export function readManifest(dir) {
@@ -117,6 +118,8 @@ export async function stageUpdate({ updateDir, latest, installRoot, stageRoot, n
   const src = join(updateDir, rel)
   const next = await readJson(join(src, MANIFEST), 30000)
   if (next.version !== latest.version) throw new Error(`版本对不上：latest.json 是 ${latest.version}，清单是 ${next.version}`)
+  const here = `${process.platform}-${process.arch}`
+  if (next.platform && next.platform !== here) throw new Error(`更新位置上的是 ${next.platform} 的安装包，这台电脑是 ${here}：每种平台用自己的更新位置（ASTROLAB_UPDATE_DIR）`)
   for (const r of Object.keys(next.files || {})) safeRel(r)
   const plan = planUpdate(readManifest(installRoot), next)
   const dir = join(stageRoot, `v${next.version}`)

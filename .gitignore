@@ -40,3 +40,8 @@ sample/coding/*/doc/编码说明-*
 GJB_8114-2013md/
 
 evals/g3-pdus/results/
+
+# 临时产出：演示视频和生成脚本、生成文档的中间文件、Claude 输出的副本；工作台和打包都用不到
+output/
+Claude outputs/
+/AstroLab项目介绍与说明.docx

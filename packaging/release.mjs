@@ -1,6 +1,6 @@
 // 打包电脑上用：生成安装包的清单、把安装包发布到更新位置（内网共享文件夹）。
 //
-//   node packaging/release.mjs manifest <安装包目录> [--version 0.2.0] [--commit abc1234]
+//   node packaging/release.mjs manifest <安装包目录> [--version 0.2.0] [--commit abc1234] [--platform linux-arm64]
 //       给打好的包（runtime\dist\AstroLab）写 manifest.json：版本号（默认取 app\app\package.json）和每个文件的 sha256。
 //       build-offline.ps1 最后一步会调用。
 //   node packaging/release.mjs publish <安装包目录> <更新位置> [--notes "这次改了什么"] [--force]
@@ -23,13 +23,13 @@ function args(argv) {
   return { pos, opt }
 }
 
-export async function writePackageManifest(pkg, { version, commit } = {}) {
+export async function writePackageManifest(pkg, { version, commit, platform } = {}) {
   if (!version) {
     const pj = join(pkg, 'app', 'app', 'package.json')
     if (!existsSync(pj)) throw new Error(`找不到 ${pj}，用 --version 指定版本号`)
     version = JSON.parse(readFileSync(pj, 'utf8')).version
   }
-  const m = await makeManifest(pkg, { version, commit })
+  const m = await makeManifest(pkg, { version, commit, platform })
   await writeFile(join(pkg, MANIFEST), JSON.stringify(m, null, 1))
   return m
 }
@@ -63,7 +63,7 @@ const isMain = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(imp
 if (isMain) {
   const { pos, opt } = args(process.argv.slice(2))
   const [cmd, a, b] = pos
-  const run = cmd === 'manifest' && a ? writePackageManifest(resolve(a), { version: opt.version, commit: opt.commit }).then((m) => console.log(`manifest.json：版本 ${m.version}，${Object.keys(m.files).length} 个文件`))
+  const run = cmd === 'manifest' && a ? writePackageManifest(resolve(a), { version: opt.version, commit: opt.commit, platform: typeof opt.platform === 'string' ? opt.platform : '' }).then((m) => console.log(`manifest.json：版本 ${m.version}，${Object.keys(m.files).length} 个文件`))
     : cmd === 'publish' && a && b ? publish(resolve(a), resolve(b), { notes: opt.notes === true ? '' : opt.notes, force: !!opt.force })
       : Promise.reject(new Error('用法：release.mjs manifest <包目录> [--version v] | publish <包目录> <更新位置> [--notes "…"] [--force]'))
   run.catch((e) => { console.error(e.message); process.exitCode = 1 })

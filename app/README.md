@@ -23,13 +23,15 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 | `main/git.mjs` | 任务前快照（不建分支、不动暂存区）、相对快照的改动和差异、恢复、只提交任务改动、防护钩子 |
 | `main/projects.mjs` | 项目清单、加入项目时的文件夹权限和钩子、示例工程、任务描述里提到的文件 |
 | `main/library.mjs` | 库：我的库、共享库（内网 Git）的同步，提交审核、通过、退回，技能和插件的目录、安装、卸载 |
-| `main/paths.mjs` | 开发与安装两种布局、用户数据目录、设置文件、DSH 数据目录补丁 |
+| `main/paths.mjs` | 开发与安装两种布局（Windows、Linux）、用户数据目录、设置文件、DSH 数据目录补丁 |
+| `main/models.mjs` | 模型配置：部门默认（local.env）+ 设置页里加的自定义模型（models.json，密钥用系统的 safeStorage 加密）；在用的模型经 `DEPT_LLM_*` 交给引擎，切换后引擎自动重启；`ASTROLAB_MODEL_LOCK=1` 时只能用部门默认 |
+| `main/probe.mjs` | 模型探测：服务端的模型名、上下文、工具调用、思考逐项查，和 local.env 对一遍，给出改法；设置页“检测模型”、安装脚本、自检和命令行共用 |
 | `src/` | 界面（React + TypeScript）：发起、进行中、审核、历史、知识库、技能与插件；提问卡片、提示条、声音、三套皮肤（浅紫、奶油、陶土） |
 | `test/` | `npm test`：引擎层、引擎桥、Git、任务控制器、库（本机裸仓库当 Git 服务器）、知识检索、编码自查脚本、读取围栏；`node app/test/real-dsh.mjs`：在真实 DSH 上验证插话、停止、继续、提问、知识库工具、安装的技能和插件（假的模型服务，不花模型调用）；`real-dsh-fence.mjs`：读取围栏；`measure-request.mjs`：量第一个请求 |
 
 ## 数据放在哪
 
-- 用户数据：安装版在 `%LOCALAPPDATA%\AstroLab`；用 `dev.ps1` 开发时在仓库的 `runtime\app-data`（不提交）。内容：项目清单、任务记录、DSH 会话、示例工程副本、日志
+- 用户数据：安装版在 `%LOCALAPPDATA%\AstroLab`（Linux：`~/.local/share/AstroLab`）；用 `dev.ps1` 开发时在仓库的 `runtime\app-data`（不提交）。内容：项目清单、任务记录、DSH 会话、示例工程副本、日志
 - 示例工程：首次运行把仓库的 `sample` 复制到数据目录下的 `workspace\sample`，建成 Git 仓库
 - 排查问题：数据目录下的 `logs\main.log`（主进程）、`logs\<任务>.jsonl`（引擎收发），以及 `runtime\app-dev.log`（dev.ps1 输出）
 
@@ -105,6 +107,28 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 - 停止：经引擎桥 cancel，只中止当前这一轮，引擎进程不退出，继续不用重启；桥不可用或 3 秒内停不下来才结束进程
 - 引擎：打开项目时在后台启动（冷启动要等工具服务和技能加载完，实测第一次超过 1 分钟），任务之间共用；状态栏显示引擎状态
 - 主进程日志 `logs\main.log` 记录引擎每次启动用时和引擎桥连接
+
+## 麒麟（Linux）和局域网模型
+
+同一份程序在 Linux 上运行（11-16 在 Linux x64 上实测：Electron 窗口、窗口控件覆盖层、真实 DSH 引擎、工具服务）。和 Windows 的差别：
+
+- 安装布局 `tools/node/bin/node`；gcc、cppcheck、git、bubblewrap 用系统的（安装包可带离线包）。打包、安装、自检见 `packaging/麒麟部署说明.md`
+- DSH 在 Linux 上用 bash 执行命令，命令沙箱是 bubblewrap 或 Landlock（Windows 是 ACL）；两者都不可用时 DSH 拒绝执行命令
+- 标题栏：Windows 和 Linux 都用窗口控件覆盖层；`ASTROLAB_NATIVE_FRAME=1` 改用系统标题栏，`ASTROLAB_DISABLE_GPU=1` 关 GPU 加速
+- 局域网 Qwen3.8-27B：`DEPT_LLM_THINKING_FORMAT=qwen-chat-template`（发 `enable_thinking`、`preserve_thinking`），上下文和输出上限按服务端改；**设置 → 模型 → 检测模型** 逐项检查。验证：`node app/test/real-dsh-qwen.mjs`（真实 DSH + 假 vLLM，看发出去的参数和思考的往返）、`node --test app/test/probe.test.mjs`
+- 浏览器里看界面时，地址加 `?scenario=kylin-qwen` 模拟这个场景（演示、截图用）
+
+## 模型配置（设置 → 模型）
+
+- **部门默认**：设置文件 local.env 的 `DEPT_LLM_*`，管理员改；列表第一项，不能删。
+- **自定义模型**：“添加模型”从预设开始（局域网 Qwen3.8-27B、内网 DeepSeek、DeepSeek 官方接口、其他 OpenAI 兼容接口），填地址后“获取模型列表”（读服务端 /models，自动带出上下文和思考参数写法），“检测”逐项查模型、上下文、工具调用、思考，有建议可以一键采用；“保存并使用”后引擎用新模型重启（任务进行中的等这一轮结束）。
+- **存放**：用户数据目录的 `models.json`；密钥用 Electron safeStorage 加密（Windows DPAPI、Linux 密钥环），系统不支持时明文并只给本人读写，和 local.env 一样。密钥不回到界面。
+- **锁定**：部门要统一模型时在 local.env 写 `ASTROLAB_MODEL_LOCK=1`，设置页只读、只用部门默认。
+- 验证：`node --test test/models.test.mjs`；11-16 在 Linux 上用安装好的工作台（真实 DSH + 两个假 vLLM）走过：界面里加“内网 DeepSeek”、检测、保存并使用 → 引擎重启 → 新任务的请求都发到了新服务、用新模型名。
+
+## 源码保护（麒麟部署，`--protect`）
+
+不想把工作台源码随安装包发出去时，打包加 `--protect`（`packaging/linux/protect.mjs`）：主进程、预加载、引擎、各工具服务编成 **V8 字节码**（用安装包自带的 Electron、node 编，和运行时同一套 V8）；引擎桥、读取围栏、更新器、自检改为**压缩代码**（DSH 按 ESM 文件加载桥和围栏，换字节码可能让读取围栏悄悄失效，不冒险）；界面本就是 Vite 压缩产物；技能和配置不动（技能是 Markdown，运行时要读原文）。装好的包里 grep 不到可读的工作台源码。界限：本地程序没法绝对不可破，有 root 的人总能取到运行时文件，字节码挡的是常规查看和复制。细节见 `packaging/麒麟部署说明.md`。11-16 在 Linux 上验证：字节码包能启动、真实引擎跑通单元测试任务、调用字节码工具服务。
 
 ## 已知限制
 

@@ -100,6 +100,18 @@ test('更新位置的文件被改过：准备时校验不通过；清单里的�
   await assert.rejects(checkUpdate({ updateDir: join(f.share, '没有这个目录'), current: '0.1.0' }), /ENOENT/)
 })
 
+test('别的平台的安装包（Linux 包写了平台）：拒绝；写的是本机平台时照常', async () => {
+  const f = await fixture()
+  const c = await checkUpdate({ updateDir: f.share, current: '0.1.0' })
+  const file = join(f.share, '0.2.0', 'manifest.json')
+  const m = JSON.parse(read(f.share, '0.2.0/manifest.json'))
+  writeFileSync(file, JSON.stringify({ ...m, platform: 'linux-loong64' }))
+  await assert.rejects(stageUpdate({ updateDir: f.share, latest: c.latest, installRoot: f.install, stageRoot: f.stage }), /linux-loong64 的安装包/)
+  writeFileSync(file, JSON.stringify({ ...m, platform: `${process.platform}-${process.arch}` }))
+  const { plan } = await stageUpdate({ updateDir: f.share, latest: c.latest, installRoot: f.install, stageRoot: f.stage })
+  assert.equal(plan.to, '0.2.0')
+})
+
 test('runner：等旧程序退出后换文件，写结果，重新启动软件', { skip: process.platform === 'win32' && '重启脚本用 sh' }, async () => {
   const f = await fixture()
   const c = await checkUpdate({ updateDir: f.share, current: '0.1.0' })

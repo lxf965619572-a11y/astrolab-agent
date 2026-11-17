@@ -101,6 +101,12 @@ foreach ($svc in @('cppcheck', 'docreader', 'docgen', 'utest')) {
 
 # 4. DSH (pinned version, as installed by setup.ps1)
 Say '4/7 DSH runtime'
+$dshWant = ([IO.File]::ReadAllText((Join-Path $Root 'config\dsh.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json).version
+$dshBinSrc = Join-Path $Root 'runtime\dsh\node_modules\@deepseek-ai\dsh\lib\bin.js'
+if (-not (Test-Path $dshBinSrc)) { throw 'runtime\dsh is missing: run scripts\setup.ps1' }
+$dshHave = "$(& node $dshBinSrc --version)".Trim()
+if ($dshHave -ne $dshWant) { throw "runtime\dsh has DSH $dshHave but config\dsh.json pins $dshWant: run scripts\setup.ps1 first" }
+Say "   DSH $dshHave (config\dsh.json)"
 Robo (Join-Path $Root 'runtime\dsh') (Join-Path $Dist 'app\runtime\dsh') @()
 
 # 5. Node.js

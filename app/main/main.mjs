@@ -1,12 +1,14 @@
 // AstroLab 主进程（Electron）：窗口、项目、任务控制器、与界面之间的接口（IPC）、系统通知。
 // 界面进程不接触 Node：contextIsolation + sandbox，只能调用 preload.cjs 暴露的接口；不加载任何网络内容。
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, protocol, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, protocol, safeStorage, shell } from 'electron'
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
+import { probeModel } from './probe.mjs'
+import { DEPT_ID, ModelStore } from './models.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
 import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, searchTasks, STAGES, TaskController } from './task.mjs'
@@ -25,6 +27,22 @@ app.setPath('userData', join(P.data, 'electron'))
 const AUMID = P.installed ? 'AstroLab' : 'AstroLab.Dev'
 app.setAppUserModelId(AUMID)
 const DEV_URL = process.env.ASTROLAB_DEV_URL || ''
+// Linux（麒麟）上的两个开关，写在设置文件 local.env 或环境变量里：
+//   ASTROLAB_NATIVE_FRAME=1  用系统标题栏（窗口管理器画不出控件覆盖层时）
+//   ASTROLAB_DISABLE_GPU=1   关掉 GPU 加速（个别国产显卡驱动下窗口花屏、白屏或闪退时）
+// 模型配置：部门默认（local.env）+ 设置页里加的自定义模型；在用的模型经 DEPT_LLM_* 交给引擎（app/main/models.mjs）
+const models = new ModelStore({
+  file: join(P.data, 'models.json'),
+  deptEnv: () => engineEnv(P),
+  crypto: { available: () => { try { return safeStorage.isEncryptionAvailable() } catch { return false } }, encrypt: (s) => safeStorage.encryptString(s).toString('base64'), decrypt: (s) => safeStorage.decryptString(Buffer.from(s, 'base64')) },
+})
+/** 引擎和直接调模型的地方用的环境：local.env + 在用的自定义模型 */
+const envNow = () => ({ ...engineEnv(P), ...models.envOverrides() })
+const LOCAL_FLAGS = (() => { try { return readLocalEnv(P.localEnv) } catch { return {} } })()
+const flag = (k) => process.env[k] === '1' || LOCAL_FLAGS[k] === '1'
+const OVERLAY = process.platform === 'win32' || process.platform === 'linux'
+const NATIVE_FRAME = process.platform === 'linux' && flag('ASTROLAB_NATIVE_FRAME')
+if (flag('ASTROLAB_DISABLE_GPU')) app.disableHardwareAcceleration()
 
 // 预览项目里的 HTML（比如信息流插件的交互版）：走单独的 astro-preview: 地址，带自己的 CSP——
 // 允许页面里的脚本，但什么网也连不了；界面用 sandbox iframe（不给 allow-same-origin）显示，碰不到工作台和 preload。
@@ -86,7 +104,7 @@ function fenceRoots(env) {
 }
 
 function makeEngine(project) {
-  const env = engineEnv(P)
+  const env = envNow()
   env.ASTROLAB_BRIDGE = bridge.path
   // 知识库工具服务用：我的库 + 全部共享库（还没克隆的也列上，同步后不用重启引擎就能查到）
   env.ASTROLAB_LIBRARIES = JSON.stringify(lib.sources().map((x) => ({ id: x.id, name: x.name, dir: x.dir, model: x.model || '', writable: !!x.writable })))
@@ -103,13 +121,13 @@ function makeEngine(project) {
 }
 
 function appState() {
-  const env = engineEnv(P)
+  const env = envNow()
   const m = modelConfig(env)
   return {
     platform: process.platform,
     mock: P.mock,
     installed: P.installed,
-    model: { provider: m.provider, model: m.model, baseURL: m.baseURL, hasKey: m.hasKey, contextWindow: m.contextWindow },
+    model: { provider: m.provider, model: m.model, baseURL: m.baseURL, hasKey: m.hasKey, contextWindow: m.contextWindow, maxTokens: m.maxTokens, thinkingFormat: m.thinkingFormat, name: env.ASTROLAB_MODEL_NAME || '部门默认', activeId: models.activeId() },
     engineReady: P.mock || existsSync(P.dshBin),
     projects: store.list(),
     stages: STAGES.map((s) => ({ ...s, hasSkill: lib.skillDirs().some((d) => existsSync(join(d, s.skill))) })),
@@ -129,6 +147,16 @@ function appState() {
 
 // ---------- 多个项目并行 ----------
 const anyBusy = () => [...ctls.values()].some((c) => c.busy)
+/** 换了在用的模型：引擎要用新的环境重启；任务进行中的等它这一轮结束再换 */
+function restartForModel(name) {
+  let now = true
+  for (const c of allCtls()) now = c.requestRestart() && now
+  mlog(`切换模型：${name}${now ? '' : '（有任务在进行，结束后重启引擎）'}`)
+  return now
+}
+function switchModel(id) {
+  if (models.activate(id)) restartForModel(models.list().models.find((m) => m.id === id)?.name || id)
+}
 const allCtls = () => [...ctls.values()]
 /** 后台的任务（不是正在看的项目）：侧栏显示它们的状态，点一下切过去 */
 function background() {
@@ -238,7 +266,7 @@ async function createInLibrary(kind, prompt) {
 }
 // ---------- 知识整理（蒸馏）和 Obsidian ----------
 function distillContext() {
-  const env = engineEnv(P)
+  const env = envNow()
   const scope = distillScope(env, modelConfig(env).baseURL)
   const mine = mineLib().dir
   const st = readState(mine)
@@ -384,7 +412,7 @@ function registerIpc() {
   // 设置页“测试连接”：用部门模型回一句话，量用时；密钥只在主进程里用
   handle('model:test', async () => {
     if (P.mock) return { ok: true, ms: 0, model: '模拟引擎', reply: '（模拟引擎不调用模型）' }
-    const env = engineEnv(P)
+    const env = envNow()
     const m = modelConfig(env)
     const apiKey = env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY || ''
     if (!apiKey) return { ok: false, ms: 0, model: m.model, error: '没有配置密钥（config/local.env）' }
@@ -395,6 +423,46 @@ function registerIpc() {
     } catch (e) {
       return { ok: false, ms: Date.now() - t0, model: m.model, error: String(e?.message || e).replace(/(sk|key)[-_a-z0-9]{8,}/gi, '***').slice(0, 200) }
     }
+  })
+  // 设置页“检测模型”：服务端的模型名、上下文、工具调用、思考逐项查，和 local.env 对一遍（app/main/probe.mjs）
+  handle('model:probe', async () => {
+    const env = envNow()
+    const m = modelConfig(env)
+    if (P.mock) return null
+    const r = await probeModel({
+      baseURL: m.baseURL, apiKey: env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY || '', model: env.DEPT_LLM_MODEL || '',
+      configured: { contextWindow: env.DEPT_LLM_CONTEXT_WINDOW, maxTokens: env.DEPT_LLM_MAX_TOKENS, thinkingFormat: env.DEPT_LLM_THINKING_FORMAT },
+    })
+    mlog(`模型探测 ${r.baseURL} ${r.model}：${r.checks.map((c) => `${c.item}=${c.status}`).join(' ')}`)
+    return { ...r, envFile: P.localEnv }
+  })
+  // 模型配置（设置 → 模型）：列表、新建和修改、删除、切换在用的模型；检测可以对着还没保存的表单做
+  handle('model:list', () => models.list())
+  handle('model:save', (m) => {
+    const id = models.upsert(m || {})
+    if (m && m.use) switchModel(id)
+    return models.list()
+  })
+  handle('model:remove', (id) => {
+    const wasActive = models.activeId() === id
+    models.remove(id)
+    if (wasActive) restartForModel('部门默认（local.env）')
+    return models.list()
+  })
+  handle('model:activate', (id) => { switchModel(id); return models.list() })
+  // 表单里的“获取模型列表”“检测”：draft 是表单内容；key 为空而且是改已有模型时，用存着的密钥
+  handle('model:probeDraft', async (draft) => {
+    if (P.mock) return null
+    const d = draft || {}
+    let apiKey = d.key || ''
+    if (!apiKey && d.id) { try { apiKey = models.connection(d.id).apiKey } catch { /* 已删 */ } }
+    const r = await probeModel({
+      baseURL: d.baseURL, apiKey, model: d.model || '', timeoutMs: d.listOnly ? 8000 : 60000,
+      configured: { contextWindow: d.contextWindow, maxTokens: d.maxTokens, thinkingFormat: d.thinkingFormat === 'off' ? '' : d.thinkingFormat },
+      listOnly: !!d.listOnly,
+    })
+    mlog(`模型探测（表单）${r.baseURL} ${r.model}：${r.checks.map((c) => `${c.item}=${c.status}`).join(' ')}`)
+    return r
   })
   // 编辑对话（侧栏和任务历史里的“⋯”菜单）：任何一个工作区的任务都能改，不用先切过去
   handle('task:rename', (pid, id, title) => {
@@ -493,10 +561,10 @@ function registerIpc() {
     const err = await shell.openPath(abs)
     if (err) throw new Error(err)
   })
-  // 皮肤：Windows 标题栏右侧的系统按钮区（最小化、关闭）跟着换底色
+  // 皮肤：标题栏右侧的系统按钮区（最小化、关闭）跟着换底色（Windows、Linux）
   handle('sys:titlebar', (c) => {
     const ok = (v) => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
-    if (process.platform === 'win32' && win && !win.isDestroyed() && ok(c && c.color) && ok(c && c.symbolColor)) win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: 48 })
+    if (OVERLAY && !NATIVE_FRAME && win && !win.isDestroyed() && ok(c && c.color) && ok(c && c.symbolColor)) win.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: 48 })
   })
 }
 
@@ -563,8 +631,9 @@ async function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1280, minHeight: 720,
     show: false, title: 'AstroLab', backgroundColor: '#F3F1F9',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'win32' ? { color: '#F6F4FB', symbolColor: '#3B3946', height: 48 } : false,
+    // Windows 和 Linux（麒麟 UKUI 等）都用窗口控件覆盖层：标题栏是界面自己画的，右上角留给系统的最小化、最大化、关闭。
+    // 个别 Linux 窗口管理器画不出覆盖层时，设置文件里写 ASTROLAB_NATIVE_FRAME=1 改用系统标题栏
+    ...(NATIVE_FRAME ? {} : { titleBarStyle: 'hidden', titleBarOverlay: OVERLAY ? { color: '#F6F4FB', symbolColor: '#3B3946', height: 48 } : false }),
     icon: appIcon(),
     webPreferences: {
       preload: join(P.appDir, 'main', 'preload.cjs'),
@@ -646,7 +715,7 @@ async function boot() {
   refs = new ReferenceService({
     libs: () => kbLibs(), mineDir: () => mineLib().dir, dataDir: P.data,
     model: () => {
-      const env = engineEnv(P)
+      const env = envNow()
       const m = modelConfig(env)
       const scope = ['public', 'all'].includes(env.ASTROLAB_REFERENCE_SCOPE) ? env.ASTROLAB_REFERENCE_SCOPE : distillScope({}, m.baseURL) === 'sample' ? 'public' : 'all'
       return { baseURL: m.baseURL, apiKey: env.DEPT_LLM_API_KEY || env.DEEPSEEK_API_KEY || '', model: m.model, scope }

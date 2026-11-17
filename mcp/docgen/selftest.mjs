@@ -31,7 +31,7 @@ try {
   say(!tl.isError && tl.structuredContent.templates.length > 0, `模板 ${tl.isError ? tl.content[0].text : tl.structuredContent.templates.map((t) => t.name).join('、') || '（无）'}`)
 
   const docx = join(tmp, '任务书.docx')
-  const r1 = await gen.callTool({ name: 'render_docx', arguments: { source: 'docs/软件研制任务书-示例.md', output: docx, fields: { 软件名称: '自检' } } })
+  const r1 = await gen.callTool({ name: 'render_docx', arguments: { source: 'docs/软件研制任务书-示例.md', output: docx, template: 'demo-gjb438b', fields: { 软件名称: '自检' } } })
   say(!r1.isError, r1.isError ? r1.content[0].text : `render_docx 生成 Word（${r1.structuredContent.stats.headings} 个标题，${r1.structuredContent.stats.tables} 个表格）`)
 
   const r2 = await rd.callTool({ name: 'read_document', arguments: { path: docx, mode: 'outline' } })
@@ -47,7 +47,7 @@ try {
   // 流程图：Mermaid 代码块转为 Word 图形
   const fmd = join(tmp, '流程图.md')
   writeFileSync(fmd, '# 流程图自检\n\n```mermaid\nflowchart TD\n  S([开始]) --> A{条件?}\n  A -- 是 --> B[处理]\n  B --> A\n  A -- 否 --> E([返回])\n```\n\n图 1 自检流程图\n')
-  const r5 = await gen.callTool({ name: 'render_docx', arguments: { source: fmd, output: join(tmp, '流程图.docx') } })
+  const r5 = await gen.callTool({ name: 'render_docx', arguments: { source: fmd, output: join(tmp, '流程图.docx'), template: 'demo-gjb438b' } })
   const fw = (r5.structuredContent?.warnings || []).filter((w) => w.includes('流程图'))
   say(!r5.isError && r5.structuredContent.stats.flowcharts === 1 && !fw.length, r5.isError ? r5.content[0].text : `流程图转换为 Word 图形${fw.length ? `：${fw.join('；')}` : ''}`)
 

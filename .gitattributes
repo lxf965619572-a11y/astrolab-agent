@@ -2,3 +2,7 @@
 app/git-hooks/* text eol=lf
 dsh-dept/hooks/* text eol=lf
 dsh-dept/trial/*.cmd text eol=crlf
+# 麒麟（Linux）安装包的脚本和桌面文件：在 Windows 上检出、打包也必须是 LF，否则 bash 报 $'\r': command not found
+*.sh text eol=lf
+packaging/linux/* text eol=lf
+config/scenarios/* text eol=lf

@@ -45,6 +45,12 @@ contextBridge.exposeInMainWorld('astro', {
   },
   model: {
     test: () => invoke('model:test'),
+    probe: () => invoke('model:probe'),
+    list: () => invoke('model:list'),
+    save: (m) => invoke('model:save', m),
+    remove: (id) => invoke('model:remove', id),
+    activate: (id) => invoke('model:activate', id),
+    probeDraft: (d) => invoke('model:probeDraft', d),
   },
   review: {
     changes: () => invoke('review:changes'),

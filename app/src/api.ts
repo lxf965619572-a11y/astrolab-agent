@@ -65,7 +65,7 @@ export interface TaskState {
 
 export interface AppState {
   platform: string; mock: boolean; installed: boolean
-  model: { provider: string; model: string; baseURL: string; hasKey: boolean; contextWindow?: number }
+  model: { provider: string; model: string; baseURL: string; hasKey: boolean; contextWindow?: number; maxTokens?: number; thinkingFormat?: string; name?: string; activeId?: string }
   engineReady: boolean; projects: Project[]; stages: Stage[]; skills?: SkillCard[]; notes: string[]; libraryDir?: string
   /** 本机用户名（侧栏账户区）、版本、数据和日志目录（设置页） */
   user?: string; versions?: { app: string; electron: string; node: string }; dataDir?: string; logDir?: string
@@ -111,6 +111,21 @@ export interface Mention { name: string; paths: string[] }
 
 // ---------- 库：知识库、技能与插件 ----------
 export type KbKind = '经验' | '设计' | '代码' | '问题'
+/** 模型探测的结果（app/main/probe.mjs） */
+export interface ProbeCheck { item: string; status: 'ok' | 'warn' | 'fail'; detail: string; fix?: string }
+export interface ModelProbe {
+  ok: boolean; baseURL: string; server: string; model: string; models: string[]; family: string; maxModelLen: number | null
+  tokPerSec: number | null; checks: ProbeCheck[]; suggest: Record<string, string>; ms: number; envFile?: string
+  listMeta?: { id: string; maxModelLen: number | null; family: string }[]
+}
+/** 模型配置（app/main/models.mjs）：部门默认 + 自定义模型 */
+export interface ModelProfile {
+  id: string; name: string; baseURL: string; model: string; thinkingFormat: string; contextWindow: number; maxTokens: number; input: string
+  hasKey: boolean; builtin: boolean; active?: boolean
+}
+export interface ModelPreset { id: string; name: string; baseURL: string; model: string; thinkingFormat: string; contextWindow: number; maxTokens: number; input: string; defaultKey: string; note: string }
+export interface ModelList { active: string; locked: boolean; models: ModelProfile[]; presets: ModelPreset[] }
+export interface ModelDraft { id?: string; name: string; baseURL: string; model: string; thinkingFormat: string; contextWindow: number; maxTokens: number; input: string; key?: string | null; use?: boolean; listOnly?: boolean }
 export interface KbMeta { title: string; kind: KbKind; model?: string; tags: string[]; author?: string; date?: string; source?: string; status?: string }
 export interface KbHit { id: string; title: string; kind: KbKind; model: string; tags: string[]; lib: string; libName: string; writable: boolean; path: string; date: string; author: string; status: string; source: string; score: number; snippet: string }
 export interface KbEntry { id: string; lib: string; libName: string; writable: boolean; path: string; meta: KbMeta; body: string }
@@ -178,7 +193,8 @@ export interface AstroApi {
     outputs(): Promise<OutputFile[]>
   }
   /** 设置页“测试连接” */
-  model: { test(): Promise<{ ok: boolean; ms: number; model: string; reply?: string; error?: string }> }
+  model: { test(): Promise<{ ok: boolean; ms: number; model: string; reply?: string; error?: string }>; probe(): Promise<ModelProbe | null>
+    list(): Promise<ModelList>; save(m: ModelDraft): Promise<ModelList>; remove(id: string): Promise<ModelList>; activate(id: string): Promise<ModelList>; probeDraft(d: ModelDraft): Promise<ModelProbe | null> }
   review: {
     changes(): Promise<Change[]>; file(path: string): Promise<FileVersions>
     commit(message: string, paths?: string[]): Promise<string>; undo(): Promise<void>; restore(): Promise<number>

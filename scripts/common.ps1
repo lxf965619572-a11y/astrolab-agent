@@ -6,7 +6,8 @@ $Script:DshDir   = Join-Path $Root 'runtime\dsh'              # DSH 安装目录
 $Script:DshHome  = Join-Path $Root 'runtime\dsh-home'         # DSH 数据目录（会话、配置）
 $Script:DshBin   = Join-Path $DshDir 'node_modules\@deepseek-ai\dsh\lib\bin.js'
 $Script:LocalEnv = Join-Path $Root 'config\local.env'
-$Script:DshVersion = '0.2.1-rc.2'                              # 锁定版本，不要用 latest
+# 锁定的 DSH 版本只写在 config\dsh.json（升级流程见 README“升级 DSH”）
+$Script:DshVersion = ([IO.File]::ReadAllText((Join-Path $Root 'config\dsh.json'), [Text.Encoding]::UTF8) | ConvertFrom-Json).version
 
 function Write-Step($msg) { Write-Host "`n== $msg" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "   [OK] $msg" -ForegroundColor Green }

@@ -84,13 +84,20 @@
         baseURL: !!js "process.env.DEPT_LLM_BASE_URL || 'https://api.deepseek.com'"
         apiKeyEnv: DEPT_LLM_API_KEY
         compat:
-          # 官方 API：deepseek（thinking + reasoning_effort）；内网 vLLM：chat-template（chat_template_kwargs）
+          # 思考参数的写法：
+          #   deepseek            官方 API（thinking + reasoning_effort）
+          #   chat-template       内网 vLLM 上的 DeepSeek（chat_template_kwargs）
+          #   qwen-chat-template  局域网 vLLM / SGLang 上的 Qwen3.x（chat_template_kwargs 的 enable_thinking + preserve_thinking；
+          #                       preserve_thinking 让历史轮次的思考留在上下文里，多步任务更稳）
+          # 不知道填哪个：运行 node app/main/probe.mjs（或设置 → 模型 → 检测模型），它按服务端的模型给出建议
           thinkingFormat: !!js "process.env.DEPT_LLM_THINKING_FORMAT || 'deepseek'"
         models:
           - id: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
             name: !!js "process.env.DEPT_LLM_MODEL || 'deepseek-flash'"
             contextWindow: !!js "Number(process.env.DEPT_LLM_CONTEXT_WINDOW || 1048576)"
             maxTokens: !!js "Number(process.env.DEPT_LLM_MAX_TOKENS || 65536)"
+            # 模型能看图时写 DEPT_LLM_INPUT=text,image（Qwen3.8 是视觉语言模型；服务端用 --language-model-only 启动时不能写 image）
+            input: !!js "String(process.env.DEPT_LLM_INPUT || 'text').split(',').map((s) => s.trim()).filter(Boolean)"
             reasoningEfforts:
               'off':
               high: high

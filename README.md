@@ -67,7 +67,7 @@ astrolab-agent/
 在 PowerShell 中进入本目录（`D:\lixf\astrolab-agent`），依次执行：
 
 ```powershell
-# 1. 安装 DSH（锁定 0.2.1-rc.2）、MCP 服务依赖，生成配置。首次几分钟。
+# 1. 安装 DSH（版本锁定在 config\dsh.json）、MCP 服务依赖，生成配置。首次几分钟。
 #    官方 npm 源慢的话加参数：-Registry https://registry.npmmirror.com
 powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
 
@@ -306,6 +306,16 @@ DEEPSEEK_API_KEY=<内网网关签发的 Key>
 
 DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的 `/v1/messages`），不是 OpenAI 的 `/v1/chat/completions`。如果昇腾上的 vLLM-Ascend 只提供 OpenAI 兼容接口，有两种办法：在模型网关上做协议转换（LiteLLM 等网关支持），或改用 DSH 的通用 `llm-pi-ai` 提供方（`openai-completions` 协议）。到那一步再按实际接口配置，届时把 `/v1/models` 和一次工具调用请求的返回给我看即可。
 
+## 使用场景：麒麟电脑 + 局域网 Qwen3.8-27B
+
+工程师用银河麒麟桌面（x86_64 或 aarch64），局域网服务器用 vLLM 跑 Qwen3.8-27B。打 Linux 离线安装包、安装、自检、服务端启动参数都在 [packaging/麒麟部署说明.md](packaging/麒麟部署说明.md)；设置模板 `config/scenarios/kylin-lan-qwen.env`。接上任何 OpenAI 兼容的模型服务前，先运行模型探测：
+
+```bash
+node app/main/probe.mjs --base http://192.168.10.20:8000/v1        # 加 --write 把建议写回 local.env
+```
+
+它逐项检查模型名、上下文、工具调用（服务端要 `--enable-auto-tool-choice --tool-call-parser qwen3_coder`）、思考（`--reasoning-parser qwen3`），并和 local.env 对一遍。工作台里是 **设置 → 模型 → 检测模型**。
+
 ## 常见问题
 
 | 现象 | 处理 |
@@ -347,5 +357,44 @@ DSH 内置的 DeepSeek 适配器使用 **Messages 协议**（Anthropic 风格的
 
 ## 版本说明
 
-- DSH 锁定为 `0.2.1-rc.2`（2026-10-17 发布的开发者预览版）。升级前先在测试目录验证，不要直接改成 latest。
+- DSH 锁定为 `0.2.1-rc.2`（2026-10-17 发布的开发者预览版），版本号只写在 `config\dsh.json`：`setup.ps1` 按它安装，`check.ps1` 和打包脚本核对装的是不是它。升级按下面“升级 DSH”一节做，不要直接改成 latest。
 - 2026-10-23 已在 Windows 笔记本 + DeepSeek 官方 API 上实测：走查示例代码约 3.5 分钟、27 次工具调用，报告覆盖了全部埋入的缺陷。示例代码带有“缺陷：”提示注释，这个结果偏乐观，不能代表真实代码上的效果。
+
+## 升级 DSH
+
+DSH 还是开发者预览版，更新很快（锁定 rc.2 之后三周里出了 rc.3～rc.5、0.2.2-alpha.2/3、0.2.2-rc.1），官方说明会有不兼容的变更。**不追着升**，只在有明确理由时升：修了安全问题、修了遇到的缺陷，或者有需要的新功能。
+
+```powershell
+# 1. 把候选版本装到 runtime\dsh-check\<版本>，逐项核对接触面，再在真实引擎上跑引擎桥和读取围栏的测试（不动现有安装）
+node scripts\dsh-upgrade-check.mjs 0.2.2-rc.1
+#    报告写在 runtime\dsh-check\<版本>\检查报告.md。“必须处理”改完重查；“复核”逐项看过，在报告里写结论
+# 2. 都处理完后：改 config\dsh.json 的 version，重新安装、自检
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+powershell -ExecutionPolicy Bypass -File scripts\check.ps1
+# 3. 用真实模型跑 evals 回归，和升级前的分数比较；在外网样机上核对会话记录和网络连接，确认没有外发
+# 4. packaging\build-offline.ps1 打包，release.mjs 发布；先发一两台试点电脑，再全部推送（更新器只换变了的文件，失败自动换回）
+```
+
+不带版本号运行时检查的是当前锁定的版本，应该没有“必须处理”项，用来确认检查本身没坏。
+
+**接触面**（检查脚本逐项核对，代码里新用到 DSH 的东西时同步改脚本里的 `PRIVACY`、`TOUCH`、`KNOWN_OUTBOUND`）：
+
+| 接触点 | 位置 | 坏了会怎样 | 脚本怎么查 |
+|---|---|---|---|
+| 关闭数据外发的补丁 | `config\cordis.patch.yml.template`、`config\web-profile.patch.yml`、`engine.mjs` 的引擎启动补丁 | **插件改名后补丁悄悄失效，上传重新打开**：DSH 只在 stderr 打一行 `patch: entry "xxx" not found`，照常启动 | 用真实补丁组合配置（`--dump-config`），抓 not found；核对遥测、会话日志、联网工具、产品埋点的最终状态；名字像外连、没关、又不在核对名单里的新插件列为必须处理 |
+| 其他配置补丁 | 技能目录、`dept-llm` 路由、MCP 服务、精简掉的插件 | 技能、模型、工具服务加载不上 | 同上，核对组合结果 |
+| 引擎桥 | `app\engine\bridge.mjs`：`user-questions/request`、`ctx.agents` 的 steer/cancel、`createUserMessage` | 提问、插话、停止失灵（有退回做法） | 在对应包里找接口名；真实引擎测试 `app\test\real-dsh.mjs` |
+| 读取围栏、部门约定 | `read-fence.mjs`：`ctx.tools.guard`；`conventions.mjs`：`ctx.systemPrompt` | 工作区外的文件读得到（安全相关） | 找接口名；真实引擎测试 `app\test\real-dsh-fence.mjs` |
+| SDK 协议 | `engine.mjs`：`initialize`、`session/prompt`、`resume`、`wait`，`session.event`、`session.status` | 引擎连不上 | 在 `dsh-sdk-protocol` 里找方法名 |
+| 会话事件和工具名 | `activity.mjs`：`turn/start`、`tool/call` 等，`str_replace_editor`、`todo_write`、`pwsh` 等 | 界面上的活动记录、进度显示不对 | 在对应包里找名字 |
+| 包内路径、环境变量 | `lib/bin.js`、Windows 文件夹权限诊断脚本；`DSH_TELEMETRY_MODE` | 引擎起不来；Windows 上加项目失败；遥测开关失效 | 查文件、找变量名 |
+
+脚本还会和 `runtime\dsh` 里的基线比较：两版之间新增、去掉的插件和包，接触面相关的包里哪些代码改过（升级前要读这些包的改动），官方 standard 预设有没有变（变了 `dsh-dept\cordis.patch.yml` 要重新照抄）。
+
+**2026-11-06 对 0.2.2-rc.1 的检查结果（暂不升级）**：
+- 新版 sdk 自带了 `tool-ask-user`，引擎启动补丁再插入一个同名的，报 `ask_user_question is already registered`，这一项启用失败。
+- SDK 协议新增了官方的提问通道（服务端向客户端发 `user-question/ask` 请求、`user-question.cancelled` 通知），SDK 服务自己接管了 `user-questions/request`。问题被它截走、发给 `engine.mjs`，`engine.mjs` 对没见过的服务端请求一律回 method not found，引擎桥收不到问题：`real-dsh.mjs` 的提问一项（C）卡住。升级时可以改用官方通道，引擎桥只保留插话和停止。
+- `tool-subagent-list-agents` 去掉了，`engine.mjs` 的 `TRIMMED_PLUGINS` 里这一项要删。
+- `tool/call` 事件名在 `dsh-agent-loop` 里找不到了，要查 `activity.mjs` 的工具调用记录是否还对。
+- `real-dsh-fence.mjs` 6 项都没拿到工具结果，原因待查（可能是上面的启用失败连带，也可能是新的工具执行器 `tool-executor-native`）。
+- sdk 新增了 12 个插件（`schedule`、`tool-schedule`、`present`、`file-upload` 等），要逐个判断工作台用不用得上，用不上的加进 `TRIMMED_PLUGINS`。

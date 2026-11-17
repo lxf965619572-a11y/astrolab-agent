@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight } from './api'
+import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight, ModelProbe, ModelProfile, ModelPreset, ModelList } from './api'
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import { categoryMode } from './modes'
@@ -339,9 +339,134 @@ const FLOW_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="760" height="30
 </svg>`
 const FLOW_MD = `# PCU 软件信息流说明\n\n依据：《PCU 软件研制任务书（示例）》、《PCU-1553B 接口控制文件（示例2）》。\n\n## 外部接口\n\n| 对端 | 方向 | 信息 | 周期 |\n|---|---|---|---|\n| 星务计算机（BC） | 收 | 遥控指令 6 条 | 按需 |\n| 星务计算机（BC） | 发 | 遥测 8 条 | 1 s |\n| 电源控制单元 | 收 | 电压/电流、温度 | 100 ms |\n| 执行机构 | 发 | OC 指令、负载继电器 | 按需 |\n\n## 待确认\n\n1. ICD 第 4.3 节遥测第 7 条的字数与任务书不一致（6 字 / 8 字）。\n`
 
-const REPORT = `# 单元测试报告 · rt_drv\n\n| 项目 | 结果 |\n|---|---|\n| 用例 | 39 个 |\n| 通过 | 30 个 |\n| 失败 | 9 个，归为 3 个疑似缺陷 |\n`
+const REPORT = `# 单元测试报告 · rt_drv
+
+| 项目 | 结果 |
+|---|---|
+| 用例 | 39 个 |
+| 通过 | 30 个 |
+| 失败 | 9 个，归为 3 个疑似缺陷 |
+
+## 覆盖率（gcov，主机上编译运行）
+
+| 准则 | 覆盖率 | 口径 |
+|---|---|---|
+| 语句 | 97.8% | 180/184 |
+| 分支 | 91.2% | 62/68 |
+| MC/DC | 100% | 判定条件全覆盖 |
+
+未覆盖的 4 条语句在复位超时分支（缺陷 1 修复后补用例）。
+`
+
+// 需求分析产出：软件需求规格说明（部门模板节选）
+const SRS_MD = `# 软件需求规格说明 · PDUS（配电单元软件）
+
+> 依据《XY-9 卫星配电单元软件研制任务书》《XY-9 配电单元与数管分系统通信协议 V1.1》
+
+## 3 功能需求（IPO）
+
+| 编号 | 功能 | 输入 | 处理 | 输出 |
+|---|---|---|---|---|
+| PDUS-FREQ-012 | 遥控指令接收 | 1553B 子地址 1 | 校验帧头、字数、校验和 | 指令入队 / 拒绝计数 |
+| PDUS-FREQ-018 | 配电通道控制 | 通道号、通断 | 查互锁表、驱动继电器 | OC 输出、状态回读 |
+| PDUS-FREQ-023 | 遥测组帧 | 采集量、状态 | 按 1 s 周期组帧 | 遥测帧 8 条 |
+
+## 4 性能 / 安全性需求（RREQ）
+
+- PDUS-RREQ-004 指令响应 ≤ 50 ms；遥测周期 1 s ± 10 ms
+- PDUS-RREQ-009 母线过流时 2 个周期内断开对应通道（安全关键）
+
+## 7 跟踪矩阵（上级 → 需求）
+
+| 任务书条款 | 需求条目 |
+|---|---|
+| 3.2.1 配电控制 | PDUS-FREQ-018、PDUS-RREQ-009 |
+| 3.3 遥测遥控 | PDUS-FREQ-012、PDUS-FREQ-023 |
+
+**待确认 2 处**：母线过流阈值任务书与协议不一致（见需求分析记录 Q-03）；掉电保持通道清单待型号确认。
+`
+
+// 详细设计产出（节选）
+const DD_MD = `# 软件详细设计说明 · thm_ctrl（热控输出控制器）
+
+## 4.2.2 软件单元 thm_ctrl_step
+
+- **功能**：每个控制周期读温度、按阈值和滞回决定加热器通断
+- **输入**：当前温度 temp（0.1℃）、通道配置 cfg
+- **处理**：temp < on_th → 开；temp > off_th → 关；中间保持（滞回防抖）
+- **输出**：加热器通断位、本周期动作计数
+
+> 约束：on_th 必须小于 off_th（滞回带 ≥ 2℃）；单元内无动态内存、无递归（GJB 8114）。
+`
+
+// 编码产出：按详细设计生成的 C 代码
+const THM_C = `#include "thm_ctrl.h"
+
+/* 热控输出控制：带滞回的阈值控制，防止在阈值附近频繁通断 */
+uint8_t thm_ctrl_step(int16_t temp, const thm_cfg_t *cfg, thm_state_t *st)
+{
+    if (temp < cfg->on_th) {
+        st->heater = 1U;            /* 低于下限：加热 */
+    } else if (temp > cfg->off_th) {
+        st->heater = 0U;            /* 高于上限：停止 */
+    }                               /* 滞回带内：保持上一状态 */
+    st->actions += (uint16_t)(st->heater != st->last);
+    st->last = st->heater;
+    return st->heater;
+}
+`
+
+// 研制总结产出（Ⅲ、Ⅳ类，部门模板 09 节选）
+const SUMMARY_MD = `# 软件研制总结报告 · PDUS（Ⅲ、Ⅳ类）
+
+## 1 研制信息表（事实逐项标出处）
+
+| 项目 | 内容 | 出处 |
+|---|---|---|
+| 软件名称 | 配电单元软件 PDUS | 〔任务书〕 |
+| 规模 | 源代码 4 120 行，配置项 1 个 | 〔自动·cloc〕 |
+| 需求条目 | 功能 23、性能/安全 11 | 〔需求规格说明〕 |
+| 单元测试 | 39 用例，语句 97.8%、MC/DC 100% | 〔单元测试报告〕 |
+| 第三方评测 | 通过，遗留问题 0 | 〔评审纪要·2026-11-10〕 |
+
+## 5 研制过程（按评审要点）
+
+5.1.1 走查、5.1.4 单元测试、5.1.5 确认测试均已通过并归档。
+
+**待补充 1 处**：配置项测试报告编号待档案室回填〔用户提供〕。
+`
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+
+// 浏览器里看界面时的部署场景：默认是 Windows + 部门模型；地址带 ?scenario=kylin-qwen 时模拟麒麟系统 + 局域网 Qwen3.8-27B（演示、截图用）
+const KYLIN = typeof location !== 'undefined' && new URLSearchParams(location.search).get('scenario') === 'kylin-qwen'
+// 录演示视频时再加 &demo=1：界面上不写“模拟引擎”，按配好的部门模型显示（视频里要另行说明画面是回放）
+const DEMO = typeof location !== 'undefined' && new URLSearchParams(location.search).has('demo')
+const HOME = KYLIN ? '/home/zhangsan/.local/share/AstroLab' : 'C:\\Users\\demo\\AppData\\Local\\AstroLab'
+const MOCK_MODEL = KYLIN
+  ? { provider: 'dept-llm', model: 'qwen3.8-27b', baseURL: 'http://192.168.10.20:8000/v1', hasKey: true, contextWindow: 131072, maxTokens: 32768, thinkingFormat: 'qwen-chat-template' }
+  : { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 }
+const MOCK_PROBE: ModelProbe = KYLIN
+  ? {
+      ok: true, baseURL: MOCK_MODEL.baseURL, server: 'vLLM', model: 'qwen3.8-27b', models: ['qwen3.8-27b'], family: 'Qwen（通义千问）', maxModelLen: 131072, tokPerSec: 46, ms: 9400,
+      envFile: HOME + '/local.env', suggest: {},
+      checks: [
+        { item: '服务和模型', status: 'ok', detail: 'vLLM · qwen3.8-27b · 上下文 128K · Qwen（通义千问）（38 ms）' },
+        { item: '上下文窗口', status: 'ok', detail: 'local.env 131072，服务端 131072' },
+        { item: '对话', status: 'ok', detail: '1180 ms，约 46 tokens/秒（含首字等待）：验证每个函数在隔离环境下按设计正确工作。' },
+        { item: '工具调用', status: 'ok', detail: '结构化 tool_calls：read_file("src/tm_udp.c")（960 ms）' },
+        { item: '思考', status: 'ok', detail: '思考内容单独返回（612 字，6200 ms），答案：2' },
+        { item: '思考参数写法', status: 'ok', detail: 'qwen-chat-template' },
+      ],
+    }
+  : {
+      ok: true, baseURL: MOCK_MODEL.baseURL, server: 'OpenAI 兼容接口', model: 'deepseek-flash', models: ['deepseek-flash', 'deepseek-pro'], family: 'DeepSeek', maxModelLen: null, tokPerSec: 60, ms: 3100, suggest: {},
+      checks: [
+        { item: '服务和模型', status: 'ok', detail: 'OpenAI 兼容接口 · deepseek-flash · DeepSeek（120 ms）' },
+        { item: '对话', status: 'ok', detail: '900 ms，约 60 tokens/秒（含首字等待）：验证每个函数在隔离环境下按设计正确工作。' },
+        { item: '工具调用', status: 'ok', detail: '结构化 tool_calls：read_file("src/tm_udp.c")（1100 ms）' },
+      ],
+    }
 
 export function createMockApi(): AstroApi {
   const listeners = new Set<(e: AstroEvent) => void>()
@@ -349,11 +474,11 @@ export function createMockApi(): AstroApi {
   // URL 带 ?multi：演示多个工作区（侧栏按工作区列任务、工作区菜单、置顶和移出）
   const multi = new URLSearchParams(location.search).has('multi')
   const projects: Project[] = [
-    { id: 'p1', name: '示例工程', path: 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\workspace\\sample', sample: true, git: true, branch: 'main', pinned: multi },
+    { id: 'p1', name: '示例工程', path: KYLIN ? HOME + '/workspace/sample' : 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\workspace\\sample', sample: true, git: true, branch: 'main', pinned: multi },
     ...(multi ? [
-      { id: 'p2', name: 'g3-pdus', path: 'D:\\work\\g3-pdus', git: true, branch: 'dev', pinned: true },
-      { id: 'p3', name: 'oc_ctrl', path: 'D:\\work\\design\\oc_ctrl', git: true, branch: 'main' },
-      { id: 'p4', name: 'tcu', path: 'D:\\work\\design\\tcu', git: false },
+      { id: 'p2', name: 'g3-pdus', path: KYLIN ? '/home/zhangsan/work/g3-pdus' : 'D:\\work\\g3-pdus', git: true, branch: 'dev', pinned: true },
+      { id: 'p3', name: 'oc_ctrl', path: KYLIN ? '/home/zhangsan/work/design/oc_ctrl' : 'D:\\work\\design\\oc_ctrl', git: true, branch: 'main' },
+      { id: 'p4', name: 'tcu', path: KYLIN ? '/home/zhangsan/work/design/tcu' : 'D:\\work\\design\\tcu', git: false },
     ] : []),
   ]
   let project = projects[0]
@@ -451,6 +576,62 @@ export function createMockApi(): AstroApi {
         return JSON.stringify({ answers })
       })
       await say(r, reply)
+    } else if (task?.skills?.includes('requirements-analysis')) {
+      const s = (d: number) => ['读任务书和 ICD', '功能分解、写需求条目', '跟踪矩阵', '自查'].map((content, i) => ({ content, status: i < d ? 'completed' : i === d ? 'in_progress' : 'pending' }))
+      await stepStart(r)
+      await tool(r, 'skill', { name: 'requirements-analysis' }, 'skill loaded', '按部门模板做需求分析：从任务书和 ICD 抽需求，写规格说明和跟踪矩阵。')
+      await tool(r, 'todo_write', { todos: s(0) }, 'ok')
+      await tool(r, 'mcp__docreader__read_document', { path: 'docs/XY-9配电单元软件研制任务书.docx' }, '任务书：配电控制、遥测遥控……')
+      await tool(r, 'mcp__docreader__read_document', { path: 'docs/XY-9配电单元通信协议-V1.1.docx' }, 'ICD：1553B 子地址、帧格式……')
+      await stepStart(r, 1800)
+      await tool(r, 'todo_write', { todos: s(2) }, 'ok', '任务书 3.2.1 配电控制 → PDUS-FREQ-018；母线过流阈值任务书与协议不一致，记为待确认 Q-03。')
+      await tool(r, 'write', { file_path: 'docs/软件需求规格说明-PDUS.md', content: SRS_MD }, 'ok')
+      files.set('docs/软件需求规格说明-PDUS.md', { before: null, after: SRS_MD })
+      await tool(r, 'todo_write', { todos: s(4) }, 'ok')
+      await say(r, '需求分析完成：23 条功能需求、11 条性能/安全需求，跟踪矩阵对齐任务书。\n\n**2 处待确认**：母线过流阈值任务书与协议不一致（Q-03）；掉电保持通道清单待型号确认。\n\n《软件需求规格说明》在右边产出里。', '条款摘录、覆盖分析、待确认问题都写进了需求分析记录。')
+    } else if (task?.skills?.includes('detailed-design')) {
+      const s = (d: number) => ['读需求和概要设计', '单元划分、画流程图', '写详细设计', '自查'].map((content, i) => ({ content, status: i < d ? 'completed' : i === d ? 'in_progress' : 'pending' }))
+      await stepStart(r)
+      await tool(r, 'skill', { name: 'detailed-design' }, 'skill loaded', '每个配置项一份详细设计，按模块逐个软件单元写；含流程图。')
+      await tool(r, 'todo_write', { todos: s(0) }, 'ok')
+      await tool(r, 'read', { file_path: 'docs/软件需求规格说明-PDUS.md' }, 'ok')
+      await stepStart(r, 1600)
+      await tool(r, 'todo_write', { todos: s(2) }, 'ok', 'thm_ctrl_step 用滞回防抖；约束 on_th < off_th、无动态内存、无递归（GJB 8114）。')
+      await tool(r, 'write', { file_path: 'design/thm_ctrl-详细设计.md', content: DD_MD }, 'ok')
+      files.set('design/thm_ctrl-详细设计.md', { before: null, after: DD_MD })
+      await tool(r, 'write', { file_path: 'diagrams/thm_ctrl-流程图.svg', content: FLOW_SVG }, 'ok')
+      files.set('diagrams/thm_ctrl-流程图.svg', { before: null, after: FLOW_SVG })
+      await tool(r, 'todo_write', { todos: s(4) }, 'ok')
+      await say(r, '详细设计完成：按概要设计把配置项拆成 6 个软件单元，每个函数一份设计 + 流程图。关键单元 thm_ctrl_step 用滞回防止阈值附近频繁通断。\n\n产出：《详细设计说明》和流程图。')
+    } else if (task?.skills?.includes('coding') || /编码|写代码|生成代码/.test(text)) {
+      const s = (d: number) => ['读详细设计和头文件', '按设计写代码', '交叉编译检查', '对照追踪表自查'].map((content, i) => ({ content, status: i < d ? 'completed' : i === d ? 'in_progress' : 'pending' }))
+      await stepStart(r)
+      await tool(r, 'todo_write', { todos: s(0) }, 'ok')
+      await tool(r, 'read', { file_path: 'design/thm_ctrl-详细设计.md' }, 'ok')
+      await tool(r, 'read', { file_path: 'src/include/thm_ctrl.h' }, 'ok')
+      await stepStart(r, 1800)
+      await tool(r, 'todo_write', { todos: s(1) }, 'ok', '严格照详细设计 4.2.2：滞回带内保持；动作计数按状态变化累加。')
+      await tool(r, 'write', { file_path: 'src/thm_ctrl.c', content: THM_C }, 'ok')
+      files.set('src/thm_ctrl.c', { before: null, after: THM_C })
+      await tool(r, 'todo_write', { todos: s(2) }, 'ok')
+      await tool(r, 'mcp__cppcheck__run_cppcheck', { paths: 'src/thm_ctrl.c' }, async () => { await wait(1200); return '0 errors, 0 warnings' })
+      await tool(r, 'compile_check', { cc: 'sparc-gaisler-elf-gcc', file: 'src/thm_ctrl.c' }, async () => { await wait(1400); return '目标机交叉编译通过（-Wall -Wextra 无告警）' })
+      await tool(r, 'todo_write', { todos: s(4) }, 'ok')
+      await say(r, '编码完成：按详细设计生成 `src/thm_ctrl.c`，SPARC 目标机交叉编译通过、Cppcheck 无告警。逐函数对照了详细设计与代码追踪表，一一对应。\n\n代码在右边产出里。', '每个函数对照详细设计条目，确认与设计一致、符合 GJB 8114。')
+    } else if (task?.skills?.includes('dev-summary') || /研制总结/.test(text)) {
+      const s = (d: number) => ['生成研制信息表', '逐项标出处', '脚本生成报告', '自查'].map((content, i) => ({ content, status: i < d ? 'completed' : i === d ? 'in_progress' : 'pending' }))
+      await stepStart(r)
+      await tool(r, 'skill', { name: 'dev-summary' }, 'skill loaded', '研制总结几乎全是事实：先出研制信息表、逐项标出处，报告由脚本从信息表生成。')
+      await tool(r, 'todo_write', { todos: s(0) }, 'ok')
+      await tool(r, 'read', { file_path: 'docs/软件需求规格说明-PDUS.md' }, 'ok')
+      await tool(r, 'read', { file_path: 'utest/rt1553/test/单元测试报告-rt_drv.md' }, 'ok')
+      await tool(r, 'mcp__knowledge__search_reference', { query: '研制总结 Ⅲ类 评审要点' }, '1 条：模板 09 第 5 章按评审要点编号' )
+      await stepStart(r, 1600)
+      await tool(r, 'todo_write', { todos: s(2) }, 'ok', '规模 cloc 自动取、需求数来自规格说明、覆盖率来自单元测试报告；配置项测试报告编号缺，标〔用户提供〕。')
+      await tool(r, 'write', { file_path: 'docs/软件研制总结报告-PDUS.md', content: SUMMARY_MD }, 'ok')
+      files.set('docs/软件研制总结报告-PDUS.md', { before: null, after: SUMMARY_MD })
+      await tool(r, 'todo_write', { todos: s(4) }, 'ok')
+      await say(r, '研制总结报告生成完毕（Ⅲ、Ⅳ类，部门模板 09）。研制信息表每项都标了出处：〔自动〕规模、〔来源〕需求数和覆盖率、〔用户提供〕待回填的档案编号。\n\n**1 处待补充**：配置项测试报告编号待档案室回填。报告在右边产出里。', '研制总结几乎全是事实，编错一个数字评审要逐项核对，所以每项都标了出处。')
     } else if (task?.skills?.includes('info-flow') || /信息流/.test(text)) {
       const steps = (done: number) => ['读任务书和 ICD', '抽取接口和信息', '建信息流模型', '出总图和说明', '自查'].map((content, i) => ({ content, status: i < done ? 'completed' : i === done ? 'in_progress' : 'pending' }))
       await stepStart(r)
@@ -484,10 +665,10 @@ export function createMockApi(): AstroApi {
         files.set(p, { before: null, after: c })
       }
       await stepStart(r)
-      await tool(r, 'write', { file_path: 'D:\\temp\\out.txt', content: 'log\n' }, 'sandbox denied: write outside the workspace is not permitted')
+      await tool(r, 'write', { file_path: KYLIN ? '/home/zhangsan/out.txt' : 'D:\\temp\\out.txt', content: 'log\n' }, 'sandbox denied: write outside the workspace is not permitted')
       await stepStart(r)
       await tool(r, 'todo_write', { todos: todos(3) }, 'ok')
-      await tool(r, 'mcp__utest__run_unit_tests', { test_dir: 'utest/rt1553/test' }, async () => { await wait(2400); return '编译通过；39 个用例，30 通过，9 失败' })
+      await tool(r, 'mcp__utest__run_unit_tests', { test_dir: 'utest/rt1553/test', coverage: 'mcdc' }, async () => { await wait(2400); return '编译通过；39 个用例，30 通过，9 失败；覆盖率 语句 97.8%、分支 91.2%、MC/DC 100%' })
       await stepStart(r)
       await tool(r, 'edit', { file_path: 'utest/rt1553/src/rt_drv.c', old_string: '    while (t < ticks) {', new_string: '    /* 测试桩接入点 */\n    while (t < ticks) {' }, 'ok')
       files.set('utest/rt1553/src/rt_drv.c', { before: RT_DRV_BEFORE, after: RT_DRV_BEFORE.replace('    while (t < ticks) {', '    /* 测试桩接入点 */\n    while (t < ticks) {') })
@@ -495,7 +676,7 @@ export function createMockApi(): AstroApi {
       await tool(r, 'write', { file_path: 'utest/rt1553/test/单元测试报告-rt_drv.md', content: REPORT }, 'ok')
       files.set('utest/rt1553/test/单元测试报告-rt_drv.md', { before: null, after: REPORT })
       await tool(r, 'todo_write', { todos: todos(6) }, 'ok')
-      await say(r, '单元测试做完了：39 个用例，30 通过，9 失败。\n\n失败的用例按设计核对后归为 3 个疑似缺陷：\n\n1. **复位第 10 tick 就绪时仍报超时**（TC-007～010）：设计 4.2.3 要求“大于或等于 10 tick 视为就绪”，代码用了 `>`。\n2. **描述符堆栈第 65 项没有回绕**（TC-021～024）。\n3. **字数为 0 的消息按 0 个字处理**（TC-033）：1553 协议中字数 0 表示 32 个字。\n\n报告在 `utest/rt1553/test/单元测试报告-rt_drv.md`。', '核对失败用例与设计条目，确认预期值都来自设计。')
+      await say(r, '单元测试做完了：39 个用例，30 通过，9 失败；覆盖率语句 97.8%、分支 91.2%、MC/DC 100%。\n\n失败的用例按设计核对后归为 3 个疑似缺陷：\n\n1. **复位第 10 tick 就绪时仍报超时**（TC-007～010）：设计 4.2.3 要求“大于或等于 10 tick 视为就绪”，代码用了 `>`。\n2. **描述符堆栈第 65 项没有回绕**（TC-021～024）。\n3. **字数为 0 的消息按 0 个字处理**（TC-033）：1553 协议中字数 0 表示 32 个字。\n\n报告在 `utest/rt1553/test/单元测试报告-rt_drv.md`。', '核对失败用例与设计条目，确认预期值都来自设计。')
     }
     ev('turn/end', { turn, reason: { kind: 'completed' } })
   }
@@ -523,12 +704,27 @@ export function createMockApi(): AstroApi {
   let up: UpdateState = { version: '0.1.0', installed: true, dir: '\\\\fileserver\\astrolab\\release', configured: true, working: null, check: null, staged: null, progress: null, last: null }
   const upEmit = () => emitUi({ type: 'update', payload: { ...up } })
   const LATEST = { version: '0.2.0', date: '2026-10-29T09:00:00Z', notes: '- 提交后页头显示“已提交”\n- 产出文件数按实际改动计\n- 命令说明用中文' }
+  // 模型配置（浏览器里看界面用）：部门默认 + 自定义模型
+  const PRESETS_MOCK: ModelPreset[] = [
+    { id: 'lan-qwen', name: '局域网 Qwen3.8-27B（vLLM）', baseURL: 'http://192.168.10.20:8000/v1', model: 'qwen3.8-27b', thinkingFormat: 'qwen-chat-template', contextWindow: 131072, maxTokens: 32768, input: 'text', defaultKey: 'EMPTY', note: '地址换成你们服务器的；模型名是 vLLM 的 --served-model-name' },
+    { id: 'intranet-deepseek', name: '内网 DeepSeek（vLLM）', baseURL: 'http://10.0.0.10:8000/v1', model: 'deepseek-v4', thinkingFormat: 'chat-template', contextWindow: 131072, maxTokens: 32768, input: 'text', defaultKey: 'EMPTY', note: '内网 4×H200 上的 vLLM' },
+    { id: 'deepseek-api', name: 'DeepSeek 官方接口', baseURL: 'https://api.deepseek.com', model: 'deepseek-flash', thinkingFormat: 'deepseek', contextWindow: 1048576, maxTokens: 65536, input: 'text', defaultKey: '', note: '公网接口：只能用示例代码和非敏感内容' },
+    { id: 'openai-compatible', name: '其他 OpenAI 兼容接口', baseURL: 'http://', model: '', thinkingFormat: 'chat-template', contextWindow: 131072, maxTokens: 32768, input: 'text', defaultKey: '', note: '填好地址后点“获取模型列表”，再点“检测”' },
+  ]
+  const deptModel: ModelProfile = { id: 'dept', name: '部门默认（local.env）', baseURL: MOCK_MODEL.baseURL, model: MOCK_MODEL.model, thinkingFormat: MOCK_MODEL.thinkingFormat || 'deepseek', contextWindow: MOCK_MODEL.contextWindow, maxTokens: MOCK_MODEL.maxTokens || 65536, input: 'text', hasKey: true, builtin: true }
+  let customModels: ModelProfile[] = []
+  let activeModelId = 'dept'
+  const modelList = (): ModelList => ({ active: activeModelId, locked: false, presets: PRESETS_MOCK, models: [deptModel, ...customModels].map((x) => ({ ...x, active: x.id === activeModelId })) })
+  const activeModel = () => {
+    const x = [deptModel, ...customModels].find((m) => m.id === activeModelId) || deptModel
+    return { provider: 'dept-llm', model: x.model, baseURL: x.baseURL, hasKey: x.hasKey, contextWindow: x.contextWindow, maxTokens: x.maxTokens, thinkingFormat: x.thinkingFormat, name: x.id === 'dept' ? '部门默认' : x.name, activeId: x.id }
+  }
   function appState(): AppState {
     return {
-      platform: 'win32', mock: true, installed: false,
-      model: { provider: 'dept-llm', model: 'deepseek-flash', baseURL: 'https://api.deepseek.com', hasKey: true, contextWindow: 1048576 },
+      platform: KYLIN ? 'linux' : 'win32', mock: !DEMO, installed: DEMO,
+      model: activeModel(),
       engineReady: true, projects: [...projects], stages: STAGES, skills: SKILLS, notes: [], task: state(), items: act.items.map(plainItem), update: { ...up },
-      user: 'zhangsan', versions: { app: '0.1.0', electron: '44.9.3', node: '22.20.0' }, dataDir: 'C:\\Users\\demo\\AppData\\Local\\AstroLab', logDir: 'C:\\Users\\demo\\AppData\\Local\\AstroLab\\logs',
+      user: 'zhangsan', versions: { app: '0.1.0', electron: '44.9.3', node: '22.20.0' }, dataDir: HOME, logDir: KYLIN ? HOME + '/logs' : HOME + '\\logs',
     }
   }
 
@@ -593,7 +789,7 @@ export function createMockApi(): AstroApi {
   ]
 
   const api: AstroApi = {
-    platform: 'win32',
+    platform: KYLIN ? 'linux' : 'win32',
     async getState() { return appState() },
     onEvent(cb) { listeners.add(cb); return () => listeners.delete(cb) },
     project: {
@@ -730,7 +926,45 @@ export function createMockApi(): AstroApi {
         return { tasks: tasks.slice(0, 30), files: terms.length ? fileList.filter((f) => terms.every((x) => f.path.toLowerCase().includes(x))).slice(0, 30) : [] }
       },
     },
-    model: { async test() { await new Promise((r) => setTimeout(r, 600)); return { ok: true, ms: 600, model: 'deepseek-flash', reply: '连接正常（模拟）' } } },
+    model: {
+      async test() { await new Promise((r) => setTimeout(r, 600)); return { ok: true, ms: 600, model: MOCK_MODEL.model, reply: '连接正常（模拟）' } },
+      async probe() { await sleep(KYLIN ? 2400 : 1200); return MOCK_PROBE },
+      async list() { return modelList() },
+      async save(d) {
+        await wait(300)
+        if (!d.name.trim()) throw new Error('给模型起个名字')
+        if (!/^https?:\/\/[^\s/]+/.test(d.baseURL)) throw new Error('地址要以 http:// 或 https:// 开头')
+        if (!d.model.trim()) throw new Error('填模型名')
+        const old = customModels.find((x) => x.id === d.id)
+        const rec: ModelProfile = { id: old ? old.id : `m${customModels.length + 1}`, name: d.name, baseURL: d.baseURL.replace(/\/+$/, ''), model: d.model, thinkingFormat: d.thinkingFormat, contextWindow: d.contextWindow, maxTokens: d.maxTokens, input: d.input, hasKey: !!d.key || !!old?.hasKey, builtin: false }
+        if (old) Object.assign(old, rec); else customModels.push(rec)
+        if (d.use) activeModelId = rec.id
+        return modelList()
+      },
+      async remove(id) { customModels = customModels.filter((x) => x.id !== id); if (activeModelId === id) activeModelId = 'dept'; return modelList() },
+      async activate(id) { activeModelId = id; return modelList() },
+      async probeDraft(d) {
+        const ds = /deepseek/i.test(d.model) || /10\.0\.0\.10/.test(d.baseURL)
+        const id = d.model || (ds ? 'deepseek-v4' : 'qwen3.8-27b')
+        if (d.listOnly) {
+          await wait(500)
+          const listMeta = ds ? [{ id: 'deepseek-v4', maxModelLen: 131072, family: 'deepseek' }] : [{ id: 'qwen3.8-27b', maxModelLen: 131072, family: 'qwen' }]
+          return { ...MOCK_PROBE, baseURL: d.baseURL, model: listMeta[0].id, models: listMeta.map((x) => x.id), listMeta, checks: [{ item: '服务和模型', status: 'ok' as const, detail: `vLLM · ${listMeta.length} 个模型（21 ms）` }], suggest: {} }
+        }
+        await wait(1600)
+        const fam = ds ? 'DeepSeek' : 'Qwen（通义千问）'
+        return {
+          ok: true, baseURL: d.baseURL, server: 'vLLM', model: id, models: [id], family: fam, maxModelLen: d.contextWindow, tokPerSec: ds ? 38 : 46, ms: 7200, suggest: {},
+          checks: [
+            { item: '服务和模型', status: 'ok' as const, detail: `vLLM · ${id} · 上下文 ${Math.round(d.contextWindow / 1024)}K · ${fam}（24 ms）` },
+            { item: '上下文窗口', status: 'ok' as const, detail: `设置 ${d.contextWindow}，服务端 ${d.contextWindow}` },
+            { item: '对话', status: 'ok' as const, detail: `${ds ? 1420 : 1180} ms，约 ${ds ? 38 : 46} tokens/秒（含首字等待）` },
+            { item: '工具调用', status: 'ok' as const, detail: '结构化 tool_calls：read_file("src/tm_udp.c")（1030 ms）' },
+            { item: '思考', status: 'ok' as const, detail: '思考内容单独返回（540 字，5800 ms），答案：2' },
+          ],
+        }
+      },
+    },
     review: {
       async changes(): Promise<Change[]> {
         return [...files.entries()].map(([path, f]) => {
