@@ -17,6 +17,7 @@ sample/design/*/doc-*/
 evals/detailed-design/results/
 evals/preliminary-design/results/
 evals/coding/results/
+evals/info-flow/results/
 sample/design/*/src/
 sample/design/*/include/
 
@@ -45,3 +46,5 @@ evals/g3-pdus/results/
 output/
 Claude outputs/
 /AstroLab项目介绍与说明.docx
+# 技能打包出来分发用的 zip（sync 不许提交 zip）
+skills/*.zip

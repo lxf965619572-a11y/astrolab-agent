@@ -350,7 +350,7 @@ node app/main/probe.mjs --base http://192.168.10.20:8000/v1        # 加 --write
 | 静态分析 | static-analysis | cppcheck；gjb-scan.mjs、metrics.mjs、check-sa.mjs、gen-sa-report.mjs | 复用走查评测用例的代码 | 11-03 新增，待试用；部门 TESTBED 结果按 CSV 接入 |
 | 确认测试 | confirmation-test | docreader、docgen；ct-results.mjs（导出执行记录表、导入结果）、check-ct.mjs、gen-ct-report.mjs | 虚构 TCU 需求片段（脚本自测） | 11-03 新增，待试用；智能体不执行测试，结果由测试人员填表导入 |
 | 研制总结 | dev-summary | docreader、docgen；info-sheet.mjs、check-summary.mjs、gen-summary.mjs | 虚构 TCU（Ⅰ、Ⅲ、Ⅳ类各生成一次） | 11-03 新增，待试用；只做Ⅰ、Ⅲ、Ⅳ类 |
-| 文档与图 | info-flow（信息流梳理） | docreader、infoflow（布局、出图、N² 矩阵、交互版） | PCU 任务书 + ICD（示例 2），`skills/info-flow/tests/pcu-demo` | 插件时期已试用（1.2.0）；11-17 改为内置，服务自测 44 项通过，待在工作台上用 PCU 用例走一遍 |
+| 文档与图 | info-flow（信息流梳理） | docreader、infoflow（布局、出图、N² 矩阵、交互版） | PCU 任务书 + ICD（示例 2），`skills/info-flow/tests/pcu-demo` | 插件时期已试用（1.2.0）；11-17 改为内置，服务自测 44 项通过；局域网 Qwen 上走通（11-18 用户确认）；自动评分 `evals/info-flow`（11-18，pcu 用例与技能示例同材料，内容分偏乐观） |
 
 **全流程验收 G3（2026-11-04 准备好材料，待跑）：**`evals\g3-pdus`，一个虚构的Ⅲ类软件从需求分析走到研制总结（11 个任务），每个环节埋了陷阱，覆盖 11-03 改造后的全部技能。步骤见其中的 README。
 
