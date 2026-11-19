@@ -11,6 +11,7 @@ import { HistoryView } from './views/HistoryView'
 import { ProjectView, ProjectsView } from './views/ProjectView'
 import { SettingsView } from './views/SettingsView'
 import { OutputsView } from './views/OutputsView'
+import { SchedulesView } from './views/SchedulesView'
 import { visibleProjects } from './components/Shell'
 import { SearchDialog } from './components/SearchDialog'
 import { KbEditor, KnowledgeView } from './views/KnowledgeView'
@@ -69,6 +70,7 @@ export function App() {
           {v === 'history' && <HistoryView />}
           {v === 'settings' && <SettingsView />}
           {v === 'outputs' && <OutputsView />}
+          {v === 'schedules' && <SchedulesView />}
           {v === 'peek' && <PeekView />}
           {v === 'knowledge' && <KnowledgeView />}
           {v === 'library' && <LibraryView />}

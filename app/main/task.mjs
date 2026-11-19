@@ -41,6 +41,26 @@ const MAX_SKILLS = 3
 
 const RESUME_TEXT = '刚才的任务被中断了，请从中断的地方接着做；已经完成的步骤不要重做。'
 // 进度按智能体的 todo_write 显示。模型常常不列，所以：新一轮的话后面带一句提示；一轮里做了几步还没列，工作台插一句提醒
+/**
+ * 定时任务的无人值守约定（做法同 Claude 的定时任务）：没人回答，所以不提问；按最合理的理解做，把假设写进“待确认”；
+ * 不可撤销又两可的决定不做，准备好后写清楚要人决定什么。结果照常进审核，人回来先看最后一条回复。
+ */
+export function unattendedNote(t) {
+  const s = t.schedule || {}
+  const when = s.due ? new Date(s.due) : new Date()
+  const hm = `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`
+  const why = s.manual ? '（这次是手动点了“立即运行”）' : s.catchup ? `（这是补跑：原定 ${when.getMonth() + 1} 月 ${when.getDate()} 日 ${hm}，当时电脑没开或在睡眠）` : ''
+  return `【无人值守】这是定时任务“${s.name || t.title}”的一次自动运行${why}，现在没有人在电脑前，没人能回答问题。所以：
+- 不要用 ask_user_question 提问。遇到要拍板的地方，按最合理的理解继续做，在最后的回复里用“待确认”一节逐条写出你做的假设和理由。
+- 删除或覆盖用户写的内容这类不可撤销、两种做法都说得通的决定不要做：把准备工作做完，在“待确认”里写清楚需要用户决定什么。
+- 工作区里缺输入、或者这次没有要做的事（例如没有新的改动），就写一句说明后结束，不要编造内容。
+- 最后的回复开头用两三句话写清这次做了什么、结果写在哪个文件，用户回来先看这里。`
+}
+/** 无人值守时智能体还是提了问：替用户回答（有人正看着这个任务时先等一会儿） */
+export const UNATTENDED_ANSWER = '（无人值守，没有人回答）请按你认为最合理的做法继续，并把这个决定和理由写进最后回复的“待确认”。'
+/** 用户回到无人值守的任务里追问：告诉智能体现在有人了 */
+export const BACK_NOTE = '（我回来了，现在有人在：需要拍板时可以用 ask_user_question 问我。）'
+
 export const PLAN_HINT = '【工作台】超过三步的工作，开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。'
 export const PLAN_NUDGE = '【工作台】这项工作有好几步，请先用 todo_write 列出要做的步骤（工作台的“进度”按它显示），之后每做完一步更新状态，然后接着做。'
 const PLAN_NUDGE_AFTER = 4 // 一轮里调用了这么多次工具还没列步骤，就提醒一次
@@ -56,6 +76,7 @@ export function composeFollowUp(text, { skills = [], files = [] } = {}, titleOf 
   return parts.join('\n\n')
 }
 export function followUpDisplay(t) {
+  if (t.startsWith(BACK_NOTE)) t = t.slice(BACK_NOTE.length).replace(/^\n+/, '')
   const i = t.search(/\n\n【(技能|相关文件|工作台)】/)
   if (i < 0) return t
   const sk = /\n\n【技能】([^\n]*)/.exec(t)
@@ -172,6 +193,10 @@ function taskFile(dataDir, projectId, id) {
   return f
 }
 /** 改一个任务记录里的字段（标题、归档标记），返回改后的任务 */
+/** 读一个任务的记录（定时任务的运行记录要显示任务现在的状态）；没有或读不了返回 null */
+export function readTaskRecord(dataDir, projectId, id) {
+  try { return JSON.parse(readFileSync(taskFile(dataDir, projectId, id), 'utf8')).task } catch { return null }
+}
 export function patchTaskRecord(dataDir, projectId, id, patch) {
   const f = taskFile(dataDir, projectId, id)
   const rec = JSON.parse(readFileSync(f, 'utf8'))
@@ -399,7 +424,8 @@ export class TaskController extends EventEmitter {
       this.save()
       void this.refreshChangeStat({ end: true }).then(() => this.emit('task-done', this.task))
       if (this.restartPending) this.requestRestart()
-      this.emit('notify', { level: 2, kind: 'done', title: `${this.task.stage === 'general' ? '任务' : this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120) })
+      const sch = this.task.schedule
+      this.emit('notify', { level: 2, kind: 'done', title: sch ? `定时任务“${sch.name}”做完了，等你审核` : `${this.task.stage === 'general' ? '任务' : this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120), ...(sch ? { schedule: sch.id, projectId: this.project && this.project.id, taskId: this.task.id } : {}) })
     }
   }
 
@@ -431,7 +457,9 @@ export class TaskController extends EventEmitter {
     const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
     // 约定放最前面：放在末尾时智能体的第一句话仍是英文
     const kb = this.o.knowledge ? '动手前先用 mcp__knowledge__search_knowledge 查部门知识库里相关的经验、设计和代码，用到的在回复里注明出处。需要依据或细节（标准、教材里怎么说）时用 mcp__knowledge__search_reference 查部门资料库（原文多是英文，用英文术语检索），引用写资料名、节号和页码。不要主动往知识库里记东西：只有我明确说“记到知识库”“入库”时，才用 mcp__knowledge__propose_knowledge 按我说的内容记一条草稿。' : ''
-    const parts = [`【约定】全程用中文回复。今天是 ${today}。需要我拍板时用 ask_user_question 提问，不要猜；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。命令和工具调用的说明（description）也用中文写，我在界面上看得懂。超过三步的工作，开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。${kb}`]
+    const askRule = t.unattended ? '这次是无人值守的定时运行，规则见下面的【无人值守】' : '需要我拍板时用 ask_user_question 提问，不要猜'
+    const parts = [`【约定】全程用中文回复。今天是 ${today}。${askRule}；不要提交或推送 Git，改动由我在工作台审核后提交。只读写当前工作区和技能目录里的文件，工作区外的文件请我放进来，不要到别的目录去找。命令和工具调用的说明（description）也用中文写，我在界面上看得懂。超过三步的工作，开始前用 todo_write 列出这次要做的步骤，每做完一步更新状态（工作台的“进度”按它显示）。${kb}`]
+    if (t.unattended) parts.push(unattendedNote(t))
     const skills = (t.skills || []).filter((n) => !this.o.skillsDir || this.knownSkill(n))
     if (skills.length) {
       // 写成 /技能名：DSH 在第一步之前就把技能内容附到对话里（和 skill 工具返回的一样），
@@ -505,7 +533,10 @@ export class TaskController extends EventEmitter {
     this.task = {
       id, sessionId: id, stage: stage.id, stageName: stage.name, skill: stage.skill, skills: chosen.map((c) => c.name), category, mode,
       reportable: chosen.some((c) => c.report) || !cards.length,
-      title: prompt.split('\n')[0].slice(0, 60), prompt, files: input.files || [], options: input.options || {},
+      title: String(input.title || '').trim().slice(0, 60) || prompt.split('\n')[0].slice(0, 60), prompt, files: input.files || [], options: input.options || {},
+      // 定时任务发起的：无人值守（不等人回答），记下是哪个定时任务、计划时间、是否补跑
+      ...(input.unattended ? { unattended: true } : {}),
+      ...(input.schedule ? { schedule: { id: String(input.schedule.id), name: String(input.schedule.name || ''), due: input.schedule.due || null, catchup: !!input.schedule.catchup, manual: !!input.schedule.manual } } : {}),
       startedAt: Date.now(), endedAt: null, status: 'starting', snapshot: null, commit: null,
       firstSent: false, firstMessageId: null,
     }
@@ -567,6 +598,12 @@ export class TaskController extends EventEmitter {
         this.activity.todos = []
         this.save()
       }
+    }
+    // 定时任务做完（或做着）时用户来追问：人回来了，之后的提问照常等人回答
+    if (this.task.unattended) {
+      this.task.unattended = false
+      text = `${BACK_NOTE}\n\n${text}`
+      this.save()
     }
     // 新一轮（不是进行中的插话）：带上列步骤的提示；上一项的步骤已经全部做完的，清掉等新列的
     if (!this.busy) {
@@ -673,6 +710,18 @@ export class TaskController extends EventEmitter {
     this.questions.set(q.id, item)
     this.setStatus('asking')
     this.emit('question', item)
+    if (this.task.unattended) {
+      // 无人值守：替用户回答“按最合理的做法继续”。有人正看着这个任务（窗口在前台、正打开它）就先等一会儿，让人自己答
+      const wait = this.o.watched && this.o.watched(this) ? (this.o.unattendedAskMs ?? 120_000) : 0
+      const fire = () => {
+        if (!this.questions.has(q.id) || !(this.task && this.task.unattended)) return
+        // 对话里的提问工具结果会显示这句自动回答，不另外弹提示
+        this.answer(q.id, item.questions.map((x, i) => ({ id: x.id || String(i), selected: [], custom: UNATTENDED_ANSWER })))
+      }
+      if (wait) setTimeout(fire, wait)
+      else setImmediate(fire)
+      return
+    }
     this.emit('notify', { level: 3, kind: 'ask', title: '需要你决定', body: (item.questions[0] && item.questions[0].question) || '' })
   }
 

@@ -128,6 +128,11 @@ function ConvHead({ inCode }: { inCode: boolean }) {
           <div className="conv-meta">
             <span className={`pill sm ${st.cls}`}><span className={`dot ${live && ts.status !== 'starting' ? 'breathe' : ''}`} />{st.label}</span>
             <span className="conv-stage">{task.stageName}</span>
+            {task.schedule && (
+              <Button className="crumb-proj" onPress={() => setView('schedules')} aria-label={`定时任务“${task.schedule.name}”自动运行的，打开定时任务页`}>
+                <Icon name="clock" size={12} stroke={1.8} />定时{task.schedule.catchup ? '（补跑）' : task.schedule.manual ? '（手动）' : ''}
+              </Button>
+            )}
             <span><Icon name="clock" size={12} stroke={2} />{used} · 第 {ts.summary.steps} 步</span>
             {!!ts.summary.files && <span>{ts.summary.files} 个文件 <span className="add">+{ts.summary.added}</span>{ts.summary.removed ? <span className="rem"> −{ts.summary.removed}</span> : null}</span>}
           </div>
@@ -139,6 +144,11 @@ function ConvHead({ inCode }: { inCode: boolean }) {
           {!live && <Key size="sm" onPress={() => void run((api) => api.task.reset()).then(() => setView(inCode ? 'code' : 'launch'))}><Icon name="plus" size={14} stroke={2} />新任务</Key>}
         </div>
       </div>
+      {task.schedule && task.unattended && (
+        <div className="sched-banner"><Icon name="clock" size={14} stroke={1.8} />
+          <span>定时任务“{task.schedule.name}”自动运行，无人值守：智能体不提问，按最合理的理解做，假设写在最后回复的“待确认”里。在下面追问就算你回来了，之后有问题会照常问你。</span>
+        </div>
+      )}
       {/* 任务模式右边面板开着时，进度在面板里，这里不重复 */}
       {!!ts.summary.todos.length && (inCode || !panel) && <Progress todos={ts.summary.todos} live={live} />}
     </header>

@@ -49,7 +49,29 @@ export interface Task {
   usage?: Usage | null
   /** 归档了：侧栏不再列出，任务历史里“已归档”能找到 */
   archived?: boolean
+  /** 定时任务发起的：哪个定时任务、计划时间、是否补跑或手动；unattended 为真时智能体不等人回答（用户追问后变为假） */
+  schedule?: { id: string; name: string; due: number | null; catchup: boolean; manual: boolean }
+  unattended?: boolean
 }
+
+// ---------- 定时任务（main/schedule.mjs） ----------
+export type Freq = 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'once' | 'manual'
+export interface Trigger { freq: Freq; time?: string; minute?: number; days?: number[]; at?: number }
+export interface ScheduleRun {
+  id: string; at: number; due?: number; status: 'started' | 'skipped' | 'missed' | 'failed'; reason?: string
+  taskId?: string; projectId?: string; catchup?: boolean; manual?: boolean
+  task?: { status: Status; title: string; startedAt: number; endedAt: number | null; commit: Task['commit']; restoredAt: number | null } | null
+}
+export interface Schedule {
+  id: string; name: string; prompt: string; projectId: string; skills: string[]; mode: 'task' | 'code'; options: { report?: boolean }
+  trigger: Trigger; enabled: boolean; nextRunAt: number | null; lastRunAt?: number; createdAt: number; updatedAt: number
+  /** 到点了但工程被占用，排着队等（最多 2 小时） */
+  pending: null | { due: number; since: number; reason: string; catchup: boolean }
+  runs: ScheduleRun[]; describe: string
+}
+export interface ScheduleTemplate { id: string; name: string; icon: string; mode: 'task' | 'code'; skills: string[]; trigger: Trigger; summary: string; prompt: string }
+export interface ScheduleDraft { id?: string; name: string; prompt: string; projectId: string; skills: string[]; mode: 'task' | 'code'; options: { report?: boolean }; trigger: Trigger; enabled?: boolean }
+export interface ScheduleState { schedules: Schedule[]; templates: ScheduleTemplate[]; login: { supported: boolean; on: boolean; note?: string }; tray: boolean; now: number }
 
 export interface QuestionItem { id: string; header?: string; question: string; options?: { label: string; description?: string }[]; multiSelect?: boolean }
 export interface Question { id: string; questions: QuestionItem[]; at: number }
@@ -78,6 +100,8 @@ export interface AppState {
 /** 后台项目的任务：侧栏显示状态，点一下切到那个项目 */
 export interface BgTask {
   projectId: string; projectName: string; status: string; asking: boolean
+  /** 定时任务发起的 */
+  scheduled?: boolean
   task: { id: string; title: string; stageName: string; mode?: 'task' | 'code'; category?: string; startedAt: number }
 }
 
@@ -96,6 +120,12 @@ export type AstroEvent =
   | { type: 'library'; payload: LibSource[] }
   | { type: 'update'; payload: UpdateState }
   | { type: 'ref-translate'; payload: { id: string; job: RefJob | null } }
+  /** 定时任务有变化（新建、运行、跳过）：定时任务页重新取 */
+  | { type: 'schedules'; payload: null }
+  /** 后台发起了任务：侧栏的最近任务重新取 */
+  | { type: 'recent'; payload: null }
+  /** 托盘菜单、系统通知要打开的页面或任务 */
+  | { type: 'open'; payload: { view?: 'schedules'; projectId?: string; taskId?: string } }
 
 /** 软件更新（main/update.mjs 的 state()） */
 export interface UpdateState {
@@ -191,6 +221,12 @@ export interface AstroApi {
     search(q: string, scope?: 'all' | 'current'): Promise<SearchResult>
     /** 产出页：所有工程的任务写过的文件 */
     outputs(): Promise<OutputFile[]>
+  }
+  schedule: {
+    list(): Promise<ScheduleState>; save(d: ScheduleDraft): Promise<{ id: string; state: ScheduleState }>; remove(id: string): Promise<ScheduleState>
+    enable(id: string, on: boolean): Promise<ScheduleState>; runNow(id: string): Promise<{ run: ScheduleRun | null; state: ScheduleState }>
+    /** 开机自动启动（最小化到托盘） */
+    login(on: boolean): Promise<ScheduleState>
   }
   /** 设置页“测试连接” */
   model: { test(): Promise<{ ok: boolean; ms: number; model: string; reply?: string; error?: string }>; probe(): Promise<ModelProbe | null>

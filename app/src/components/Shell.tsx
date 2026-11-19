@@ -144,6 +144,8 @@ export function Sidebar() {
   const loadRecent = useStore((s) => s.loadRecent)
   const bg = useStore((s) => s.app?.background) || NOBG
   const peekId = useStore((s) => (s.view === 'peek' ? s.peek?.task.id : null))
+  // 定时任务在运行的个数（当前工程的 + 后台的）
+  const schedLive = useStore((s) => (s.ts?.task?.schedule && ['starting', 'running', 'asking'].includes(s.ts.status) ? 1 : 0) + (s.app?.background || []).filter((b) => b.scheduled && ['starting', 'running', 'asking'].includes(b.status)).length)
   const cur = ts?.project || null
   const curId = ts?.task?.id
   const busy = ts ? LIVE.includes(ts.status) : false
@@ -202,6 +204,7 @@ export function Sidebar() {
         <Button className="nav s-nav" onPress={() => useStore.getState().setSearchOpen(true)}><Icon name="search" size={16} stroke={1.7} /><span className="nav-name">搜索</span><span className="side-kbd">Ctrl K</span></Button>
         <Button className={`nav s-nav ${view === 'projects' ? 'on' : ''}`} onPress={() => setView('projects')}><Icon name="folder" size={16} stroke={1.7} /><span className="nav-name">工程</span></Button>
         <Button className={`nav s-nav ${view === 'outputs' ? 'on' : ''}`} onPress={() => setView('outputs')}><Icon name="file" size={16} stroke={1.7} /><span className="nav-name">产出</span></Button>
+        <Button className={`nav s-nav ${view === 'schedules' ? 'on' : ''}`} onPress={() => setView('schedules')}><Icon name="clock" size={16} stroke={1.7} /><span className="nav-name">定时任务</span>{schedLive > 0 && <span className="side-kbd sched-live" title="定时任务正在运行">{schedLive} 个在运行</span>}</Button>
         <Button className={`nav s-nav ${view === 'knowledge' ? 'on' : ''}`} onPress={() => setView('knowledge')}><Icon name="book" size={16} stroke={1.7} /><span className="nav-name">知识库</span></Button>
         <Button className={`nav s-nav ${view === 'library' ? 'on' : ''}`} onPress={() => setView('library')}><Icon name="puzzle" size={16} stroke={1.7} /><span className="nav-name">技能与插件</span></Button>
       </div>

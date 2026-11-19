@@ -7,7 +7,7 @@ import { modeOf, type Mode } from './modes'
 
 // launch/task 是任务模式（新任务 / 当前任务）；code-launch/code 是代码模式（新任务 / 当前任务）；其余是两种模式共用的页面：
 // project 工程主页（当前工程：新建 + 它的全部任务），projects 工程列表，history 全部任务（所有工程），outputs 产出（所有工程的文件），settings 设置
-export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek' | 'settings' | 'outputs'
+export type View = 'launch' | 'task' | 'code-launch' | 'code' | 'review' | 'project' | 'projects' | 'history' | 'knowledge' | 'library' | 'peek' | 'settings' | 'outputs' | 'schedules'
 export interface Toast { id: number; text: string; tone?: 'ok' | 'err' | 'info'; action?: { label: string; run: () => void } }
 
 export type Theme = 'lavender' | 'cream' | 'mars'
@@ -64,6 +64,10 @@ interface Store {
   archiveTask(projectId: string, t: import('./api').Task, on: boolean): Promise<void>
   removeTask(projectId: string, t: import('./api').Task): Promise<void>
   histVer: number
+  /** 定时任务有变化时加一，定时任务页重新取 */
+  schedVer: number
+  /** 打开某个工程里的任务（只有 id，例如系统通知、定时任务的运行记录） */
+  openTaskById(projectId: string, taskId: string): Promise<void>
   /** 搜索弹层（Ctrl K） */
   searchOpen: boolean
   setSearchOpen(on: boolean): void
@@ -190,6 +194,13 @@ export const useStore = create<Store>((set, get) => ({
     }
     await get().openTask(t)
   },
+  async openTaskById(projectId, taskId) {
+    const st = get()
+    const t = (st.recent[projectId] || []).find((x) => x.id === taskId)
+      || (await st.run((api) => api.task.recent(500)))?.[projectId]?.find((x) => x.id === taskId)
+    if (t) await get().openTaskIn(projectId, t)
+    else st.toast({ text: '找不到这个任务的记录（可能已经删除）', tone: 'err' })
+  },
   async pinProject(id, on) {
     const list = await get().run((api) => api.project.pin(id, on), on ? '置顶失败' : '取消置顶失败')
     const app = get().app
@@ -200,6 +211,7 @@ export const useStore = create<Store>((set, get) => ({
     if (s) { get().applyAppState(s); void get().loadRecent() }
   },
   histVer: 0,
+  schedVer: 0,
   searchOpen: false,
   setSearchOpen(on) { set({ searchOpen: on }) },
   settingsTab: 'general',
@@ -336,6 +348,13 @@ function onEvent(e: AstroEvent) {
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break
     case 'library': useStore.setState({ libraries: e.payload, kbVersion: st.kbVersion + 1 }); break
     case 'update': if (st.app) useStore.setState({ app: { ...st.app, update: e.payload } }); break
+    case 'schedules': useStore.setState({ schedVer: st.schedVer + 1 }); break
+    case 'recent': void st.loadRecent(); break
+    case 'open': {
+      if (e.payload.view) st.setView(e.payload.view)
+      else if (e.payload.projectId && e.payload.taskId) void st.openTaskById(e.payload.projectId, e.payload.taskId)
+      break
+    }
     case 'ref-translate': { const j = { ...st.refJobs }; if (e.payload.job) j[e.payload.id] = e.payload.job; else delete j[e.payload.id]; useStore.setState({ refJobs: j }); break }
   }
 }

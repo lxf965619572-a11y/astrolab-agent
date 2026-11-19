@@ -409,3 +409,42 @@ test('工程说明和参考资料写进第一条消息；产出列出任务写�
   assert.doesNotMatch(b.firstMessage, /【工程说明】|【参考资料】/, '没写就不加')
   await until(() => ctl.status === 'done')
 })
+
+test('定时任务（无人值守）：第一条消息带约定，不让提问；提问自动回答后做完；用户回来追问时解除', async (t) => {
+  const { ctl } = await setup(t)
+  const asked = []
+  const notes = []
+  ctl.on('question', (q) => asked.push(q))
+  ctl.on('notify', (n) => notes.push(n))
+  const task = await ctl.start({ stage: 'utest', prompt: '[ask] 每晚巡检', title: '每晚巡检', unattended: true, schedule: { id: 's1', name: '每晚巡检', due: Date.now(), catchup: true } })
+  assert.equal(task.title, '每晚巡检')
+  assert.match(task.firstMessage, /【无人值守】/)
+  assert.match(task.firstMessage, /补跑/)
+  assert.doesNotMatch(task.firstMessage, /需要我拍板时用 ask_user_question 提问/)
+  await until(() => ctl.status === 'done')
+  assert.equal(asked.length, 1, '问题照常显示在界面上')
+  assert.match(ctl.snapshotState().summary.lastAssistantText, /无人值守/, '智能体收到的是自动回答')
+  assert.ok(!notes.some((n) => n.kind === 'ask'), '不弹“需要你决定”')
+  const done = notes.find((n) => n.kind === 'done')
+  assert.match(done.title, /定时任务“每晚巡检”/)
+  assert.equal(done.schedule, 's1')
+  assert.equal(ctl.task.schedule.id, 's1')
+  // 用户回来追问：解除无人值守，对话里不显示“我回来了”那句
+  const items = new Map()
+  ctl.on('activity', (xs) => xs.forEach((x) => items.set(x.id, x)))
+  await ctl.send('结果在哪')
+  assert.equal(ctl.task.unattended, false)
+  await until(() => ctl.status === 'done')
+  const users = [...items.values()].filter((x) => x.kind === 'user').map((x) => x.text)
+  assert.ok(users.includes('结果在哪'), users.join('|'))
+})
+
+test('无人值守但有人正看着：先等一会儿，人回答了就不自动回答', async (t) => {
+  const { ctl } = await setup(t)
+  ctl.o.watched = () => true
+  ctl.o.unattendedAskMs = 400
+  ctl.on('question', (q) => setTimeout(() => ctl.answer(q.id, [{ id: 'lang', selected: ['英文'] }, { id: 'title', selected: [], custom: '人答的' }]), 50))
+  await ctl.start({ stage: 'utest', prompt: '[ask] 巡检', unattended: true, schedule: { id: 's2', name: '巡检' } })
+  await until(() => ctl.status === 'done')
+  assert.match(ctl.snapshotState().summary.lastAssistantText, /英文/)
+})

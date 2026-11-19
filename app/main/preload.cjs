@@ -43,6 +43,14 @@ contextBridge.exposeInMainWorld('astro', {
     search: (q, scope) => invoke('task:search', q, scope),
     outputs: () => invoke('task:outputs'),
   },
+  schedule: {
+    list: () => invoke('schedule:list'),
+    save: (d) => invoke('schedule:save', d),
+    remove: (id) => invoke('schedule:remove', id),
+    enable: (id, on) => invoke('schedule:enable', id, on),
+    runNow: (id) => invoke('schedule:runNow', id),
+    login: (on) => invoke('schedule:login', on),
+  },
   model: {
     test: () => invoke('model:test'),
     probe: () => invoke('model:probe'),

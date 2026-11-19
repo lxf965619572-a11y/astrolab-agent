@@ -2,7 +2,11 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight, ModelProbe, ModelProfile, ModelPreset, ModelList } from './api'
+import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight, ModelProbe, ModelProfile, ModelPreset, ModelList, Schedule, ScheduleState, ScheduleTemplate } from './api'
+import { describeTrigger, nextRun } from './schedule'
+// @ts-expect-error 纯 JS 模块（主进程用），没有类型声明
+import { TEMPLATES } from '../main/schedule-templates.mjs'
+const SCHEDULE_TEMPLATES = TEMPLATES as ScheduleTemplate[]
 // @ts-ignore 纯 JS 模块
 import { applyEvent, createActivity, plainItem, summarize } from '../engine/activity.mjs'
 import { categoryMode } from './modes'
@@ -788,6 +792,24 @@ export function createMockApi(): AstroApi {
     { key: 'mine:skill:fpga-reg-check', kind: 'skill', name: 'fpga-reg-check', title: '', description: '核对 FPGA 寄存器配置表与驱动代码里的地址、位定义是否一致。', source: 'mine', sourceName: '我的库', path: 'skills/fpga-reg-check', mine: true, installed: false },
   ]
 
+  // 定时任务：URL 带 ?nosched 时从空的开始（看空状态和模板）
+  const H = 3600_000
+  const sNow = Date.now()
+  const schedules: Schedule[] = new URLSearchParams(location.search).has('nosched') ? [] : [
+    { id: 's1', name: '每晚静态分析巡检', prompt: SCHEDULE_TEMPLATES[0].prompt, projectId: 'p1', skills: ['static-analysis'], mode: 'code', options: {}, trigger: { freq: 'weekdays', time: '21:00' }, enabled: true,
+      nextRunAt: nextRun({ freq: 'weekdays', time: '21:00' }, sNow), createdAt: sNow - 200 * H, updatedAt: sNow - 200 * H, pending: null, describe: '工作日 21:00', lastRunAt: sNow - 10 * H,
+      runs: [
+        { id: 'r3', at: sNow - 10 * H, due: sNow - 10 * H, status: 'started', taskId: 't-past-1.2', projectId: 'p1', task: { status: 'done', title: '每晚静态分析巡检', startedAt: sNow - 10 * H, endedAt: sNow - 9.7 * H, commit: null, restoredAt: null } },
+        { id: 'r2', at: sNow - 30 * H, due: sNow - 34 * H, status: 'started', catchup: true, taskId: 't-past-26', projectId: 'p1', task: { status: 'done', title: '每晚静态分析巡检', startedAt: sNow - 30 * H, endedAt: sNow - 29.6 * H, commit: { sha: '8fa01be', message: '静态分析巡检', at: sNow - 20 * H, files: 2 }, restoredAt: null } },
+        { id: 'r1', at: sNow - 58 * H, due: sNow - 58 * H, status: 'skipped', reason: '上一次运行还没做完' },
+      ] },
+    { id: 's2', name: '每周研制进展', prompt: SCHEDULE_TEMPLATES[2].prompt, projectId: 'p1', skills: [], mode: 'task', options: {}, trigger: { freq: 'weekly', days: [5], time: '16:30' }, enabled: false,
+      nextRunAt: null, createdAt: sNow - 100 * H, updatedAt: sNow - 100 * H, pending: null, describe: '每周五 16:30', runs: [] },
+  ]
+  let loginOn = false
+  const schedState = (): ScheduleState => ({ schedules: schedules.map((x) => ({ ...x, describe: describeTrigger(x.trigger) })), templates: SCHEDULE_TEMPLATES, login: { supported: true, on: loginOn }, tray: schedules.some((x) => x.enabled), now: Date.now() })
+  const schedOf = (id: string) => { const x = schedules.find((y) => y.id === id); if (!x) throw new Error('这个定时任务已经删除'); return x }
+
   const api: AstroApi = {
     platform: KYLIN ? 'linux' : 'win32',
     async getState() { return appState() },
@@ -925,6 +947,34 @@ export function createMockApi(): AstroApi {
         const fileList = ps.flatMap((p) => historyOf(p.id).flatMap((t) => [`doc/${t.stageName}-${t.id.slice(-4)}.md`, `doc/${t.stageName}-${t.id.slice(-4)}.docx`].map((path) => ({ pid: p.id, pname: p.name, taskId: t.id, taskTitle: t.title, path }))))
         return { tasks: tasks.slice(0, 30), files: terms.length ? fileList.filter((f) => terms.every((x) => f.path.toLowerCase().includes(x))).slice(0, 30) : [] }
       },
+    },
+    schedule: {
+      async list() { return schedState() },
+      async save(d) {
+        if (!d.name.trim()) throw new Error('请给定时任务起个名字')
+        if (!d.prompt.trim()) throw new Error('请写清楚每次运行要做什么')
+        if (d.trigger.freq === 'once' && d.enabled !== false && (!d.trigger.at || d.trigger.at <= Date.now())) throw new Error('只跑一次的时间要在以后')
+        const old = d.id ? schedOf(d.id) : null
+        const x: Schedule = { ...(old || { id: `s${Date.now()}`, createdAt: Date.now(), runs: [] }), name: d.name.trim(), prompt: d.prompt.trim(), projectId: d.projectId, skills: d.skills, mode: d.mode, options: d.options,
+          trigger: d.trigger, enabled: d.enabled !== false, updatedAt: Date.now(), pending: null, describe: describeTrigger(d.trigger), nextRunAt: d.enabled !== false ? nextRun(d.trigger, Date.now()) : null }
+        if (old) schedules[schedules.indexOf(old)] = x
+        else schedules.push(x)
+        return { id: x.id, state: schedState() }
+      },
+      async remove(id) { const i = schedules.findIndex((x) => x.id === id); if (i >= 0) schedules.splice(i, 1); return schedState() },
+      async enable(id, on) { const x = schedOf(id); x.enabled = on; x.nextRunAt = on ? nextRun(x.trigger, Date.now()) : null; return schedState() },
+      async runNow(id) {
+        const x = schedOf(id)
+        const t = await api.task.start({ prompt: x.prompt, skills: x.skills, files: [], options: { report: !!x.options.report }, mode: x.mode })
+        t.title = x.name
+        t.schedule = { id: x.id, name: x.name, due: Date.now(), catchup: false, manual: true }
+        t.unattended = true
+        const run = { id: `r${Date.now()}`, at: Date.now(), due: Date.now(), status: 'started' as const, manual: true, taskId: t.id, projectId: project.id, task: { status: 'running' as const, title: x.name, startedAt: Date.now(), endedAt: null, commit: null, restoredAt: null } }
+        x.runs = [run, ...x.runs]
+        x.lastRunAt = run.at
+        return { run, state: schedState() }
+      },
+      async login(on) { loginOn = on; return schedState() },
     },
     model: {
       async test() { await new Promise((r) => setTimeout(r, 600)); return { ok: true, ms: 600, model: MOCK_MODEL.model, reply: '连接正常（模拟）' } },

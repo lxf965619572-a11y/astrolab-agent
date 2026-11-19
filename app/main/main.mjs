@@ -1,9 +1,9 @@
 // AstroLab 主进程（Electron）：窗口、项目、任务控制器、与界面之间的接口（IPC）、系统通知。
 // 界面进程不接触 Node：contextIsolation + sandbox，只能调用 preload.cjs 暴露的接口；不加载任何网络内容。
 
-import { app, BrowserWindow, clipboard, dialog, ipcMain, Notification, protocol, safeStorage, shell } from 'electron'
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
-import { userInfo } from 'node:os'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeImage, Notification, powerMonitor, powerSaveBlocker, protocol, safeStorage, shell, Tray } from 'electron'
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { homedir, userInfo } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { Engine, EngineBridge, writeEnginePatch } from '../engine/engine.mjs'
 import { engineEnv, modelConfig, prepareDshHome, readLocalEnv, resolvePaths } from './paths.mjs'
@@ -11,7 +11,8 @@ import { probeModel } from './probe.mjs'
 import { DEPT_ID, ModelStore } from './models.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
-import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, searchTasks, STAGES, TaskController } from './task.mjs'
+import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, readTaskRecord, searchTasks, STAGES, TaskController } from './task.mjs'
+import { Scheduler, TEMPLATES as SCHEDULE_TEMPLATES } from './schedule.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -78,6 +79,12 @@ const ctls = new Map() // 项目 id -> TaskController
 const MAX_PARALLEL = Math.max(1, Number(process.env.ASTROLAB_MAX_PARALLEL) || 3)
 let lib = null
 let updates = null
+/** 定时任务：调度器、托盘（有启用的定时任务时常驻，关窗口缩到这里）、运行期间不让电脑睡 */
+let sched = null
+let tray = null
+let keepAwake = null
+/** 开机自启时带 --hidden：只在托盘里，不弹窗口 */
+const START_HIDDEN = process.argv.includes('--hidden')
 let refs = null
 let notes = []
 /** 启动时的提醒（打开项目时 notes 会换成项目的，这些不跟着换） */
@@ -164,6 +171,7 @@ function background() {
     projectId: c.project.id, projectName: c.project.name, status: c.status,
     task: { id: c.task.id, title: c.task.title, stageName: c.task.stageName, mode: c.task.mode, category: c.task.category, startedAt: c.task.startedAt },
     asking: c.questions.size > 0,
+    scheduled: !!c.task.schedule,
   }))
 }
 const sendBackground = () => send('background', background())
@@ -178,9 +186,146 @@ function checkParallel(c) {
   if (clash) throw new Error(`“${clash.project.name}”（${clash.project.path}）有任务在进行，它和这个项目是同一批文件（文件夹互相包含），同时改会互相覆盖。等那个任务结束再开始`)
 }
 function newController() {
-  const c = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, shared: true, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')) })
+  const c = new TaskController({ bridge, dataDir: P.data, logDir: P.logs, skillsDir: P.skillsDir, skillCards: () => lib.skillCards(), makeEngine, shared: true, knowledge: !P.mock && existsSync(join(P.root, 'mcp', 'knowledge', 'server.mjs')),
+    // 定时任务的提问：有人正看着这个任务就先等人答，没人就自动回答
+    watched: (x) => x === ctl && userPresent() })
   wireController(c)
   return c
+}
+
+// ---------- 定时任务 ----------
+/** 人在电脑前：窗口在前台，而且 5 分钟内动过键盘鼠标 */
+function userPresent() {
+  try { return !!(win && !win.isDestroyed() && win.isVisible() && win.isFocused() && powerMonitor.getSystemIdleTime() < 300) } catch { return false }
+}
+/**
+ * 到点发起一次运行：在定时任务的工程里用后台控制器发起任务（界面正看着的工程不切换）。
+ * 工程里有任务在进行、并行已满、你正对着这个工程：返回 { wait }，调度器过一会儿再试（最多等 2 小时）
+ */
+async function launchScheduled(s, slot) {
+  const p = store.get(s.projectId)
+  if (!p) throw new Error('工程已经不在列表里，请编辑这个定时任务换一个工程')
+  if (!existsSync(p.path)) throw new Error(`工程文件夹不存在：${p.path}`)
+  let c = ctls.get(p.id)
+  if (c && c.busy) return { wait: c === ctl ? '你正在这个工程里做任务' : `工程里有任务在进行：${c.task ? c.task.title : ''}` }
+  // 你正对着这个工程（会把你在看的任务换掉）：等你走开或切到别的工程。手动“立即运行”不等
+  if (c && c === ctl && c.task && !slot.manual && userPresent()) return { wait: '你正在看这个工程' }
+  try { checkParallel(c || { busy: false, project: p }) } catch (e) { return { wait: e.message } }
+  if (!c) {
+    const pn = await prepareProject(p, P)
+    if (pn.length) mlog('定时任务准备工程', p.name, pn)
+    store.update(p.id, p)
+    c = newController()
+    ctls.set(p.id, c)
+    await c.setProject(store.get(p.id))
+  }
+  mlog(`定时任务开始：${s.name}（${p.name}）${slot.catchup ? '，补跑' : ''}${slot.manual ? '，手动' : ''}`)
+  const task = await c.start({
+    prompt: s.prompt, skills: s.skills, mode: s.mode, options: s.options, files: [], title: s.name,
+    unattended: true, schedule: { id: s.id, name: s.name, due: slot.due, catchup: !!slot.catchup, manual: !!slot.manual },
+  })
+  sendBackground()
+  send('recent', null)
+  return { taskId: task.id, projectId: p.id }
+}
+function scheduledTaskInfo(pid, id) {
+  const c = ctls.get(pid)
+  const t = c && c.task && c.task.id === id ? c.task : readTaskRecord(P.data, pid, id)
+  return t ? { status: t.status, title: t.title, startedAt: t.startedAt, endedAt: t.endedAt, commit: t.commit || null, restoredAt: t.restoredAt || null } : null
+}
+/** 系统通知（窗口不在前台时）；点一下打开窗口，带了任务就打开那个任务 */
+function systemNote(title, body, open) {
+  if (win && !win.isDestroyed() && win.isFocused()) return
+  if (!Notification.isSupported()) return
+  const note = new Notification({ title: `AstroLab · ${title}`, body: body || '', silent: true })
+  note.on('click', () => { showWindow(); if (open) send('open', open) })
+  note.show()
+}
+function showWindow() {
+  if (!win || win.isDestroyed()) return
+  if (win.isMinimized()) win.restore()
+  win.show()
+  win.focus()
+}
+/** 定时任务在做的时候不让电脑睡（屏幕可以关） */
+function updateKeepAwake() {
+  const need = allCtls().some((c) => c.busy && c.task && c.task.schedule)
+  if (need && keepAwake === null) { keepAwake = powerSaveBlocker.start('prevent-app-suspension'); mlog('定时任务运行中，阻止系统睡眠') }
+  if (!need && keepAwake !== null) { powerSaveBlocker.stop(keepAwake); keepAwake = null; mlog('定时任务都结束了，允许系统睡眠') }
+}
+const hm = (t) => new Date(t).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
+/** 托盘：有启用的定时任务时常驻（关窗口缩到这里，定时任务照常跑）；都停用了、窗口开着就收起来 */
+function updateTray() {
+  const need = !!(sched && sched.enabledCount > 0)
+  if (!need) {
+    if (tray && (!win || win.isDestroyed() || win.isVisible())) { tray.destroy(); tray = null }
+    return
+  }
+  if (!tray) {
+    const f = appIcon()
+    let img = f ? nativeImage.createFromPath(f) : nativeImage.createEmpty()
+    if (process.platform !== 'win32' && !img.isEmpty()) img = img.resize({ width: 22, height: 22 })
+    tray = new Tray(img)
+    tray.on('click', showWindow)
+  }
+  const up = sched.upcoming()
+  const busy = allCtls().filter((c) => c.busy && c.task && c.task.schedule)
+  tray.setToolTip(['AstroLab', busy.length ? `定时任务进行中：${busy.map((c) => c.task.schedule.name).join('、')}` : '', up ? `下一个：${up.name}，${hm(up.nextRunAt)}` : ''].filter(Boolean).join('\n'))
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: '打开 AstroLab', click: showWindow },
+    { label: '定时任务', click: () => { showWindow(); send('open', { view: 'schedules' }) } },
+    ...(up ? [{ label: `下一个：${up.name}（${hm(up.nextRunAt)}）`, enabled: false }] : []),
+    { type: 'separator' },
+    { label: '退出 AstroLab（定时任务不再运行）', click: quitFromTray },
+  ]))
+}
+function quitFromTray() {
+  if (anyBusy()) {
+    const r = dialog.showMessageBoxSync({ type: 'question', buttons: ['停止任务并退出', '取消'], defaultId: 1, cancelId: 1, title: 'AstroLab', message: '还有任务在进行', detail: '退出会停止任务。对话和已写的文件都会保留，下次打开可以继续。' })
+    if (r !== 0) return
+  }
+  app.isQuitting = true
+  app.quit()
+}
+// 开机自动启动（最小化到托盘）：Windows 用登录项，Linux（麒麟）写 ~/.config/autostart 的 .desktop
+const AUTOSTART_DESKTOP = join(homedir(), '.config', 'autostart', 'astrolab.desktop')
+function loginItem() {
+  if (process.defaultApp) return { supported: false, on: false, note: '开发时（dev.ps1）不能设置；装好的软件才可以' }
+  if (process.platform === 'win32' || process.platform === 'darwin') {
+    try { return { supported: true, on: app.getLoginItemSettings({ path: process.execPath, args: ['--hidden'] }).openAtLogin } } catch (e) { return { supported: false, on: false, note: e.message } }
+  }
+  if (process.platform === 'linux') return { supported: true, on: existsSync(AUTOSTART_DESKTOP) }
+  return { supported: false, on: false, note: '这个系统不支持' }
+}
+function setLoginItem(on) {
+  const li = loginItem()
+  if (!li.supported) throw new Error(li.note || '不支持开机启动')
+  if (process.platform === 'linux') {
+    if (on) {
+      mkdirSync(dirname(AUTOSTART_DESKTOP), { recursive: true })
+      writeFileSync(AUTOSTART_DESKTOP, `[Desktop Entry]\nType=Application\nName=AstroLab\nComment=部门研发智能体工作台（定时任务）\nExec="${process.execPath}" --hidden\nX-GNOME-Autostart-enabled=true\n`)
+    } else rmSync(AUTOSTART_DESKTOP, { force: true })
+  } else app.setLoginItemSettings({ openAtLogin: !!on, path: process.execPath, args: ['--hidden'] })
+}
+function scheduleState() {
+  return { schedules: sched.list(), templates: SCHEDULE_TEMPLATES, login: loginItem(), tray: !!tray, now: Date.now() }
+}
+function startScheduler() {
+  sched = new Scheduler({ file: join(P.data, 'schedules.json'), launch: launchScheduled, taskInfo: scheduledTaskInfo, log: mlog })
+  sched.on('change', () => { send('schedules', null); updateTray() })
+  sched.on('failed', ({ schedule: s, reason }) => {
+    mlog(`定时任务没能运行：${s.name}：${reason}`)
+    send('notify', { level: 3, kind: 'error', title: `定时任务“${s.name}”没能运行`, body: reason })
+    systemNote(`定时任务“${s.name}”没能运行`, reason, { view: 'schedules' })
+  })
+  sched.on('skipped', ({ schedule: s, reason }) => mlog(`定时任务跳过：${s.name}：${reason}`))
+  sched.on('run', ({ schedule: s, run }) => { if (run.catchup) send('notify', { level: 1, kind: 'done', title: `补跑定时任务“${s.name}”`, body: '原定时间电脑没开或在睡眠，现在补跑一次' }) })
+  updateTray()
+  // 启动后先等一会儿（当前工程的引擎在预热、界面在加载），再检查到点和错过的
+  setTimeout(() => sched.start(30_000), P.mock ? 3000 : 15_000)
+  // 电脑从睡眠醒来、解锁：马上检查一遍（错过的补跑）
+  powerMonitor.on('resume', () => { mlog('系统唤醒'); setTimeout(() => void sched.tick(), 5000) })
+  powerMonitor.on('unlock-screen', () => void sched.tick())
 }
 
 async function openProject(id) {
@@ -408,6 +553,17 @@ function registerIpc() {
   // 搜索（Ctrl K）：所有工程（没移出列表的），或只搜当前工程
   // 产出页：所有工程的任务写过的文件
   handle('task:outputs', () => listOutputs(P.data, store.list().filter((p) => !p.hidden)))
+  // 定时任务
+  handle('schedule:list', () => scheduleState())
+  handle('schedule:save', (d) => {
+    if (!d || !store.get(d.projectId)) throw new Error('请选择在哪个工程里运行')
+    const id = sched.upsert(d)
+    return { id, state: scheduleState() }
+  })
+  handle('schedule:remove', (id) => { sched.remove(id); return scheduleState() })
+  handle('schedule:enable', (id, on) => { sched.setEnabled(id, on); return scheduleState() })
+  handle('schedule:runNow', async (id) => { const run = await sched.runNow(id); return { run, state: scheduleState() } })
+  handle('schedule:login', (on) => { setLoginItem(on); return scheduleState() })
   handle('task:search', (q, scope) => searchTasks(P.data, store.list().filter((p) => !p.hidden && (scope !== 'current' || p.id === ctl.project?.id)), q))
   // 设置页“测试连接”：用部门模型回一句话，量用时；密钥只在主进程里用
   handle('model:test', async () => {
@@ -583,6 +739,8 @@ function wireController(c) {
     if (!active()) void c.closeEngine().catch(() => {})
   })
   c.on('state', (st) => { if (st.status === 'error') mlog('task error', c.project && c.project.name, st.error) })
+  // 定时任务：运行期间不让电脑睡；托盘提示跟着变
+  c.on('state', () => { updateKeepAwake(); if (tray) updateTray() })
   let engineSince = 0
   c.on('engine', (e) => {
     if (e.state === 'starting') engineSince = Date.now()
@@ -598,7 +756,8 @@ function wireController(c) {
       if (n.level === 2) setTimeout(() => { if (win && !win.isDestroyed()) win.flashFrame(false) }, 3000)
       if (Notification.isSupported()) {
         const note = new Notification({ title: `AstroLab · ${n.title}`, body: n.body || '', silent: true })
-        note.on('click', () => { win.show(); win.focus() })
+        // 定时任务做完的通知：点一下打开那个任务（窗口可能缩在托盘里）
+        note.on('click', () => { showWindow(); if (n.taskId) send('open', { projectId: n.projectId, taskId: n.taskId }) })
         note.show()
       }
     }
@@ -627,6 +786,7 @@ function setTaskbarDetails(w) {
   } catch (e) { mlog('任务栏图标', e) }
 }
 
+let trayHinted = false
 async function createWindow() {
   win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 1280, minHeight: 720,
@@ -641,8 +801,11 @@ async function createWindow() {
     },
   })
   setTaskbarDetails(win)
-  win.once('ready-to-show', () => win.show())
+  // 开机自启（--hidden）且有启用的定时任务：只在托盘里，不弹窗口
+  win.once('ready-to-show', () => { if (!(START_HIDDEN && sched && sched.enabledCount > 0)) win.show() })
   win.on('focus', () => win.flashFrame(false))
+  // 从托盘打开窗口后：定时任务都停用了的话，托盘图标收起来
+  win.on('show', () => updateTray())
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   win.webContents.on('will-navigate', (e, url) => {
     if (!(url.startsWith('file:') || (DEV_URL && url.startsWith(DEV_URL)))) e.preventDefault()
@@ -652,6 +815,17 @@ async function createWindow() {
     if (!e.isMainFrame && !e.url.startsWith(`${PREVIEW}:`) && e.url !== 'about:blank') e.preventDefault()
   })
   win.on('close', (e) => {
+    // 有启用的定时任务：关窗口只是缩到托盘，定时任务和进行中的任务照常做（退出用托盘菜单）
+    if (!app.isQuitting && sched && sched.enabledCount > 0) {
+      e.preventDefault()
+      win.hide()
+      updateTray()
+      if (!trayHinted) {
+        trayHinted = true
+        if (Notification.isSupported()) new Notification({ title: 'AstroLab 在托盘里继续运行', body: '有启用的定时任务，到点会自动运行。要完全退出，在托盘图标上点右键选“退出”。', silent: true }).show()
+      }
+      return
+    }
     if (anyBusy() && !app.isQuitting) {
       const r = dialog.showMessageBoxSync(win, {
         type: 'question', buttons: ['停止任务并退出', '取消'], defaultId: 1, cancelId: 1,
@@ -751,6 +925,7 @@ async function boot() {
   if (last) {
     try { await openProject(last.id) } catch (e) { notes.push(e.message) }
   }
+  startScheduler()
   await createWindow()
   // 在 Obsidian 里改的知识条目：启动时和每 3 分钟提交一次
   void commitExternalEdits()
@@ -761,9 +936,10 @@ async function boot() {
   void lib.syncAll().then(() => send('library', lib.states())).catch((e) => mlog('library sync', e))
 }
 
-app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus() } })
+app.on('second-instance', () => showWindow())
 app.on('before-quit', () => { app.isQuitting = true })
 app.on('window-all-closed', async () => {
+  if (sched) sched.stop()
   for (const c of allCtls()) { try { await c.dispose() } catch { /* 退出时尽力而为 */ } }
   try { if (bridge) await bridge.close() } catch { /* 同上 */ }
   app.quit()
