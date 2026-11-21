@@ -89,7 +89,7 @@ const add = (level, rule, where, line, msg) => {
   seen.add(key)
   findings.push({ level, rule, where, line, msg })
 }
-const PENDING = /【待确认】|【待补充】|【待定】/
+const PENDING = /【(?:待确认|待补充|待定)[】：:]/
 const ID = /\b([A-Z][A-Z0-9]*-(?:FREQ\d{3}(?:-(?:K|N|KN))?|PREQ\d+\.\d+|RREQ\d+|SREQ\d+|IREQ\d+\.\d+))(?![\w.])/g
 const IDLIKE = /\b[A-Z][A-Z0-9]*-[A-Z]REQ[\w.-]*/g
 
@@ -261,6 +261,39 @@ for (const r of reqList) {
   const unspecified = /未规定|未给|未明确|未说明|未定义|无依据|不明确|无判据|未提供/.test(qText)
   add(unspecified ? '必须处理' : '复核', 'R2 问题未关闭却已给答案', '规格说明', r.line,
     `${r.id} 引用了 ${qs.join('、')}${unspecified ? '（问题写明“未规定”）' : ''}，但描述中没有【待确认】。检查处理方式、数值、范围是不是自己定的`)
+}
+
+// R14 矛盾波及：类型为“矛盾”的问题，所涉上级条款里的数值（如“1 字节”“LSB 0.02 A”“N=2”）在所涉需求和引用该条款的表格行里
+// 出现时，这一处也要带【待确认】，否则就是用了矛盾的一方（2026-11-21 G3 复验：问题清单列了 0x35 格式矛盾，
+// 处理步骤里却写“数据域长度为 2”，跟踪矩阵照录“1 字节阈值 LSB 0.02 A”）
+if (S && R) {
+  const UNIT = /(?:LSB\s*)?\d+(?:\.\d+)?\s*(?:字节|mA|A|ms|μs|us|s|V|位|bit|kbps|bps|Hz)(?![A-Za-z])/g
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s*')
+  for (const q of qRows.filter((r) => /矛盾/.test(r.cells[2] || ''))) {
+    const qid = q.cells[0].trim()
+    const refs = (q.cells[1] || '').split(/[、,，;；\s]+/).filter(Boolean)
+    const pats = []
+    const desc = (q.cells[3] || '').replace(/\s+/g, '')
+    for (const cid of refs.filter((x) => clauseMap.has(x))) {
+      const t = clauseMap.get(cid)
+      // 只取问题描述里也引用了的数值（矛盾所在）；范围的端点（“0.5～5.0 A”）一般不是矛盾所在，不算，免得到处误报
+      for (const m of t.matchAll(UNIT)) if (desc.includes(m[0].replace(/\s+/g, '')) && !/[～~]\s*$/.test(t.slice(0, m.index)) && !/^\s*[～~]/.test(t.slice(m.index + m[0].length))) pats.push([m[0].replace(/\s+/g, ' '), new RegExp(esc(m[0]))])
+      for (const m of t.matchAll(/\bN\s*=\s*(\d+)/g)) pats.push([`N=${m[1]}`, new RegExp(`(?:\\bN\\s*=|长度\\s*(?:为|是|=)?)\\s*${m[1]}(?![\\d.])`)])
+    }
+    if (!pats.length) continue
+    const clauseIds = refs.filter((x) => clauseMap.has(x))
+    // 表格行的锚：条款标识，或条款里的指令码/地址（如 0x35，照录协议指令表时行里没有条款标识）
+    const anchors = [...clauseIds, ...new Set(clauseIds.flatMap((c) => clauseMap.get(c).match(/\b0x[0-9A-Fa-f]{2,4}\b/g) || []))]
+    const hit = (l) => !PENDING.test(l) && !l.includes(qid) && pats.find(([, re]) => re.test(l))
+    const seen = new Set()
+    for (const r of reqList.filter((x) => refs.includes(x.id))) r.text.split('\n').forEach((l, k) => {
+      const p = hit(l); if (p && !seen.has(r.line + k)) { seen.add(r.line + k); add('复核', 'R14 矛盾波及', '规格说明', r.line + k, `${r.id}：写了“${p[0]}”，它来自 ${qid}（矛盾）所涉的上级条款。受矛盾影响的值写【待确认】（见 ${qid}）；和矛盾无关的（同一数值用在别的字段）保留并说明`) }
+    })
+    S.lines.forEach((l, i) => {
+      if (!/^\|/.test(l) || !anchors.some((c) => l.includes(c))) return
+      const p = hit(l); if (p && !seen.has(i + 1)) { seen.add(i + 1); add('复核', 'R14 矛盾波及', '规格说明', i + 1, `表格这一行引用了 ${clauseIds.join('、')} 的内容，照录了“${p[0]}”，没有【待确认】。照录矛盾的格式时，这一格本身写“【待确认】（见 ${qid}）”`) }
+    })
+  }
 }
 
 for (const id of derivedIds) {

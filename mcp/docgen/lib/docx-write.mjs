@@ -11,7 +11,8 @@ import { cleanText, escAttr, escText, kid, kids, parseXml, serializeDoc, val, wa
 import { parseMarkdown, plainText } from './markdown.mjs'
 import { renderFlowchart, setFlowchartLatin } from './flowchart.mjs'
 
-const MARKERS = /(【待确认】|【待补充】|【待定】|【TBD】)/
+// 也认带说明的写法，如“【待确认：评审早于被评审文档】”（2026-11-21 研制总结复验：带说明的标记没标黄）
+const MARKERS = /(【(?:待确认|待补充|待定|TBD)(?:[：:][^】]*)?】)/
 const FIELD_RE = /\{\{\s*([^{}]+?)\s*\}\}/g
 const BODY_KEYS = new Set(['正文', 'BODY', 'body'])
 const TOC_KEYS = new Set(['目录', 'TOC', 'toc'])

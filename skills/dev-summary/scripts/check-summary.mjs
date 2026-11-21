@@ -166,7 +166,8 @@ if (pkgDir) {
   const datesIn = (t) => (clean(t).match(/\d{4}\s*[-./年]\s*\d{1,2}\s*[-./月]\s*\d{1,2}/g) || []).map(toDate).filter(Number.isFinite)
   for (const r of realRows('关键质量控制点评审')) {
     const d = toDate(r['日期'])
-    if (!Number.isFinite(d) || /计划/.test(clean(r['日期']))) continue
+    // 已标【待确认】（问过用户、写明了矛盾）的不再提示
+    if (!Number.isFinite(d) || /计划|待确认/.test(clean(r['日期']))) continue
     const codes = new Set(Object.values(r).join(' ').match(/[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){2,}/g) || [])
     for (const code of codes) {
       const p = pkg.find((x) => clean(x['代号']) === code)

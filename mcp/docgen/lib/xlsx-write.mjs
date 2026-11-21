@@ -5,7 +5,7 @@ import { writeZip } from '../../common/zip.mjs'
 import { cleanText, escAttr, escText } from '../../common/xml.mjs'
 import { parseMarkdown, plainText } from './markdown.mjs'
 
-const MARK = /【待确认】|【待补充】|【待定】|【TBD】/
+const MARK = /【(?:待确认|待补充|待定|TBD)(?:[：:][^】]*)?】/
 const DECL = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\r\n'
 
 const colName = (i) => { let s = ''; i++; while (i > 0) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26) } return s }

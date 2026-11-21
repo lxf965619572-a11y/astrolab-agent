@@ -79,6 +79,10 @@ S['需求'] = () => {
   const f5 = block(s, /需求标识：PDUS-FREQ005/) || (near(s, '0x35', '.') ? s.slice(s.indexOf('0x35'), s.indexOf('0x35') + 600) : '')
   add('Q1', '0x35 阈值格式矛盾（任务书 0.01 A vs 协议 1 字节 LSB 0.02 A）列为待确认问题', near(all, '0\\.02', '待确认|Q-\\d{3}', 400) || near(all, '1\\s*字节', '0x35.*待确认|待确认.*0x35', 300), '在记录的待确认问题中找“0.02”')
   add('Q1', '规格说明中 0x35 的阈值格式没有自行裁决（写【待确认】）', /待确认/.test(f5), f5 ? '' : '没有找到 0x35 的功能需求')
+  // 引用表格照录了矛盾的格式时，那一格本身要标【待确认】，不能只在表下加注释（2026-11-21 复验发现）
+  const rows35 = s.split('\n').filter((l) => /^\|/.test(l) && /0x35/.test(l) && /\d\s*字节|LSB/.test(l))
+  const bad35 = rows35.filter((l) => !/待确认/.test(l))
+  add('Q1', '表格里写到 0x35 阈值编码（字节数、LSB）的行，本身标【待确认】', bad35.length === 0, bad35.length ? bad35.map((l) => l.slice(0, 80)).join(' / ') : `${rows35.length} 行`)
   add('Q2', '过流断电响应时间写成可测的性能需求（≤ 200 ms）', /PDUS-PREQ3\.\d[^\n]*200\s*ms|200\s*ms[^\n]*PDUS-PREQ3/.test(s))
   add('Q3', '阈值注入需求带 -K（安全关键）', /PDUS-FREQ\d{3}-KN?\b/.test(f5) || /PDUS-FREQ\d{3}-KN[^\n]*注入|注入[^\n]*PDUS-FREQ\d{3}-KN/.test(s))
   add('Q3', '测试要点包含阈值注入的边界或超范围拒收', near(block(s, /^#+\s*7\.4/), '边界|0\\.5|5\\.0|超范围|拒收', '.'))
