@@ -7,7 +7,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Engine, EngineBridge } from '../engine/engine.mjs'
-import { TaskController, composeFollowUp, followUpDisplay, listOutputs, searchTasks } from '../main/task.mjs'
+import { TaskController, composeFollowUp, followUpDisplay, listOutputs, scheduledOutcome, searchTasks } from '../main/task.mjs'
 import * as git from '../main/git.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -425,9 +425,10 @@ test('定时任务（无人值守）：第一条消息带约定，不让提问�
   assert.equal(asked.length, 1, '问题照常显示在界面上')
   assert.match(ctl.snapshotState().summary.lastAssistantText, /无人值守/, '智能体收到的是自动回答')
   assert.ok(!notes.some((n) => n.kind === 'ask'), '不弹“需要你决定”')
-  const done = notes.find((n) => n.kind === 'done')
+  await until(() => notes.some((n) => n.schedule === 's1'))
+  const done = notes.find((n) => n.schedule === 's1')
   assert.match(done.title, /定时任务“每晚巡检”/)
-  assert.equal(done.schedule, 's1')
+  assert.ok(['review', 'nochange', 'nothing'].includes(ctl.task.outcome))
   assert.equal(ctl.task.schedule.id, 's1')
   // 用户回来追问：解除无人值守，对话里不显示“我回来了”那句
   const items = new Map()
@@ -447,4 +448,34 @@ test('无人值守但有人正看着：先等一会儿，人回答了就不自�
   await ctl.start({ stage: 'utest', prompt: '[ask] 巡检', unattended: true, schedule: { id: 's2', name: '巡检' } })
   await until(() => ctl.status === 'done')
   assert.match(ctl.snapshotState().summary.lastAssistantText, /英文/)
+})
+
+test('定时任务的结果：改了文件等审核；没改文件只看回复；回复第一行【无事可做】的标无事可做', async (t) => {
+  assert.equal(scheduledOutcome(2, '【无事可做】'), 'review')
+  assert.equal(scheduledOutcome(0, '  【无事可做】工程里没有 .c 文件'), 'nothing')
+  assert.equal(scheduledOutcome(0, '巡检完了，没有新问题'), 'nochange')
+  // 单元测试剧本会写 3 个文件：改了文件，等审核，通知是“做完了，改了 3 个文件”
+  const { ctl } = await setup(t)
+  const notes = []
+  ctl.on('notify', (n) => notes.push(n))
+  await ctl.start({ stage: 'utest', prompt: '巡检', unattended: true, schedule: { id: 's3', name: '巡检' } })
+  await until(() => notes.some((n) => n.schedule === 's3'))
+  assert.equal(ctl.task.outcome, 'review')
+  assert.match(notes.find((n) => n.schedule === 's3').title, /改了 3 个文件，等你审核/)
+})
+
+test('无人值守越界即停：读取围栏拦下一次就停止，记下原因并通知；有人值守的照常', async (t) => {
+  const { ctl } = await setup(t)
+  const notes = []
+  ctl.on('notify', (n) => notes.push(n))
+  await ctl.start({ stage: 'utest', prompt: '[fence] 巡检', unattended: true, schedule: { id: 's4', name: '巡检' } })
+  await until(() => ctl.status === 'stopped')
+  assert.equal(ctl.task.stopReason, 'fence')
+  assert.ok(notes.some((n) => n.kind === 'error' && /越界，已停止/.test(n.title)))
+  const globs = ctl.items().filter((i) => i.kind === 'tools').flatMap((i) => i.calls).filter((c) => c.name === 'glob').length
+  assert.ok(globs < 6, `停下来了，没有接着找完（找了 ${globs} 次）`)
+  // 有人值守：被拦下后照常做完
+  await ctl.start({ stage: 'utest', prompt: '[fence] 找代码' })
+  await until(() => ctl.status === 'done')
+  assert.equal(ctl.task.stopReason, undefined)
 })

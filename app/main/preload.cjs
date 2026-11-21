@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('astro', {
     archive: (pid, id, on) => invoke('task:archive', pid, id, on),
     remove: (pid, id) => invoke('task:remove', pid, id),
     peek: (id) => invoke('task:peek', id),
+    peekIn: (pid, id) => invoke('task:peekIn', pid, id),
     search: (q, scope) => invoke('task:search', q, scope),
     outputs: () => invoke('task:outputs'),
   },

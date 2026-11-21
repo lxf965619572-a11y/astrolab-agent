@@ -59,10 +59,14 @@ export function runState(r: ScheduleRun): { text: string; tone: 'run' | 'ok' | '
   if (r.status === 'skipped') return { text: '跳过', tone: 'idle' }
   if (r.status === 'missed') return { text: '错过', tone: 'idle' }
   if (r.status === 'failed') return { text: '没能运行', tone: 'err' }
+  if (r.status === 'nothing') return { text: '无事可做', tone: 'idle' }
   const t = r.task
   if (!t) return { text: '记录已删除', tone: 'idle' }
   if (t.commit) return { text: '已提交', tone: 'ok' }
   if (t.restoredAt) return { text: '已恢复', tone: 'idle' }
+  if (t.stopReason === 'fence') return { text: '越界停止', tone: 'err' }
+  if (t.status === 'done' && t.outcome === 'nothing') return { text: '无事可做', tone: 'idle' }
+  if (t.status === 'done' && t.outcome === 'nochange') return { text: '做完，没改文件', tone: 'ok' }
   switch (t.status) {
     case 'starting': case 'running': return { text: '进行中', tone: 'run' }
     case 'asking': return { text: '等你决定', tone: 'ask' }

@@ -180,12 +180,13 @@ test('仅手动：不会自己跑，立即运行可以；发起失败记下原�
   assert.equal(launched.length, 1)
   assert.equal(sch.list()[0].runs[0].manual, true)
 
-  const r = rig({ launch: async () => { throw new Error('项目文件夹不存在') } })
+  const r = rig({ launch: async () => { throw Object.assign(new Error('项目文件夹不存在'), { config: true }) } })
   const id2 = r.sch.upsert(draft())
   r.clock.t = at(2026, 11, 18, 9, 1)
   await r.sch.tick()
   assert.equal(r.sch.get(id2).runs[0].status, 'failed')
-  assert.match(r.sch.get(id2).runs[0].reason, /不存在/)
+  assert.match(r.sch.get(id2).runs[0].reason, /不存在.*已停用/)
+  assert.equal(r.sch.get(id2).enabled, false, '设置本身的问题：停用，不再每天失败')
 })
 
 test('停用后不跑，也清掉排队；列表带上任务的当前状态', async () => {
@@ -200,4 +201,27 @@ test('停用后不跑，也清掉排队；列表带上任务的当前状态', as
   tasks.get('t1').status = 'done'
   assert.equal(sch.list()[0].runs[0].task.status, 'done')
   assert.equal(sch.list()[0].describe, '每天 09:00')
+})
+
+test('无事可做：发起返回 skip 时记“无事可做”，不算上一次没做完；开始的运行记下 HEAD 给下次比较', async () => {
+  let skip = '上次运行之后没有新提交'
+  const heads = []
+  const { clock, sch } = rig({ launch: async (s) => { heads.push(s.lastHead); return skip ? { skip, head: 'abc' } : { taskId: 't9', projectId: 'p1', head: 'def' } } })
+  const id = sch.upsert(draft({ condition: { kind: 'commits', exts: 'c, .h' } }))
+  assert.deepEqual(sch.get(id).condition, { kind: 'commits', exts: ['c', 'h'] })
+  assert.equal(sch.list()[0].describeCondition, '有新提交改了 .c .h 才跑')
+  clock.t = at(2026, 11, 18, 9, 1)
+  await sch.tick()
+  assert.equal(sch.get(id).runs[0].status, 'nothing')
+  assert.match(sch.get(id).runs[0].reason, /没有新提交/)
+  assert.equal(sch.get(id).lastHead, undefined, '没跑就不更新比较基准')
+  skip = null
+  clock.t = at(2026, 11, 19, 9, 1)
+  await sch.tick()
+  assert.equal(sch.get(id).runs[0].head, 'def')
+  assert.equal(sch.get(id).lastHead, 'def')
+  // 换工程：比较基准清掉
+  sch.upsert({ ...draft({ projectId: 'p2' }), id })
+  assert.equal(sch.get(id).lastHead, undefined)
+  assert.throws(() => sch.upsert(draft({ condition: { kind: 'files', exts: '' } })), /文件类型/)
 })

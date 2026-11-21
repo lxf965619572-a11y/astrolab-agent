@@ -9,7 +9,10 @@ import { useStore } from '../store'
 import { Icon } from '../components/Icon'
 import { Key, Toggle } from '../components/Keys'
 import { SkillPickerButton } from '../components/Pickers'
-import type { Freq, Schedule, SkillCard, ScheduleDraft, ScheduleState, ScheduleTemplate, Trigger } from '../api'
+import { ItemRow } from './TaskView'
+import { elapsed } from '../format'
+import { Markdown } from '../components/Markdown'
+import type { Condition, Item, Summary, Task, Freq, Schedule, SkillCard, ScheduleDraft, ScheduleState, ScheduleTemplate, Trigger } from '../api'
 import { DAY_NAMES, FREQ_NAMES, WEEK_ORDER, describeTrigger, nextRun, nextText, runState, whenText } from '../schedule'
 
 const NO_SKILLS: SkillCard[] = []
@@ -26,6 +29,8 @@ export function SchedulesView() {
   const [open, setOpen] = useState<string | null>(null)
   const [draft, setDraft] = useState<ScheduleDraft | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // 点运行记录：在这里弹出那次运行的详情，不切换工程
+  const [viewing, setViewing] = useState<{ pid: string; id: string; name: string } | null>(null)
   // 选择器要返回原来的数组（每次 filter 出新数组，zustand 会认为变了而无限重画）
   const allProjects = useStore((s) => s.app?.projects)
   const projects = useMemo(() => (allProjects || []).filter((p) => !p.hidden && !p.library), [allProjects])
@@ -38,10 +43,12 @@ export function SchedulesView() {
   }, [])
 
   const list = st?.schedules || []
-  const pname = (id: string) => projects.find((p) => p.id === id)?.name || '（工程已移出）'
-  const blank = (): ScheduleDraft => ({ name: '', prompt: '', projectId: curPid || projects[0]?.id || '', skills: [], mode: 'task', options: {}, trigger: { freq: 'weekdays', time: '09:00' }, enabled: true })
-  const fromTemplate = (t: ScheduleTemplate): ScheduleDraft => ({ name: t.name, prompt: t.prompt, projectId: curPid || projects[0]?.id || '', skills: t.skills, mode: t.mode, options: {}, trigger: { ...t.trigger }, enabled: true })
-  const edit = (s: Schedule): ScheduleDraft => ({ id: s.id, name: s.name, prompt: s.prompt, projectId: s.projectId, skills: s.skills, mode: s.mode, options: s.options, trigger: { ...s.trigger }, enabled: s.enabled })
+  const pname = (id: string) => projects.find((p) => p.id === id)?.name || list.find((x) => x.projectId === id)?.projectName || '（工程已移出）'
+  // 默认工程：当前工程在可选列表里才用它（“我的库”这类不列出的工程不能当默认，不然下拉框显示的和存下的不一样）
+  const defPid = () => (projects.some((p) => p.id === curPid) ? curPid! : projects[0]?.id || '')
+  const blank = (): ScheduleDraft => ({ name: '', prompt: '', projectId: defPid(), skills: [], mode: 'task', options: {}, trigger: { freq: 'weekdays', time: '09:00' }, condition: { kind: 'none' }, enabled: true })
+  const fromTemplate = (t: ScheduleTemplate): ScheduleDraft => ({ name: t.name, prompt: t.prompt, projectId: defPid(), skills: t.skills, mode: t.mode, options: {}, trigger: { ...t.trigger }, condition: t.condition ? { ...t.condition } : { kind: 'none' }, enabled: true })
+  const edit = (s: Schedule): ScheduleDraft => ({ id: s.id, name: s.name, prompt: s.prompt, projectId: s.projectId, skills: s.skills, mode: s.mode, options: s.options, trigger: { ...s.trigger }, condition: s.condition ? { ...s.condition } : { kind: 'none' }, enabled: s.enabled })
 
   const toggle = async (s: Schedule, on: boolean) => { const r = await run((api) => api.schedule.enable(s.id, on), on ? '启用失败' : '停用失败'); if (r) setSt(r) }
   const runNow = async (s: Schedule) => {
@@ -75,7 +82,8 @@ export function SchedulesView() {
           <div className="sched-list card">
             {list.map((s) => (
               <ScheduleRow key={s.id} s={s} pname={pname(s.projectId)} now={st?.now || Date.now()} open={open === s.id} busy={busy === s.id}
-                onToggleOpen={() => setOpen(open === s.id ? null : s.id)} onEnable={(v) => void toggle(s, v)} onRun={() => void runNow(s)} onEdit={() => setDraft(edit(s))} onRemove={() => remove(s)} />
+                onToggleOpen={() => setOpen(open === s.id ? null : s.id)} onView={(pid, id) => setViewing({ pid, id, name: s.name })} onEnable={(v) => void toggle(s, v)}
+                onRun={() => (s.problem ? setDraft(edit(s)) : void runNow(s))} onEdit={() => setDraft(edit(s))} onRemove={() => remove(s)} />
             ))}
           </div>
         )}
@@ -121,14 +129,15 @@ export function SchedulesView() {
         </div>
       </div>
 
-      {draft && <ScheduleEditor draft={draft} projects={projects} onClose={() => setDraft(null)} onSaved={(r) => { setSt(r); setDraft(null); setTab('mine') }} />}
+      {viewing && <RunDialog {...viewing} pname={pname(viewing.pid)} onClose={() => setViewing(null)} />}
+      {draft && <ScheduleEditor draft={draft} projects={projects} scope={st?.scope} blocked={st?.blocked || {}} onRefresh={(r) => setSt(r)} onClose={() => setDraft(null)} onSaved={(r) => { setSt(r); setDraft(null); setTab('mine') }} />}
     </div>
   )
 }
 
-function ScheduleRow({ s, pname, now, open, busy, onToggleOpen, onEnable, onRun, onEdit, onRemove }: {
+function ScheduleRow({ s, pname, now, open, busy, onToggleOpen, onView, onEnable, onRun, onEdit, onRemove }: {
   s: Schedule; pname: string; now: number; open: boolean; busy: boolean
-  onToggleOpen: () => void; onEnable: (v: boolean) => void; onRun: () => void; onEdit: () => void; onRemove: () => void
+  onToggleOpen: () => void; onView: (pid: string, id: string) => void; onEnable: (v: boolean) => void; onRun: () => void; onEdit: () => void; onRemove: () => void
 }) {
   const skills = useStore((x) => x.app?.skills || NO_SKILLS)
   const titleOf = (n: string) => skills.find((k) => k.name === n)?.title || n
@@ -141,19 +150,27 @@ function ScheduleRow({ s, pname, now, open, busy, onToggleOpen, onEnable, onRun,
           <span className="sched-icon"><Icon name="clock" size={17} stroke={1.7} /></span>
           <span className="sched-text">
             <span className="sched-name">{s.name}</span>
-            <span className="sched-meta">{s.describe} · {pname}{s.skills.length ? ` · ${s.skills.map(titleOf).join(' + ')}` : ''}</span>
+            <span className="sched-meta">{s.describe}{s.describeCondition ? `（${s.describeCondition}）` : ''} · {pname}{s.skills.length ? ` · ${s.skills.map(titleOf).join(' + ')}` : ''}</span>
           </span>
-          <span className={`sched-next ${s.pending ? 'pending' : ''}`}>{nextText(s, now)}</span>
-          {ls ? <span className={`pill sm ${ls.tone}`} title={last?.reason || ''}><span className="dot" />{ls.text}</span> : <span className="pill sm idle">还没运行</span>}
+          {s.problem
+            ? <span className="pill sm ask"><span className="dot" />要换工程</span>
+            : <span className={`sched-next ${s.pending ? 'pending' : ''}`}>{nextText(s, now)}</span>}
+          {s.problem ? null : ls ? <span className={`pill sm ${ls.tone}`} title={last?.reason || ''}><span className="dot" />{ls.text}</span> : <span className="pill sm idle">还没运行</span>}
           <Icon name="chevron" size={14} className="sched-chev" />
         </Button>
         <Toggle isSelected={s.enabled} onChange={onEnable} aria-label={`启用“${s.name}”`} />
         <span className="sched-acts">
-          <Button className="out-act" onPress={onRun} isDisabled={busy} aria-label={`立即运行“${s.name}”`}>{busy ? <span className="spin" /> : <Icon name="play" size={15} />}</Button>
+          <Button className="out-act" onPress={onRun} isDisabled={busy} aria-label={s.problem ? `先换工程：编辑“${s.name}”` : `立即运行“${s.name}”`}>{busy ? <span className="spin" /> : <Icon name="play" size={15} />}</Button>
           <Button className="out-act" onPress={onEdit} aria-label={`编辑“${s.name}”`}><Icon name="edit" size={15} /></Button>
           <Button className="out-act" onPress={onRemove} aria-label={`删除“${s.name}”`}><Icon name="trash" size={15} /></Button>
         </span>
       </div>
+      {s.problem && (
+        <div className="sched-problem small">
+          <Icon name="warn" size={14} stroke={1.8} /><span>{s.problem}</span>
+          <Button className="sched-warn-btn" onPress={onEdit}>换工程</Button>
+        </div>
+      )}
       {open && (
         <div className="sched-detail">
           <div className="sched-prompt">{s.prompt}</div>
@@ -173,7 +190,7 @@ function ScheduleRow({ s, pname, now, open, busy, onToggleOpen, onEnable, onRun,
               {canOpen && <Icon name="arrow" size={13} className="run-go" />}
             </>)
             return canOpen
-              ? <Button key={r.id} className="run-row" onPress={() => void useStore.getState().openTaskById(r.projectId!, r.taskId!)} aria-label={`打开 ${whenText(r.at, now)} 那次运行的任务`}>{body}</Button>
+              ? <Button key={r.id} className="run-row" onPress={() => onView(r.projectId!, r.taskId!)} aria-label={`查看 ${whenText(r.at, now)} 那次运行`}>{body}</Button>
               : <div key={r.id} className="run-row static">{body}</div>
           })}
         </div>
@@ -182,13 +199,44 @@ function ScheduleRow({ s, pname, now, open, busy, onToggleOpen, onEnable, onRun,
   )
 }
 
-function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: ScheduleDraft; projects: { id: string; name: string }[]; onClose: () => void; onSaved: (s: ScheduleState) => void }) {
+function ScheduleEditor({ draft, projects, scope, blocked, onRefresh, onClose, onSaved }: {
+  draft: ScheduleDraft; projects: { id: string; name: string; sample?: boolean; library?: boolean; cloudOk?: boolean }[]; scope?: 'sample' | 'all'; blocked: Record<string, string>
+  onRefresh: (s: ScheduleState) => void; onClose: () => void; onSaved: (s: ScheduleState) => void
+}) {
   const run = useStore((s) => s.run)
   const skills = useStore((s) => s.app?.skills || NO_SKILLS)
-  const [d, setD] = useState<ScheduleDraft>(draft)
+  // 编辑一个工程已不在列表里（移出了，或以前误选了“我的库”）的定时任务：清空，让人重新选
+  const [d, setD] = useState<ScheduleDraft>(() => (projects.some((p) => p.id === draft.projectId) ? draft : { ...draft, projectId: '' }))
   const [saving, setSaving] = useState(false)
   const set = (p: Partial<ScheduleDraft>) => setD((x) => ({ ...x, ...p }))
   const setT = (p: Partial<Trigger>) => setD((x) => ({ ...x, trigger: { ...x.trigger, ...p } }))
+  const setC = (p: Partial<Condition>) => setD((x) => ({ ...x, condition: { ...x.condition, ...p } }))
+  // 文件类型输入框：保持用户敲的原样，保存时再整理
+  const [extText, setExtText] = useState((draft.condition?.exts || ['c', 'h']).join(' '))
+  const blockedWhy = d.projectId ? blocked[d.projectId] : undefined
+  // 用公网模型时把工程标为非敏感：人确认过里面没有型号代码
+  const unmark = async () => {
+    const list = await run((api) => api.project.setInfo(d.projectId, { cloudOk: false }), '取消标记失败')
+    const app = useStore.getState().app
+    if (list && app) useStore.setState({ app: { ...app, projects: list } })
+    const r = await run((api) => api.schedule.list())
+    if (r) onRefresh(r)
+  }
+  const markedOk = scope === 'sample' && !!projects.find((p) => p.id === d.projectId && p.cloudOk && !p.sample)
+  const markOk = async () => {
+    const pid = d.projectId
+    const pn = projects.find((p) => p.id === pid)?.name || ''
+    useStore.getState().askConfirm({
+      title: `把“${pn}”标为非敏感？`, body: '标了之后，用公网模型时也能在这个工程里跑定时任务，代码会发到云端。只在确认里面没有任何型号代码时才标。', ok: '确认没有型号代码',
+      run: async () => {
+        const list = await run((api) => api.project.setInfo(pid, { cloudOk: true }), '标记失败')
+        const app = useStore.getState().app
+        if (list && app) useStore.setState({ app: { ...app, projects: list } })
+        const r = await run((api) => api.schedule.list())
+        if (r) onRefresh(r)
+      },
+    })
+  }
   const changeFreq = (f: Freq) => {
     const t: Trigger = { freq: f }
     if (f === 'hourly') t.minute = d.trigger.minute ?? 0
@@ -202,7 +250,8 @@ function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: Schedule
   const save = async () => {
     setSaving(true)
     try {
-      const r = await run((api) => api.schedule.save(d), '保存失败')
+      const cond: Condition = d.condition.kind === 'none' ? { kind: 'none' } : { kind: d.condition.kind, exts: extText.split(/[\s,，、;；]+/).filter(Boolean) }
+      const r = await run((api) => api.schedule.save({ ...d, condition: cond }), '保存失败')
       if (r) { onSaved(r.state); useStore.getState().toast({ text: d.id ? `已保存“${d.name}”` : `已新建“${d.name}”${d.enabled !== false && next ? `，下次 ${whenText(next)}` : ''}`, tone: 'ok' }) }
     } finally { setSaving(false) }
   }
@@ -230,7 +279,8 @@ function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: Schedule
           <div className="field-row">
             <label className="field grow"><span>工程</span>
               <select className="sched-sel" value={d.projectId} onChange={(e) => set({ projectId: e.target.value })}>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {!d.projectId && <option value="" disabled>请选择工程</option>}
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}{blocked[p.id] ? '（公网模型下不能用）' : ''}</option>)}
               </select>
             </label>
             <label className="field"><span>模式</span>
@@ -240,6 +290,18 @@ function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: Schedule
               </select>
             </label>
           </div>
+          {blockedWhy && (
+            <div className="sched-warn small">
+              <Icon name="shield" size={14} stroke={1.8} />
+              <span>{blockedWhy}。</span>
+              {scope === 'sample' && <Button className="sched-warn-btn" onPress={() => void markOk()}>确认没有型号代码，标为非敏感</Button>}
+            </div>
+          )}
+          {markedOk && (
+            <div className="sched-ok small muted"><Icon name="check" size={13} stroke={2} />这个工程已标为“非敏感”（确认过没有型号代码），用公网模型时也能跑定时任务。
+              <Button className="sched-link" onPress={() => void unmark()}>取消标记</Button>
+            </div>
+          )}
           <div className="field-row sched-trig">
             <label className="field"><span>运行</span>
               <select className="sched-sel" value={d.trigger.freq} onChange={(e) => changeFreq(e.target.value as Freq)}>
@@ -258,6 +320,16 @@ function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: Schedule
               })}
             </div>
           )}
+          <div className="field-row sched-trig">
+            <label className="field"><span>启动条件（到点先查，没事可做就不启动智能体）</span>
+              <select className="sched-sel" value={d.condition.kind} onChange={(e) => setC({ kind: e.target.value as Condition['kind'] })}>
+                <option value="none">不检查，到点就跑</option>
+                <option value="commits">上次运行后有新提交改了这些文件才跑</option>
+                <option value="files">工程里有这些文件才跑</option>
+              </select>
+            </label>
+            {d.condition.kind !== 'none' && <label className="field"><span>文件类型{d.condition.kind === 'commits' ? '（不填就是任何文件）' : ''}</span><input value={extText} onChange={(e) => setExtText(e.target.value)} placeholder="c h" style={{ width: 140 }} /></label>}
+          </div>
           <div className="sched-preview small">
             <Icon name="clock" size={13} stroke={1.8} />
             {d.trigger.freq === 'manual' ? '不会自己运行，只在点“立即运行”时运行' : next ? `${describeTrigger(d.trigger)} · 下次运行：${whenText(next)}` : '这个时间已经过了'}
@@ -266,7 +338,84 @@ function ScheduleEditor({ draft, projects, onClose, onSaved }: { draft: Schedule
             <Toggle isSelected={d.enabled !== false} onChange={(v) => set({ enabled: v })}>启用</Toggle>
             <span className="grow" />
             <Key onPress={onClose}>取消</Key>
-            <Key variant="primary" onPress={() => void save()} isDisabled={saving || !d.name.trim() || !d.prompt.trim() || !d.projectId}>{saving ? '保存中…' : d.id ? '保存' : '创建'}</Key>
+            <Key variant="primary" onPress={() => void save()} isDisabled={saving || !d.name.trim() || !d.prompt.trim() || !d.projectId || (!!blockedWhy && d.enabled !== false)}>{saving ? '保存中…' : d.id ? '保存' : '创建'}</Key>
+          </div>
+        </Dialog>
+      </Modal>
+    </ModalOverlay>
+  )
+}
+
+/**
+ * 一次运行的详情：在定时任务页里看，不切换工程。最上面是智能体最后的回复（做了什么、结果在哪、待确认），
+ * 下面是只读的完整对话。要审核、提交或追问时点“去审核”，才进入那个工程。正在跑的每 3 秒刷新一次。
+ */
+function RunDialog({ pid, id, name, pname, onClose }: { pid: string; id: string; name: string; pname: string; onClose: () => void }) {
+  const run = useStore((s) => s.run)
+  const [rec, setRec] = useState<{ task: Task; items: Item[]; live: boolean; summary: Summary | null } | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const [full, setFull] = useState(false)
+  useEffect(() => {
+    let stop = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const load = async () => {
+      try {
+        const api = useStore.getState().api
+        if (!api) return
+        const r = await api.task.peekIn(pid, id)
+        if (stop) return
+        setRec(r)
+        if (r.live) timer = setTimeout(() => void load(), 3000)
+      } catch (e) { if (!stop) setErr(e instanceof Error ? e.message : String(e)) }
+    }
+    void load()
+    return () => { stop = true; if (timer) clearTimeout(timer) }
+  }, [pid, id, run])
+  const t = rec?.task
+  const items = (rec?.items || []).filter((i) => i.kind !== 'tools' || !(i.hidden || i.calls.every((c) => c.hidden)))
+  const last = [...items].reverse().find((i) => i.kind === 'assistant') as Extract<Item, { kind: 'assistant' }> | undefined
+  const rs = t ? runState({ id: 'x', at: t.startedAt, status: 'started', task: { status: t.status, title: t.title, startedAt: t.startedAt, endedAt: t.endedAt, commit: t.commit, restoredAt: t.restoredAt || null } }) : null
+  const files = rec?.summary?.files ?? (t as (Task & { changeStat?: { files: number; added: number; removed: number } }) | undefined)?.changeStat?.files
+  const review = async () => { onClose(); await useStore.getState().openTaskById(pid, id) }
+  return (
+    <ModalOverlay className="modal-scrim" isDismissable isOpen onOpenChange={(o) => { if (!o) onClose() }}>
+      <Modal className="modal wide run-modal">
+        <Dialog className="modal-dialog run-dialog" aria-label={`定时任务“${name}”的一次运行`}>
+          <div className="run-dlg-head">
+            <div>
+              <Heading slot="title" className="modal-title">{name}</Heading>
+              <div className="run-dlg-meta small muted">
+                {rs && <span className={`pill sm ${rs.tone}`}><span className="dot" />{rs.text}</span>}
+                <span><Icon name="folder" size={12} stroke={1.8} /> {pname}</span>
+                {t && <span>{whenText(t.startedAt)}{t.endedAt ? ` · 用时 ${elapsed(t.endedAt - t.startedAt)}` : ''}</span>}
+                {t?.schedule?.catchup && <span className="chip-tag">补跑</span>}
+                {t?.schedule?.manual && <span className="chip-tag">手动</span>}
+                {files !== undefined && <span>{files ? `改了 ${files} 个文件` : '没有改文件'}</span>}
+              </div>
+            </div>
+            <Button className="out-act" onPress={onClose} aria-label="关闭"><Icon name="x" size={16} /></Button>
+          </div>
+          <div className="run-dlg-body">
+            {err && <div className="pad muted">{err}</div>}
+            {!rec && !err && <div className="pad muted">正在读取…</div>}
+            {rec && (rec.live
+              ? <div className="run-final live"><span className="spin" /> 正在运行{rec.summary ? `：第 ${rec.summary.steps} 步` : ''}。做完后这里显示最后的回复。</div>
+              : last
+                ? <div className="run-final"><div className="run-final-label small">最后的回复</div><Markdown text={last.text} /></div>
+                : <div className="run-final muted">这次运行没有回复（可能中途停止或出错）。</div>)}
+            {rec && (
+              <>
+                <Button className="run-full-toggle small" onPress={() => setFull(!full)} aria-expanded={full}>
+                  <Icon name="chevron" size={13} className={full ? '' : 'rot-90'} />完整对话（{items.length} 条）
+                </Button>
+                {full && <div className="run-full">{items.map((item) => <div key={item.id} className="conv-vrow static"><ItemRow item={item} task={t} /></div>)}</div>}
+              </>
+            )}
+          </div>
+          <div className="modal-foot">
+            <span className="grow small muted run-dlg-tip">{t?.stopReason === 'fence' ? '无人值守时它想读工作区外的文件，被停止了：看看它缺什么输入，放进工程里。' : t?.outcome && t.outcome !== 'review' ? '这次没有改文件，不用审核。' : '改动在工程里审核、提交；智能体没有提交。'}</span>
+            <Key onPress={onClose}>关闭</Key>
+            <Key variant="primary" onPress={() => void review()} isDisabled={!rec}>{t && t.status === 'done' && !t.commit && !t.restoredAt && (t.outcome || 'review') === 'review' ? '去审核' : '在工程里打开'}</Key>
           </div>
         </Dialog>
       </Modal>

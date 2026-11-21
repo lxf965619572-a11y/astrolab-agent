@@ -5,6 +5,7 @@
 // 剧本按用户消息里的标记选择：
 //   [ask]    先用 ask_user_question 提两个问题（经真实的提问桥插件），按回答收尾
 //   [fail]   第一个工具调用越界被拒绝
+//   [fence]  读工作区外的文件被读取围栏拦下，然后接着找
 //   [slow]   每一步都慢，用于测试停止
 //   [noplan] 连读几个文件、不列步骤就回复（测试工作台的列步骤提醒）
 //   其他     单元测试的典型过程：读设计和源码、思考、写测试和桩、编译运行、写报告、回复
@@ -202,6 +203,15 @@ async function scenario(sessionId, text, signal) {
       await tool(sessionId, t, n, 'read', { file_path: f }, async () => `<path>${f}</path>…`)
     }
     await say(sessionId, t, ++n, '看完了。')
+  } else if (/\[fence\]/.test(text)) {
+    // 读工作区外的文件被读取围栏拦下，然后接着找（测试无人值守时越界即停）
+    await step(sessionId, S, ++n)
+    await tool(sessionId, t, n, 'read', { file_path: 'D:\\other\\src\\a.c' }, async () => { throw new Error('[astrolab: 不允许读取工作区外的文件] read 用到了 D:\\other\\src\\a.c，它在当前工作区和技能目录之外，这次调用没有执行。') })
+    for (let i = 0; i < 6; i++) {
+      await step(sessionId, S * 4, ++n)
+      await tool(sessionId, t, n, 'glob', { pattern: `**/*${i}.c` }, async () => '（没有匹配）')
+    }
+    await say(sessionId, t, ++n, '没找到代码。')
   } else if (/\[fail\]/.test(text)) {
     await step(sessionId, S, ++n)
     await tool(sessionId, t, n, 'write', { file_path: 'D:\\temp\\out.txt', content: 'x\n' }, async () => { throw new Error('sandbox denied: write outside the workspace is not permitted') })

@@ -796,18 +796,24 @@ export function createMockApi(): AstroApi {
   const H = 3600_000
   const sNow = Date.now()
   const schedules: Schedule[] = new URLSearchParams(location.search).has('nosched') ? [] : [
-    { id: 's1', name: '每晚静态分析巡检', prompt: SCHEDULE_TEMPLATES[0].prompt, projectId: 'p1', skills: ['static-analysis'], mode: 'code', options: {}, trigger: { freq: 'weekdays', time: '21:00' }, enabled: true,
+    { id: 's1', name: '每晚静态分析巡检', prompt: SCHEDULE_TEMPLATES[0].prompt, projectId: 'p1', skills: ['static-analysis'], mode: 'code', options: {}, trigger: { freq: 'weekdays', time: '21:00' }, condition: { kind: 'commits', exts: ['c', 'h'] }, enabled: true,
       nextRunAt: nextRun({ freq: 'weekdays', time: '21:00' }, sNow), createdAt: sNow - 200 * H, updatedAt: sNow - 200 * H, pending: null, describe: '工作日 21:00', lastRunAt: sNow - 10 * H,
       runs: [
         { id: 'r3', at: sNow - 10 * H, due: sNow - 10 * H, status: 'started', taskId: 't-past-1.2', projectId: 'p1', task: { status: 'done', title: '每晚静态分析巡检', startedAt: sNow - 10 * H, endedAt: sNow - 9.7 * H, commit: null, restoredAt: null } },
         { id: 'r2', at: sNow - 30 * H, due: sNow - 34 * H, status: 'started', catchup: true, taskId: 't-past-26', projectId: 'p1', task: { status: 'done', title: '每晚静态分析巡检', startedAt: sNow - 30 * H, endedAt: sNow - 29.6 * H, commit: { sha: '8fa01be', message: '静态分析巡检', at: sNow - 20 * H, files: 2 }, restoredAt: null } },
+        { id: 'r0', at: sNow - 34 * H, due: sNow - 34 * H, status: 'nothing', reason: '上次运行之后没有新提交（8fa01be）' },
         { id: 'r1', at: sNow - 58 * H, due: sNow - 58 * H, status: 'skipped', reason: '上一次运行还没做完' },
       ] },
-    { id: 's2', name: '每周研制进展', prompt: SCHEDULE_TEMPLATES[2].prompt, projectId: 'p1', skills: [], mode: 'task', options: {}, trigger: { freq: 'weekly', days: [5], time: '16:30' }, enabled: false,
+    { id: 's2', name: '每周研制进展', prompt: SCHEDULE_TEMPLATES[2].prompt, projectId: multi ? 'p2' : 'p1', skills: [], mode: 'task', options: {}, trigger: { freq: 'weekly', days: [5], time: '16:30' }, enabled: false,
       nextRunAt: null, createdAt: sNow - 100 * H, updatedAt: sNow - 100 * H, pending: null, describe: '每周五 16:30', runs: [] },
   ]
   let loginOn = false
-  const schedState = (): ScheduleState => ({ schedules: schedules.map((x) => ({ ...x, describe: describeTrigger(x.trigger) })), templates: SCHEDULE_TEMPLATES, login: { supported: true, on: loginOn }, tray: schedules.some((x) => x.enabled), now: Date.now() })
+  // URL 带 ?public：模拟用公网模型（定时任务只能在示例工程和标为非敏感的工程里跑）
+  const scope: 'sample' | 'all' = new URLSearchParams(location.search).has('public') ? 'sample' : 'all'
+  const blockedOf = (p: Project) => (p.library ? '“我的库”是做技能和插件用的，定时任务请选一个工程' : scope === 'sample' && !p.sample && !p.cloudOk ? `现在用的是公网模型，定时任务只能在示例工程或标为“非敏感”的工程里运行；“${p.name}”没有标过` : null)
+  const condText = (c?: { kind: string; exts?: string[] }) => (!c || c.kind === 'none' ? '' : c.kind === 'files' ? `工程里有 ${(c.exts || []).map((x) => `.${x}`).join(' ')} 文件才跑` : (c.exts || []).length ? `有新提交改了 ${(c.exts || []).map((x) => `.${x}`).join(' ')} 才跑` : '有新提交才跑')
+  const schedState = (): ScheduleState => ({ schedules: schedules.map((x) => { const pj = projects.find((p) => p.id === x.projectId); return { ...x, describe: describeTrigger(x.trigger), describeCondition: condText(x.condition), projectName: pj?.name || '', problem: pj ? blockedOf(pj) : '工程已经不在列表里，请编辑这个定时任务换一个工程' } }), templates: SCHEDULE_TEMPLATES, login: { supported: true, on: loginOn }, tray: schedules.some((x) => x.enabled), now: Date.now(),
+    scope, blocked: Object.fromEntries(projects.map((p) => [p.id, blockedOf(p)]).filter(([, r]) => r)) as Record<string, string> })
   const schedOf = (id: string) => { const x = schedules.find((y) => y.id === id); if (!x) throw new Error('这个定时任务已经删除'); return x }
 
   const api: AstroApi = {
@@ -933,6 +939,16 @@ export function createMockApi(): AstroApi {
       async remove(pid, id) { if (task?.id === id) { if (['starting', 'running', 'asking'].includes(status)) throw new Error('任务进行中，先停止再删除'); task = null; act = createActivity(); status = 'idle'; pushState() } const l = historyOf(pid); const i = l.findIndex((h) => h.id === id); if (i >= 0) l.splice(i, 1); return true },
       async recent(limit = 12) { return Object.fromEntries(projects.filter((p) => !p.hidden).map((p) => [p.id, historyOf(p.id).slice(0, limit)])) },
       async peek(id) { const t = historyOf(project.id).find((h) => h.id === id)!; return { task: t, items: act.items.map(plainItem), current: false } },
+      async peekIn(pid, id) {
+        if (task && task.id === id) return { task: { ...task }, items: act.items.map(plainItem), live: ['starting', 'running', 'asking'].includes(status), summary: summarize(act) }
+        const t = historyOf(pid).find((h) => h.id === id)
+        if (!t) throw new Error('找不到这个任务的记录')
+        return { task: t, items: [
+          { id: 'u1', kind: 'user', at: t.startedAt, text: t.prompt },
+          { id: 'a1', kind: 'assistant', at: t.startedAt + 60_000, text: '这次巡检对 12 个 .c 文件做了 Cppcheck 和 GJB 8114 规则扫描，结果写在 `巡检/静态分析/2026-11-18/`。和上次比，新增 2 个问题、消失 1 个。\n\n## 待确认\n\n1. 工程里有两份 `rt_drv.c`（src/ 和 backup/），只分析了 src/ 下的，backup/ 看起来是旧版本。' },
+          { id: 'e1', kind: 'turn-end', at: t.startedAt + 61_000, reason: 'completed' },
+        ], live: false, summary: null }
+      },
       async outputs() {
         const exts: Record<string, string[]> = { 需求分析: ['md', 'docx'], 概要设计: ['md', 'docx'], 详细设计: ['md', 'docx'], 单元测试: ['c', 'md'], 代码走查: ['md', 'xlsx'], 信息流梳理: ['svg', 'md'], 编码: ['c'] }
         return projects.filter((p) => !p.hidden).flatMap((p) => historyOf(p.id).filter((t) => !t.archived).flatMap((t) => (exts[t.stageName] || ['md']).map((e, i) => ({
@@ -953,10 +969,13 @@ export function createMockApi(): AstroApi {
       async save(d) {
         if (!d.name.trim()) throw new Error('请给定时任务起个名字')
         if (!d.prompt.trim()) throw new Error('请写清楚每次运行要做什么')
+        const pj = projects.find((p) => p.id === d.projectId)
+        const bl = pj && blockedOf(pj)
+        if (bl && d.enabled !== false) throw new Error(bl)
         if (d.trigger.freq === 'once' && d.enabled !== false && (!d.trigger.at || d.trigger.at <= Date.now())) throw new Error('只跑一次的时间要在以后')
         const old = d.id ? schedOf(d.id) : null
         const x: Schedule = { ...(old || { id: `s${Date.now()}`, createdAt: Date.now(), runs: [] }), name: d.name.trim(), prompt: d.prompt.trim(), projectId: d.projectId, skills: d.skills, mode: d.mode, options: d.options,
-          trigger: d.trigger, enabled: d.enabled !== false, updatedAt: Date.now(), pending: null, describe: describeTrigger(d.trigger), nextRunAt: d.enabled !== false ? nextRun(d.trigger, Date.now()) : null }
+          trigger: d.trigger, condition: d.condition, enabled: d.enabled !== false, updatedAt: Date.now(), pending: null, describe: describeTrigger(d.trigger), nextRunAt: d.enabled !== false ? nextRun(d.trigger, Date.now()) : null }
         if (old) schedules[schedules.indexOf(old)] = x
         else schedules.push(x)
         return { id: x.id, state: schedState() }

@@ -53,8 +53,22 @@ export function unattendedNote(t) {
   return `【无人值守】这是定时任务“${s.name || t.title}”的一次自动运行${why}，现在没有人在电脑前，没人能回答问题。所以：
 - 不要用 ask_user_question 提问。遇到要拍板的地方，按最合理的理解继续做，在最后的回复里用“待确认”一节逐条写出你做的假设和理由。
 - 删除或覆盖用户写的内容这类不可撤销、两种做法都说得通的决定不要做：把准备工作做完，在“待确认”里写清楚需要用户决定什么。
-- 工作区里缺输入、或者这次没有要做的事（例如没有新的改动），就写一句说明后结束，不要编造内容。
+- 缺输入、或者这次没有要做的事（例如没有新的改动）：不要写任何文件，最后的回复第一行写“${NOTHING_MARK}”加一句原因，然后结束。不要编造内容，也不要到工作区外面去找（会被拦下，任务随即停止）。
 - 最后的回复开头用两三句话写清这次做了什么、结果写在哪个文件，用户回来先看这里。`
+}
+/** 无人值守的运行没有要做的事时，最后回复的第一行（工作台据此标“无事可做”，不进审核） */
+export const NOTHING_MARK = '【无事可做】'
+/** 读取围栏拒绝时工具结果里的标记（engine/read-fence.mjs） */
+const FENCE_MARK = /\[astrolab: 不允许读取工作区外的文件\]/
+/**
+ * 定时任务做完后的结果（不同的结果，回来要做的事不同）：
+ *   review   改了文件，等你审核
+ *   nochange 做完了，没改文件（只需看回复）
+ *   nothing  智能体说无事可做（回复第一行是【无事可做】），也没改文件
+ */
+export function scheduledOutcome(files, lastReply) {
+  if (files > 0) return 'review'
+  return String(lastReply || '').trimStart().startsWith(NOTHING_MARK) ? 'nothing' : 'nochange'
 }
 /** 无人值守时智能体还是提了问：替用户回答（有人正看着这个任务时先等一会儿） */
 export const UNATTENDED_ANSWER = '（无人值守，没有人回答）请按你认为最合理的做法继续，并把这个决定和理由写进最后回复的“待确认”。'
@@ -193,6 +207,13 @@ function taskFile(dataDir, projectId, id) {
   return f
 }
 /** 改一个任务记录里的字段（标题、归档标记），返回改后的任务 */
+/** 读一个任务的完整记录（任务和对话），不切换工程：定时任务页里看某次运行用 */
+export function readTaskFull(dataDir, projectId, id) {
+  const rec = JSON.parse(readFileSync(taskFile(dataDir, projectId, id), 'utf8'))
+  // 记录里是进行中、但不在任何控制器里跑：是上次退出时中断的
+  const task = { ...rec.task, status: ['running', 'asking', 'starting'].includes(rec.task.status) ? 'stopped' : rec.task.status }
+  return { task, items: rec.items || [] }
+}
 /** 读一个任务的记录（定时任务的运行记录要显示任务现在的状态）；没有或读不了返回 null */
 export function readTaskRecord(dataDir, projectId, id) {
   try { return JSON.parse(readFileSync(taskFile(dataDir, projectId, id), 'utf8')).task } catch { return null }
@@ -386,6 +407,7 @@ export class TaskController extends EventEmitter {
     }
     const changed = applyEvent(this.activity, ev)
     this.watchPlan(ev)
+    this.watchFence(changed)
     // 发给智能体的第一条消息带了环节、技能、约定等说明；对话里只显示用户自己写的那句
     for (const it of changed) {
       if (it.kind === 'user' && this.task.firstMessage && it.text.trim() === this.task.firstMessage.trim()) it.text = this.task.prompt
@@ -396,6 +418,20 @@ export class TaskController extends EventEmitter {
     if (['turn/start', 'step/start', 'tool/call', 'tool/result', 'turn/end', 'user/message'].includes(ev.type)) {
       this.emit('state', this.snapshotState())
     }
+  }
+
+  /**
+   * 无人值守时越界即停：读取围栏拦下一次，说明智能体想去工作区外找东西。有人在时它会改问人，没人时只会接着找，
+   * 而围栏只看命令文本、挡不住刻意拼出来的路径——所以第一次被拦就停下，记下原因等人回来看
+   */
+  watchFence(changed) {
+    if (!this.task || !this.task.unattended || this.stopping || !this.busy || this.task.stopReason) return
+    const hit = changed.some((it) => it.kind === 'tools' && it.calls.some((c) => c.status === 'error' && FENCE_MARK.test(c.result || '')))
+    if (!hit) return
+    this.task.stopReason = 'fence'
+    const name = (this.task.schedule && this.task.schedule.name) || this.task.title
+    this.emit('notify', { level: 3, kind: 'error', title: `定时任务“${name}”越界，已停止`, body: '智能体想读工作区外的文件。无人值守时不允许，任务已停止；对话和已写的文件都保留，回来看看它缺什么输入。', ...(this.task.schedule ? { schedule: this.task.schedule.id, projectId: this.project && this.project.id, taskId: this.task.id } : {}) })
+    void this.stop().catch(() => {})
   }
 
   /** 一轮里做了几步还没列步骤：插一句提醒（每轮最多一次）。工作台的“进度”只能按智能体自己列的步骤打勾 */
@@ -422,10 +458,24 @@ export class TaskController extends EventEmitter {
       this.task.endedAt = Date.now()
       this.setStatus('done')
       this.save()
-      void this.refreshChangeStat({ end: true }).then(() => this.emit('task-done', this.task))
+      const task = this.task
+      const reply = summarize(this.activity).lastAssistantText
+      const sch = task.unattended ? task.schedule : null
+      void this.refreshChangeStat({ end: true }).then(() => {
+        // 定时任务（还是无人值守）：按改动统计分出结果，没改文件的不进审核、通知不打扰
+        if (sch && this.task === task) {
+          const files = task.changeStat ? task.changeStat.files : summarize(this.activity).files
+          task.outcome = scheduledOutcome(files, reply)
+          this.save()
+          this.emit('state', this.snapshotState())
+          const ids = { schedule: sch.id, projectId: this.project && this.project.id, taskId: task.id }
+          if (task.outcome === 'review') this.emit('notify', { level: 2, kind: 'done', title: `定时任务“${sch.name}”做完了，改了 ${files} 个文件，等你审核`, body: reply.slice(0, 120), ...ids })
+          else this.emit('notify', { level: 1, kind: 'info', quiet: true, title: task.outcome === 'nothing' ? `定时任务“${sch.name}”：无事可做` : `定时任务“${sch.name}”做完了，没有改文件`, body: reply.replace(NOTHING_MARK, '').trim().slice(0, 120), ...ids })
+        }
+        this.emit('task-done', task)
+      })
       if (this.restartPending) this.requestRestart()
-      const sch = this.task.schedule
-      this.emit('notify', { level: 2, kind: 'done', title: sch ? `定时任务“${sch.name}”做完了，等你审核` : `${this.task.stage === 'general' ? '任务' : this.task.stageName}完成`, body: summarize(this.activity).lastAssistantText.slice(0, 120), ...(sch ? { schedule: sch.id, projectId: this.project && this.project.id, taskId: this.task.id } : {}) })
+      if (!sch) this.emit('notify', { level: 2, kind: 'done', title: `${task.stage === 'general' ? '任务' : task.stageName}完成`, body: reply.slice(0, 120) })
     }
   }
 

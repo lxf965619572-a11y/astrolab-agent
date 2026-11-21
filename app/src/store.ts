@@ -342,7 +342,10 @@ function onEvent(e: AstroEvent) {
       if (e.payload.kind === 'done') play('done')
       else if (e.payload.kind === 'ask') play('ask')
       else if (e.payload.kind === 'error') play('error')
-      if (e.payload.kind === 'done') st.toast({ text: `${e.payload.title}，改动等你审核`, tone: 'ok' }, 6000)
+      if (e.payload.kind === 'done') st.toast({ text: /等你审核/.test(e.payload.title) ? e.payload.title : `${e.payload.title}，改动等你审核`, tone: 'ok' }, 6000)
+      else if (e.payload.kind === 'info') st.toast({ text: e.payload.title, tone: 'info' }, 5000)
+      // 定时任务的错误（越界停止、没能运行）也提示；进行中任务的错误由任务页自己显示
+      else if (e.payload.kind === 'error' && /定时任务/.test(e.payload.title)) st.toast({ text: `${e.payload.title}：${e.payload.body}`, tone: 'err' }, 8000)
       break
     }
     case 'warn': st.toast({ text: e.payload, tone: 'err' }); break

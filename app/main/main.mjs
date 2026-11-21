@@ -11,8 +11,9 @@ import { probeModel } from './probe.mjs'
 import { DEPT_ID, ModelStore } from './models.mjs'
 import { UpdateService, updateDirOf } from './update.mjs'
 import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, readProjectFile, updateSample } from './projects.mjs'
-import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, readTaskRecord, searchTasks, STAGES, TaskController } from './task.mjs'
+import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, readTaskFull, readTaskRecord, searchTasks, STAGES, TaskController } from './task.mjs'
 import { Scheduler, TEMPLATES as SCHEDULE_TEMPLATES } from './schedule.mjs'
+import { createLauncher } from './schedule-launch.mjs'
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -202,36 +203,49 @@ function userPresent() {
  * 到点发起一次运行：在定时任务的工程里用后台控制器发起任务（界面正看着的工程不切换）。
  * 工程里有任务在进行、并行已满、你正对着这个工程：返回 { wait }，调度器过一会儿再试（最多等 2 小时）
  */
-async function launchScheduled(s, slot) {
+/**
+ * 定时任务能在哪些工程里跑：用公网模型（DeepSeek 官方接口等）时，代码会发到云端，无人值守又没人能及时拦，
+ * 所以只许示例工程和人确认过“没有型号代码”的工程（cloudOk）。ASTROLAB_SCHEDULE_SCOPE=all|sample 可以改
+ */
+function scheduleScope() {
+  const env = envNow()
+  if (['all', 'sample'].includes(env.ASTROLAB_SCHEDULE_SCOPE)) return env.ASTROLAB_SCHEDULE_SCOPE
+  return distillScope({}, modelConfig(env).baseURL)
+}
+function scheduleBlocked(p) {
+  if (p.library) return '“我的库”是做技能和插件用的，定时任务请选一个工程'
+  if (scheduleScope() === 'sample' && !p.sample && !p.cloudOk) return `现在用的是公网模型，定时任务只能在示例工程或标为“非敏感”的工程里运行；“${p.name}”没有标过。确认里面没有型号代码后，在定时任务的编辑框里把它标为非敏感`
+  return null
+}
+/** 定时任务设置本身的问题（要人改了才能跑）：没有返回 null */
+function scheduleProblem(s) {
   const p = store.get(s.projectId)
-  if (!p) throw new Error('工程已经不在列表里，请编辑这个定时任务换一个工程')
-  if (!existsSync(p.path)) throw new Error(`工程文件夹不存在：${p.path}`)
-  let c = ctls.get(p.id)
-  if (c && c.busy) return { wait: c === ctl ? '你正在这个工程里做任务' : `工程里有任务在进行：${c.task ? c.task.title : ''}` }
-  // 你正对着这个工程（会把你在看的任务换掉）：等你走开或切到别的工程。手动“立即运行”不等
-  if (c && c === ctl && c.task && !slot.manual && userPresent()) return { wait: '你正在看这个工程' }
-  try { checkParallel(c || { busy: false, project: p }) } catch (e) { return { wait: e.message } }
-  if (!c) {
+  if (!p) return '工程已经不在列表里，请编辑这个定时任务换一个工程'
+  return scheduleBlocked(p)
+}
+const launchScheduled = createLauncher({
+  project: (id) => store.get(id),
+  problem: scheduleProblem,
+  controllerOf: (pid) => ctls.get(pid) || null,
+  isActive: (c) => c === ctl,
+  userPresent,
+  checkParallel,
+  createController: async (p) => {
     const pn = await prepareProject(p, P)
     if (pn.length) mlog('定时任务准备工程', p.name, pn)
     store.update(p.id, p)
-    c = newController()
+    const c = newController()
     ctls.set(p.id, c)
     await c.setProject(store.get(p.id))
-  }
-  mlog(`定时任务开始：${s.name}（${p.name}）${slot.catchup ? '，补跑' : ''}${slot.manual ? '，手动' : ''}`)
-  const task = await c.start({
-    prompt: s.prompt, skills: s.skills, mode: s.mode, options: s.options, files: [], title: s.name,
-    unattended: true, schedule: { id: s.id, name: s.name, due: slot.due, catchup: !!slot.catchup, manual: !!slot.manual },
-  })
-  sendBackground()
-  send('recent', null)
-  return { taskId: task.id, projectId: p.id }
-}
+    return c
+  },
+  onStarted: () => { sendBackground(); send('recent', null) },
+  log: mlog,
+})
 function scheduledTaskInfo(pid, id) {
   const c = ctls.get(pid)
   const t = c && c.task && c.task.id === id ? c.task : readTaskRecord(P.data, pid, id)
-  return t ? { status: t.status, title: t.title, startedAt: t.startedAt, endedAt: t.endedAt, commit: t.commit || null, restoredAt: t.restoredAt || null } : null
+  return t ? { status: t.status, title: t.title, startedAt: t.startedAt, endedAt: t.endedAt, commit: t.commit || null, restoredAt: t.restoredAt || null, outcome: t.outcome || null, stopReason: t.stopReason || null, files: t.changeStat ? t.changeStat.files : null } : null
 }
 /** 系统通知（窗口不在前台时）；点一下打开窗口，带了任务就打开那个任务 */
 function systemNote(title, body, open) {
@@ -308,7 +322,9 @@ function setLoginItem(on) {
   } else app.setLoginItemSettings({ openAtLogin: !!on, path: process.execPath, args: ['--hidden'] })
 }
 function scheduleState() {
-  return { schedules: sched.list(), templates: SCHEDULE_TEMPLATES, login: loginItem(), tray: !!tray, now: Date.now() }
+  const scope = scheduleScope()
+  return { schedules: sched.list().map((s) => ({ ...s, problem: scheduleProblem(s), projectName: store.get(s.projectId)?.name || '' })), templates: SCHEDULE_TEMPLATES, login: loginItem(), tray: !!tray, now: Date.now(), scope,
+    blocked: Object.fromEntries(store.list().filter((p) => !p.hidden).map((p) => [p.id, scheduleBlocked(p)]).filter(([, r]) => r)) }
 }
 function startScheduler() {
   sched = new Scheduler({ file: join(P.data, 'schedules.json'), launch: launchScheduled, taskInfo: scheduledTaskInfo, log: mlog })
@@ -319,6 +335,7 @@ function startScheduler() {
     systemNote(`定时任务“${s.name}”没能运行`, reason, { view: 'schedules' })
   })
   sched.on('skipped', ({ schedule: s, reason }) => mlog(`定时任务跳过：${s.name}：${reason}`))
+  sched.on('nothing', ({ schedule: s, run }) => mlog(`定时任务无事可做（没有启动智能体）：${s.name}：${run.reason}`))
   sched.on('run', ({ schedule: s, run }) => { if (run.catchup) send('notify', { level: 1, kind: 'done', title: `补跑定时任务“${s.name}”`, body: '原定时间电脑没开或在睡眠，现在补跑一次' }) })
   updateTray()
   // 启动后先等一会儿（当前工程的引擎在预热、界面在加载），再检查到点和错过的
@@ -518,6 +535,8 @@ function registerIpc() {
   handle('project:setInfo', (id, info) => {
     const patch = {}
     if (info && typeof info.notes === 'string') patch.notes = info.notes.slice(0, 4000)
+    // 定时任务：人确认这个工程里没有型号代码，用公网模型时也能在这里跑定时任务
+    if (info && typeof info.cloudOk === 'boolean') patch.cloudOk = info.cloudOk
     if (info && Array.isArray(info.refs)) {
       patch.refs = [...new Set(info.refs.map((x) => String(x || '').trim().replace(/\\/g, '/')).filter((x) => x && !isAbsolute(x) && !/^[A-Za-z]:/.test(x) && !x.split('/').includes('..')))].slice(0, 50)
     }
@@ -550,6 +569,13 @@ function registerIpc() {
   // 侧栏按工作区列最近的任务：每个工作区（没移出列表的）各取最近几个；“全部任务”页取到 500 个
   handle('task:recent', (limit) => Object.fromEntries(store.list().filter((p) => !p.hidden).map((p) => [p.id, readHistory(P.data, p.id, Math.max(1, Math.min(500, Number(limit) || 12)))])))
   handle('task:peek', (id) => ctl.peekTask(id))
+  // 任何工程里的任务，只读，不切换工程（定时任务页看某次运行）；正在跑的取控制器里的实时记录
+  handle('task:peekIn', (pid, id) => {
+    if (!store.get(pid)) throw new Error('工程已经不在列表里')
+    const c = ctls.get(pid)
+    if (c && c.task && c.task.id === id) return { task: { ...c.task }, items: c.items(), live: c.busy, summary: c.snapshotState().summary }
+    return { ...readTaskFull(P.data, pid, id), live: false, summary: null }
+  })
   // 搜索（Ctrl K）：所有工程（没移出列表的），或只搜当前工程
   // 产出页：所有工程的任务写过的文件
   handle('task:outputs', () => listOutputs(P.data, store.list().filter((p) => !p.hidden)))
@@ -557,11 +583,19 @@ function registerIpc() {
   handle('schedule:list', () => scheduleState())
   handle('schedule:save', (d) => {
     if (!d || !store.get(d.projectId)) throw new Error('请选择在哪个工程里运行')
+    const blocked = scheduleBlocked(store.get(d.projectId))
+    if (blocked && d.enabled !== false) throw new Error(blocked)
     const id = sched.upsert(d)
     return { id, state: scheduleState() }
   })
   handle('schedule:remove', (id) => { sched.remove(id); return scheduleState() })
-  handle('schedule:enable', (id, on) => { sched.setEnabled(id, on); return scheduleState() })
+  handle('schedule:enable', (id, on) => {
+    const s = sched.get(id)
+    const problem = on && s && scheduleProblem(s)
+    if (problem) throw new Error(`${problem}。先点“换工程”改好再启用`)
+    sched.setEnabled(id, on)
+    return scheduleState()
+  })
   handle('schedule:runNow', async (id) => { const run = await sched.runNow(id); return { run, state: scheduleState() } })
   handle('schedule:login', (on) => { setLoginItem(on); return scheduleState() })
   handle('task:search', (q, scope) => searchTasks(P.data, store.list().filter((p) => !p.hidden && (scope !== 'current' || p.id === ctl.project?.id)), q))
@@ -750,6 +784,8 @@ function wireController(c) {
     const n = tag(n0)
     send('notify', n)
     if (!win || win.isDestroyed()) return
+    // 没有改动的定时任务（无事可做、只有回复）：界面上提一句，不闪任务栏、不弹系统通知
+    if (n.quiet) return
     // 窗口不在前台时才打扰：L2 任务栏闪一次，L3 一直闪到用户回来；系统通知不出声（声音由界面按设置播放）
     if (!win.isFocused()) {
       win.flashFrame(true)
@@ -921,7 +957,8 @@ async function boot() {
       }
     } catch (e) { mlog('sample update', e) }
   }
-  const last = store.list()[0]
+  // 启动时打开最后用过的工程；“我的库”（做技能和插件用的）和移出列表的不算，免得一打开侧栏就是“我的库”
+  const last = store.list().find((p) => !p.library && !p.hidden) || store.list().find((p) => !p.hidden)
   if (last) {
     try { await openProject(last.id) } catch (e) { notes.push(e.message) }
   }

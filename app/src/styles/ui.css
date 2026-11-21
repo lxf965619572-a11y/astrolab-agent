@@ -1245,3 +1245,24 @@ mark.hl.flash { box-shadow: 0 0 0 3px var(--accent-ring); }
 .sched-live { color: var(--accent-text); }
 .sched-banner { display: flex; align-items: flex-start; gap: 8px; margin: 0 auto 12px; padding: 9px 12px; border-radius: var(--r); background: var(--accent-soft); color: var(--accent-deep); font-size: 12.5px; line-height: 1.6; }
 .sched-banner .chip-tag { background: var(--surface); }
+.run-modal { width: 860px; }
+.run-dialog { display: flex; flex-direction: column; max-height: calc(100vh - 80px); padding-bottom: 18px; }
+.run-dlg-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.run-dlg-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.run-dlg-meta > span { display: inline-flex; align-items: center; gap: 4px; }
+.run-dlg-body { flex: 1; min-height: 0; overflow: auto; margin-top: 14px; }
+.run-final { padding: 14px 16px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); font-size: 13.5px; }
+.run-final.live { display: flex; align-items: center; gap: 10px; color: var(--ink-2); }
+.run-final-label { color: var(--accent-text); font-weight: 600; margin-bottom: 6px; }
+.run-full-toggle { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.run-full-toggle[data-hovered] { background: var(--surface-2); color: var(--ink); }
+.rot-90 { transform: rotate(-90deg); }
+.run-full { margin-top: 6px; padding: 4px 8px; border-radius: var(--r); background: var(--surface-2); }
+.run-dlg-tip { align-self: center; }
+
+.sched-warn { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; padding: 9px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn-text); line-height: 1.6; }
+.sched-warn-btn { border: 1px solid currentColor; border-radius: 8px; padding: 3px 10px; background: transparent; color: inherit; cursor: pointer; font-size: 12px; }
+.sched-warn-btn[data-hovered] { background: var(--surface); }
+.sched-ok { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.sched-link { border: 0; background: transparent; color: var(--accent-text); cursor: pointer; padding: 0 4px; font-size: 12px; text-decoration: underline; }
+.sched-problem { display: flex; align-items: center; gap: 8px; margin: 0 12px 12px 58px; padding: 8px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn-text); }

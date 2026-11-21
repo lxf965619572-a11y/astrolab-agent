@@ -7,7 +7,9 @@ export interface Project { id: string; path: string; name: string; sample?: bool
   /** 工作区置顶；hidden：移出了列表（文件夹和任务记录都还在，重新打开这个文件夹就回来） */
   pinned?: boolean; hidden?: boolean
   /** 工程主页右栏：工程说明（写进每个任务的第一条消息）、参考资料（工程内相对路径） */
-  notes?: string; refs?: string[] }
+  notes?: string; refs?: string[]
+  /** 人确认过没有型号代码：用公网模型时也能在这里跑定时任务 */
+  cloudOk?: boolean }
 export interface Stage { id: string; name: string; skill: string; hasSkill: boolean; hidden?: boolean }
 /** 发起任务时可选的技能（内置、已安装、我做的）；category 是研制环节类别，只用于筛选和图标 */
 export interface SkillCard {
@@ -52,15 +54,21 @@ export interface Task {
   /** 定时任务发起的：哪个定时任务、计划时间、是否补跑或手动；unattended 为真时智能体不等人回答（用户追问后变为假） */
   schedule?: { id: string; name: string; due: number | null; catchup: boolean; manual: boolean }
   unattended?: boolean
+  /** 定时任务做完后的结果：review 改了文件等审核；nochange 没改文件；nothing 智能体说无事可做 */
+  outcome?: 'review' | 'nochange' | 'nothing'
+  /** fence：无人值守时想读工作区外的文件，被停止 */
+  stopReason?: 'fence'
 }
 
 // ---------- 定时任务（main/schedule.mjs） ----------
 export type Freq = 'hourly' | 'daily' | 'weekdays' | 'weekly' | 'once' | 'manual'
 export interface Trigger { freq: Freq; time?: string; minute?: number; days?: number[]; at?: number }
+/** 启动条件：到点先查有没有事可做（main/schedule-check.mjs） */
+export interface Condition { kind: 'none' | 'files' | 'commits'; exts?: string[] }
 export interface ScheduleRun {
-  id: string; at: number; due?: number; status: 'started' | 'skipped' | 'missed' | 'failed'; reason?: string
+  id: string; at: number; due?: number; status: 'started' | 'skipped' | 'missed' | 'failed' | 'nothing'; reason?: string
   taskId?: string; projectId?: string; catchup?: boolean; manual?: boolean
-  task?: { status: Status; title: string; startedAt: number; endedAt: number | null; commit: Task['commit']; restoredAt: number | null } | null
+  task?: { status: Status; title: string; startedAt: number; endedAt: number | null; commit: Task['commit']; restoredAt: number | null; outcome?: Task['outcome'] | null; stopReason?: Task['stopReason'] | null; files?: number | null } | null
 }
 export interface Schedule {
   id: string; name: string; prompt: string; projectId: string; skills: string[]; mode: 'task' | 'code'; options: { report?: boolean }
@@ -68,10 +76,17 @@ export interface Schedule {
   /** 到点了但工程被占用，排着队等（最多 2 小时） */
   pending: null | { due: number; since: number; reason: string; catchup: boolean }
   runs: ScheduleRun[]; describe: string
+  condition?: Condition; describeCondition?: string
+  /** 设置本身的问题（工程不在了、不能用于定时任务），要编辑换工程才能跑；projectName 是工程名（包括“我的库”） */
+  problem?: string | null; projectName?: string
 }
-export interface ScheduleTemplate { id: string; name: string; icon: string; mode: 'task' | 'code'; skills: string[]; trigger: Trigger; summary: string; prompt: string }
-export interface ScheduleDraft { id?: string; name: string; prompt: string; projectId: string; skills: string[]; mode: 'task' | 'code'; options: { report?: boolean }; trigger: Trigger; enabled?: boolean }
-export interface ScheduleState { schedules: Schedule[]; templates: ScheduleTemplate[]; login: { supported: boolean; on: boolean; note?: string }; tray: boolean; now: number }
+export interface ScheduleTemplate { id: string; name: string; icon: string; mode: 'task' | 'code'; skills: string[]; trigger: Trigger; condition?: Condition; summary: string; prompt: string }
+export interface ScheduleDraft { id?: string; name: string; prompt: string; projectId: string; skills: string[]; mode: 'task' | 'code'; options: { report?: boolean }; trigger: Trigger; condition: Condition; enabled?: boolean }
+export interface ScheduleState {
+  schedules: Schedule[]; templates: ScheduleTemplate[]; login: { supported: boolean; on: boolean; note?: string }; tray: boolean; now: number
+  /** sample：用的是公网模型，定时任务只能在示例工程和标为非敏感的工程里跑；blocked 是不能选的工程和原因 */
+  scope?: 'sample' | 'all'; blocked?: Record<string, string>
+}
 
 export interface QuestionItem { id: string; header?: string; question: string; options?: { label: string; description?: string }[]; multiSelect?: boolean }
 export interface Question { id: string; questions: QuestionItem[]; at: number }
@@ -115,7 +130,7 @@ export type AstroEvent =
   | { type: 'question-closed'; payload: { id: string; reason: 'answered' | 'lost' | 'aborted'; answers?: Answer[] } }
   | { type: 'queued'; payload: { id: string; text: string } }
   | { type: 'background'; payload: BgTask[] }
-  | { type: 'notify'; payload: { level: number; kind: 'done' | 'ask' | 'error'; title: string; body: string } }
+  | { type: 'notify'; payload: { level: number; kind: 'done' | 'ask' | 'error' | 'info'; title: string; body: string; quiet?: boolean } }
   | { type: 'warn'; payload: string }
   | { type: 'library'; payload: LibSource[] }
   | { type: 'update'; payload: UpdateState }
@@ -203,7 +218,7 @@ export interface AstroApi {
     open(id: string): Promise<AppState>; add(): Promise<AppState | null>; files(q: string): Promise<string[]>
     tree(): Promise<string[]>; read(path: string): Promise<{ path: string; binary: boolean; text: string | null; size: number; tooLarge?: boolean }>
     pin(id: string, on: boolean): Promise<Project[]>; hide(id: string): Promise<AppState>
-    setInfo(id: string, info: { notes?: string; refs?: string[] }): Promise<Project[]>
+    setInfo(id: string, info: { notes?: string; refs?: string[]; cloudOk?: boolean }): Promise<Project[]>
     /** 一段话里提到的项目文件（按文件名匹配） */
     mentions(text: string): Promise<Mention[]>
   }
@@ -217,6 +232,8 @@ export interface AstroApi {
     rename(projectId: string, id: string, title: string): Promise<Task>; archive(projectId: string, id: string, on: boolean): Promise<Task>; remove(projectId: string, id: string): Promise<boolean>
     /** 只读查看，不切换当前任务 */
     peek(id: string): Promise<{ task: Task; items: Item[]; current: boolean }>
+    /** 任何工程里的任务，只读、不切换工程（定时任务页看某次运行）；live：正在进行，summary 是实时的进度和改动统计 */
+    peekIn(projectId: string, id: string): Promise<{ task: Task; items: Item[]; live: boolean; summary: Summary | null }>
     /** 搜索任务（标题、描述）和产出文件名；scope 'current' 只搜当前工程 */
     search(q: string, scope?: 'all' | 'current'): Promise<SearchResult>
     /** 产出页：所有工程的任务写过的文件 */

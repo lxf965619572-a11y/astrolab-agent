@@ -4,12 +4,15 @@
 //   - 工程里有任务在进行（你正在用，或别的定时任务）：等它结束再跑，最多等 2 小时；同一个定时任务上次的运行还没做完，这次跳过
 //   - 无人值守：智能体不等人回答，按最合理的理解做，把假设写进“待确认”（约定见 task.mjs 的 unattendedNote）
 //   - “只跑一次”的做完自己停用；“仅手动”的只在点“立即运行”时跑
+//   - 启动条件（schedule-check.mjs）：到点先查有没有事可做（有某类文件、上次之后有新提交），没有就记“无事可做”，不启动智能体
+//   - 发起结果三种：{ taskId } 开始了；{ wait } 工程被占用，过会儿再试；{ skip } 无事可做
 // 与 Electron 无关：时钟、发起任务、查任务状态都由调用方给，测试里直接驱动。数据在 <数据目录>/schedules.json
 
 import { EventEmitter } from 'node:events'
 import { randomBytes } from 'node:crypto'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname } from 'node:path'
+import { describeCondition, normalizeCondition } from './schedule-check.mjs'
 
 export const FREQS = ['hourly', 'daily', 'weekdays', 'weekly', 'once', 'manual']
 export const FREQ_NAMES = { hourly: '每小时', daily: '每天', weekdays: '工作日', weekly: '每周', once: '只跑一次', manual: '仅手动' }
@@ -136,6 +139,7 @@ export class Scheduler extends EventEmitter {
     return this.items.map((s) => ({
       ...s,
       describe: describeTrigger(s.trigger),
+      describeCondition: describeCondition(s.condition),
       // 只查最近 10 次的任务状态（每次要读任务记录文件）
       runs: (s.runs || []).map((r, i) => (r.taskId && i < 10 ? { ...r, task: info(r.projectId, r.taskId) } : r)),
     }))
@@ -161,8 +165,11 @@ export class Scheduler extends EventEmitter {
       mode: d.mode === 'code' ? 'code' : 'task',
       options: d.options && typeof d.options === 'object' ? { report: d.options.report === true } : {},
       trigger, enabled, updatedAt: t, pending: null,
+      condition: normalizeCondition(d.condition),
     }
     s.nextRunAt = enabled ? nextRun(trigger, t) : null
+    // 换了工程：上次运行时的提交是别的仓库的，“有没有新提交”从头算
+    if (old && old.projectId !== s.projectId) delete s.lastHead
     if (old) this.items[this.items.indexOf(old)] = s
     else this.items.push(s)
     this.save()
@@ -217,13 +224,23 @@ export class Scheduler extends EventEmitter {
         return null
       }
       s.pending = null
-      const run = { at: t, due: slot.due, status: 'started', taskId: r.taskId, projectId: r.projectId, catchup: !!slot.catchup, manual: !!slot.manual }
+      if (r && r.skip) {
+        // 无事可做：不启动智能体，只记一条
+        const run = { at: t, due: slot.due, status: 'nothing', reason: r.skip, catchup: !!slot.catchup }
+        this.record(s, run)
+        this.emit('nothing', { schedule: s, run })
+        return run
+      }
+      if (r.head) s.lastHead = r.head
+      const run = { at: t, due: slot.due, status: 'started', taskId: r.taskId, projectId: r.projectId, catchup: !!slot.catchup, manual: !!slot.manual, ...(r.head ? { head: r.head } : {}) }
       this.record(s, run)
       this.emit('run', { schedule: s, run })
       return run
     } catch (e) {
       s.pending = null
-      const reason = e && e.message ? e.message : String(e)
+      let reason = e && e.message ? e.message : String(e)
+      // 设置本身的问题（工程不在了、不能用于定时任务）：不是一时的，停用，免得每天到点都失败一次；改好再启用
+      if (e && e.config && s.enabled) { s.enabled = false; s.nextRunAt = null; reason += '。已停用，改好后再启用' }
       this.record(s, { at: t, due: slot.due, status: 'failed', reason, catchup: !!slot.catchup, manual: !!slot.manual })
       this.emit('failed', { schedule: s, reason })
       if (slot.manual) throw e

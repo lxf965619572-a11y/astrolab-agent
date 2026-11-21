@@ -323,7 +323,7 @@ function RunGroup({ items, open, onToggle }: { items: Item[]; open: boolean; onT
   )
 }
 
-function ItemRow({ item, task: own }: { item: Item; task?: { stageName?: string; title?: string } }) {
+export function ItemRow({ item, task: own }: { item: Item; task?: { stageName?: string; title?: string } }) {
   const ts = useStore((s) => s.ts)!
   const src = own || ts.task
   // 工作台自己插的提醒（如提醒列步骤）：不是用户说的话，显示成一行灰字
