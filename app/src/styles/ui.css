@@ -1266,3 +1266,10 @@ mark.hl.flash { box-shadow: 0 0 0 3px var(--accent-ring); }
 .sched-ok { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
 .sched-link { border: 0; background: transparent; color: var(--accent-text); cursor: pointer; padding: 0 4px; font-size: 12px; text-decoration: underline; }
 .sched-problem { display: flex; align-items: center; gap: 8px; margin: 0 12px 12px 58px; padding: 8px 12px; border-radius: var(--r); background: var(--warn-soft); color: var(--warn-text); }
+.web-note { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 8px 12px; border-radius: var(--r); background: var(--accent-soft); color: var(--accent-deep); }
+.web-note a { color: inherit; margin-left: auto; }
+.web-port { display: inline-flex; gap: 8px; align-items: center; }
+.web-port .field-input { width: 90px; }
+.web-url { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.web-url .mono { font-size: 13px; min-width: 220px; }
+.field-input { border: 0; outline: none; padding: 7px 10px; border-radius: var(--r); background: var(--field); box-shadow: var(--inset); font-size: 13.5px; color: var(--ink); font-family: var(--font); }

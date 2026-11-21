@@ -27,6 +27,7 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 | `main/models.mjs` | 模型配置：部门默认（local.env）+ 设置页里加的自定义模型（models.json，密钥用系统的 safeStorage 加密）；在用的模型经 `DEPT_LLM_*` 交给引擎，切换后引擎自动重启；`ASTROLAB_MODEL_LOCK=1` 时只能用部门默认 |
 | `main/schedule.mjs`、`schedule-templates.mjs`、`schedule-check.mjs`、`schedule-launch.mjs` | 定时任务：算下次运行、到点发起、错过补跑最近一次、工程被占用时排队、运行记录、部门模板（数据在 `schedules.json`）；启动条件（有某类文件、上次之后有新提交）；到点发起一次运行（主进程和端到端验证共用） |
 | `main/probe.mjs` | 模型探测：服务端的模型名、上下文、工具调用、思考逐项查，和 local.env 对一遍，给出改法；设置页“检测模型”、安装脚本、自检和命令行共用 |
+| `main/web.mjs`、`main/api-map.json`、`src/http-api.ts` | 网页访问：内嵌的网页服务（口令登录、接口、事件推送、预览、下载）；接口表由 `scripts/gen-api-map.mjs` 从 preload 生成；浏览器端的接口实现 |
 | `src/views/SchedulesView.tsx`、`src/schedule.ts` | 定时任务页：我的 / 模板、运行记录、新建和编辑框、开机自动启动 |
 | `src/` | 界面（React + TypeScript）：发起、进行中、审核、历史、知识库、技能与插件；提问卡片、提示条、声音、三套皮肤（浅紫、奶油、陶土） |
 | `test/` | `npm test`：引擎层、引擎桥、Git、任务控制器、库（本机裸仓库当 Git 服务器）、知识检索、编码自查脚本、读取围栏；`node app/test/real-dsh.mjs`：在真实 DSH 上验证插话、停止、继续、提问、知识库工具、安装的技能和插件（假的模型服务，不花模型调用）；`real-dsh-fence.mjs`：读取围栏；`measure-request.mjs`：量第一个请求 |
@@ -152,6 +153,17 @@ powershell -ExecutionPolicy Bypass -File app\dev.ps1 -Mock    # 模拟引擎：�
 - 端到端验证：`node app/test/schedule-e2e.mjs`（不花模型调用，约 10 秒）。真的调度器、发起逻辑、启动条件、任务控制器和引擎桥，临时 Git 仓库当工程，模拟引擎当模型，时钟可拨：准点、无事可做、软件没开补跑、睡眠醒来补跑、排队、无人值守提问、越界即停、设置有问题停用、超过 7 天只记错过，共 34 项；写一份验证记录 `app/test/定时任务验证记录-<日期>.md`。托盘、系统通知、真实睡眠唤醒、开机自启要在真机桌面上看（记录末尾列了清单）。
 - 启动时打开最后用过的工程，“我的库”不算（免得一打开侧栏就是“我的库”）。
 - 还没做：按 Git 新提交触发；唤醒睡眠中的电脑（要用系统任务计划，Windows 和麒麟各做一套）；每个定时任务选模型。
+
+## 网页访问（设置 → 网页访问）
+
+工作台还在这台电脑上运行，代码留在本机；在浏览器里打开 `http://IP:端口` 用的是同一个工作台（同一套接口、同一份状态，桌面窗口和浏览器看到的一样，在一边切工程另一边也跟着切）。默认关着。
+
+- **开启**：设置 → 网页访问 → 开启。默认端口 8620，只许本机访问（`http://127.0.0.1:8620`）；打开“允许局域网访问”后，同一网络的电脑和手机用这台电脑的 IP 访问（设置页列出地址）。开着网页访问时，关闭窗口会缩到托盘，网页照常能用；托盘提示里有地址。
+- **口令**：第一次开启时生成，设置页可以显示、复制、更换（换了之后已登录的浏览器要重新登录）。登录后 7 天有效；同一地址连错 10 次锁 10 分钟。
+- **安全**：智能体能在这台电脑上读写文件、执行命令，所以网页入口一定要口令，局域网访问要单独打开（打开时提示）。接口要带 `X-AstroLab` 头且同源（挡跨站请求），会话 Cookie 是 HttpOnly、SameSite=Strict；HTML 预览带 CSP 沙箱（页面里的脚本碰不到接口）；下载不许越出工程。网页是 http，只在内网用，不要映射到外网。
+- **和桌面不同的地方**：“打开项目文件夹”改为输入这台电脑上的路径；“用默认程序打开”“在文件夹中显示”改为下载文件；系统通知、托盘在这台电脑上，网页里看提示条。
+- **实现**：`main/web.mjs`，只用 Node 自带模块。主进程的接口（`handle`）同时登记在一张表里，网页的 `POST /api/invoke` 调的是同一批函数；主进程发给界面的事件同时经 `GET /api/events`（Server-Sent Events）推给浏览器。浏览器端 `src/http-api.ts` 按接口表 `main/api-map.json` 把每个方法变成 HTTP 调用（preload 加了接口后运行 `node app/scripts/gen-api-map.mjs`，`web.test.mjs` 会检查是否同步；不在运行时读 preload，是因为麒麟安装包加 `--protect` 时它是字节码）。配置在 `<数据目录>/web.json`。
+- 测试：`node --test test/web.test.mjs`（口令、会话、接口、跨站、事件推送、预览沙箱、下载越界、换口令、端口占用、连错锁定）。
 
 ## 已知限制
 

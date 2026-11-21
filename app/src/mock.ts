@@ -2,7 +2,7 @@
 // 用真实的事件整理代码（engine/activity.mjs）得到活动记录，界面看到的数据与实机一致。
 // 只用于开发和截图检查；URL 带 ?scene=task|review|ask|launch 可以直接进入某个画面。
 
-import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight, ModelProbe, ModelProfile, ModelPreset, ModelList, Schedule, ScheduleState, ScheduleTemplate } from './api'
+import type { AppState, Project, AstroApi, AstroEvent, CatalogItem, Change, Item, KbEntry, KbHit, KbMeta, LibSource, Question, SkillCard, StartInput, Task, TaskState, UpdateState, InboxItem, InboxReport, RefDoc, RefRead, RefTranslation, RefHighlight, ModelProbe, ModelProfile, ModelPreset, ModelList, Schedule, ScheduleState, ScheduleTemplate, WebState } from './api'
 import { describeTrigger, nextRun } from './schedule'
 // @ts-expect-error 纯 JS 模块（主进程用），没有类型声明
 import { TEMPLATES } from '../main/schedule-templates.mjs'
@@ -808,6 +808,7 @@ export function createMockApi(): AstroApi {
       nextRunAt: null, createdAt: sNow - 100 * H, updatedAt: sNow - 100 * H, pending: null, describe: '每周五 16:30', runs: [] },
   ]
   let loginOn = false
+  const webSt: WebState = { enabled: false, running: false, port: 8620, lan: false, token: 'k3Vq9xLm2Pd7', urls: ['http://127.0.0.1:8620'], clients: 0, error: null }
   // URL 带 ?public：模拟用公网模型（定时任务只能在示例工程和标为非敏感的工程里跑）
   const scope: 'sample' | 'all' = new URLSearchParams(location.search).has('public') ? 'sample' : 'all'
   const blockedOf = (p: Project) => (p.library ? '“我的库”是做技能和插件用的，定时任务请选一个工程' : scope === 'sample' && !p.sample && !p.cloudOk ? `现在用的是公网模型，定时任务只能在示例工程或标为“非敏感”的工程里运行；“${p.name}”没有标过` : null)
@@ -827,6 +828,7 @@ export function createMockApi(): AstroApi {
         return appState()
       },
       async add() { return null },
+      async addPath() { throw new Error('模拟实现里不能打开文件夹') },
       async pin(id, on) { const p = projects.find((x) => x.id === id); if (p) p.pinned = on; return [...projects] },
       async setInfo(id, info) { const p = projects.find((x) => x.id === id); if (p) Object.assign(p, info); return [...projects] },
       async hide(id) { if (id === project.id) throw new Error('正在用的工作区不能移出，先切到别的工作区'); const p = projects.find((x) => x.id === id); if (p) { p.hidden = true; p.pinned = false }; return appState() },
@@ -963,6 +965,10 @@ export function createMockApi(): AstroApi {
         const fileList = ps.flatMap((p) => historyOf(p.id).flatMap((t) => [`doc/${t.stageName}-${t.id.slice(-4)}.md`, `doc/${t.stageName}-${t.id.slice(-4)}.docx`].map((path) => ({ pid: p.id, pname: p.name, taskId: t.id, taskTitle: t.title, path }))))
         return { tasks: tasks.slice(0, 30), files: terms.length ? fileList.filter((f) => terms.every((x) => f.path.toLowerCase().includes(x))).slice(0, 30) : [] }
       },
+    },
+    web: {
+      async state() { return webSt },
+      async set(p) { Object.assign(webSt, p.port ? { port: p.port } : {}, p.lan !== undefined ? { lan: p.lan } : {}, p.enabled !== undefined ? { enabled: p.enabled, running: p.enabled } : {}, p.newToken ? { token: Math.random().toString(36).slice(2, 14) } : {}); webSt.urls = webSt.lan ? [`http://192.168.1.23:${webSt.port}`] : [`http://127.0.0.1:${webSt.port}`]; return { ...webSt } },
     },
     schedule: {
       async list() { return schedState() },

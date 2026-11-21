@@ -141,6 +141,8 @@ export type AstroEvent =
   | { type: 'recent'; payload: null }
   /** 托盘菜单、系统通知要打开的页面或任务 */
   | { type: 'open'; payload: { view?: 'schedules'; projectId?: string; taskId?: string } }
+  /** 网页入口的状态变了（开关、连着的浏览器数） */
+  | { type: 'web'; payload: WebState }
 
 /** 软件更新（main/update.mjs 的 state()） */
 export interface UpdateState {
@@ -210,12 +212,19 @@ export interface SearchResult {
 
 export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean }; mode?: 'task' | 'code' }
 
+/** 网页访问（main/web.mjs）：在浏览器里经 http://IP:端口 用这个工作台 */
+export interface WebState { enabled: boolean; running: boolean; port: number; lan: boolean; token: string; urls: string[]; clients: number; error: string | null }
+
 export interface AstroApi {
   platform: string
+  /** 从网页入口打开的（浏览器里），不是桌面窗口 */
+  viaWeb?: boolean
   getState(): Promise<AppState>
   onEvent(cb: (e: AstroEvent) => void): () => void
   project: {
     open(id: string): Promise<AppState>; add(): Promise<AppState | null>; files(q: string): Promise<string[]>
+    /** 按路径打开项目文件夹（网页里用：浏览器弹不出这台电脑的选文件夹对话框） */
+    addPath(dir: string): Promise<AppState>
     tree(): Promise<string[]>; read(path: string): Promise<{ path: string; binary: boolean; text: string | null; size: number; tooLarge?: boolean }>
     pin(id: string, on: boolean): Promise<Project[]>; hide(id: string): Promise<AppState>
     setInfo(id: string, info: { notes?: string; refs?: string[]; cloudOk?: boolean }): Promise<Project[]>
@@ -239,6 +248,7 @@ export interface AstroApi {
     /** 产出页：所有工程的任务写过的文件 */
     outputs(): Promise<OutputFile[]>
   }
+  web: { state(): Promise<WebState>; set(patch: { enabled?: boolean; port?: number; lan?: boolean; newToken?: boolean }): Promise<WebState> }
   schedule: {
     list(): Promise<ScheduleState>; save(d: ScheduleDraft): Promise<{ id: string; state: ScheduleState }>; remove(id: string): Promise<ScheduleState>
     enable(id: string, on: boolean): Promise<ScheduleState>; runNow(id: string): Promise<{ run: ScheduleRun | null; state: ScheduleState }>
@@ -285,6 +295,8 @@ let api: AstroApi | null = null
 export async function getApi(): Promise<AstroApi> {
   if (api) return api
   if (window.astro) api = window.astro
+  // 浏览器里：从网页入口打开的用 HTTP 接口；单独看界面（vite 开发、静态文件、?mock）用模拟实现
+  else if (!new URLSearchParams(location.search).has('mock') && (api = await (await import('./http-api')).createHttpApi())) { /* 网页入口 */ }
   else api = (await import('./mock')).createMockApi()
   return api
 }

@@ -18,6 +18,7 @@ contextBridge.exposeInMainWorld('astro', {
   project: {
     open: (id) => invoke('project:open', id),
     add: () => invoke('project:add'),
+    addPath: (dir) => invoke('project:addPath', dir),
     files: (q) => invoke('project:files', q),
     mentions: (text) => invoke('project:mentions', text),
     tree: () => invoke('project:tree'),
@@ -43,6 +44,10 @@ contextBridge.exposeInMainWorld('astro', {
     peekIn: (pid, id) => invoke('task:peekIn', pid, id),
     search: (q, scope) => invoke('task:search', q, scope),
     outputs: () => invoke('task:outputs'),
+  },
+  web: {
+    state: () => invoke('web:state'),
+    set: (patch) => invoke('web:set', patch),
   },
   schedule: {
     list: () => invoke('schedule:list'),

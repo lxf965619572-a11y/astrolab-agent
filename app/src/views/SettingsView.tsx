@@ -9,12 +9,13 @@ import { Icon } from '../components/Icon'
 import { Key, Kbd, Toggle } from '../components/Keys'
 import { THEMES, UpdatePanel, visibleProjects } from '../components/Shell'
 import { play } from '../sound'
-import type { ModelDraft, ModelList, ModelPreset, ModelProbe, ModelProfile } from '../api'
+import type { WebState, ModelDraft, ModelList, ModelPreset, ModelProbe, ModelProfile } from '../api'
 
 const TABS: [string, string, string][] = [
   ['general', '常规', 'settings'],
   ['model', '模型', 'computer'],
   ['workspace', '工作区', 'folder'],
+  ['web', '网页访问', 'external'],
   ['knowledge', '知识与资料', 'book'],
   ['keys', '快捷键', 'terminal'],
   ['about', '关于与更新', 'download'],
@@ -38,6 +39,7 @@ export function SettingsView() {
         {tab === 'general' && <General />}
         {tab === 'model' && <Model />}
         {tab === 'workspace' && <Workspace />}
+        {tab === 'web' && <WebAccess />}
         {tab === 'knowledge' && <Knowledge />}
         {tab === 'keys' && <Keys />}
         {tab === 'about' && <About />}
@@ -439,6 +441,78 @@ function About() {
       )}
       <div className="set-label">软件更新</div>
       <div className="set-update card">{app.update ? <UpdatePanel up={app.update} busy={busy} /> : <div className="pad muted small">这个版本不支持自动更新。</div>}</div>
+    </section>
+  )
+}
+
+/**
+ * 网页访问：工作台还在这台电脑上运行、代码留在本机，在浏览器里打开 http://IP:端口 用同一个工作台（main/web.mjs）。
+ * 智能体能在这台电脑上读写文件、执行命令，所以一定要口令，局域网访问要单独打开。
+ */
+function WebAccess() {
+  const run = useStore((x) => x.run)
+  const toast = useStore((x) => x.toast)
+  const viaWeb = useStore((x) => !!x.api?.viaWeb)
+  const [st, setSt] = useState<WebState | null>(null)
+  const [port, setPort] = useState('')
+  const [show, setShow] = useState(false)
+  useEffect(() => {
+    void run((api) => api.web.state(), '读取网页访问设置失败').then((r) => { if (r) { setSt(r); setPort(String(r.port)) } })
+    const api = useStore.getState().api
+    return api?.onEvent((e) => { if (e.type === 'web') setSt(e.payload) })
+  }, [run])
+  const set = async (patch: Parameters<NonNullable<ReturnType<typeof useStore.getState>['api']>['web']['set']>[0], msg?: string) => {
+    const r = await run((api) => api.web.set(patch), '设置失败')
+    if (r) { setSt(r); setPort(String(r.port)); if (msg) toast({ text: msg, tone: r.error ? 'err' : 'ok' }) }
+  }
+  const copy = (text: string, what: string) => void run((api) => (api.sys.copy ? api.sys.copy(text) : navigator.clipboard.writeText(text))).then(() => toast({ text: `已复制${what}`, tone: 'ok' }))
+  if (!st) return <section className="set-sec"><h2>网页访问</h2><p className="muted">正在读取…</p></section>
+  const confirm = useStore.getState().askConfirm
+  return (
+    <section className="set-sec">
+      <h2>网页访问</h2>
+      <p className="muted small">工作台还在这台电脑上运行，代码留在本机；在浏览器里打开下面的地址，用的是同一个工作台，桌面窗口和网页看到的一样。开着网页访问时，关闭窗口会缩到托盘，网页照常能用。</p>
+      {viaWeb && <div className="web-note small"><Icon name="external" size={14} />你现在就是从网页打开的。<a href="/logout">退出网页登录</a></div>}
+      <Row title="开启网页访问" desc={st.running ? `运行中${st.clients ? ` · ${st.clients} 个浏览器连着` : ''}` : st.error || '关着'}>
+        <Toggle isSelected={st.enabled} onChange={(v) => {
+          if (!v && viaWeb) confirm({ title: '关闭网页访问？', body: '你现在就是从网页打开的，关掉后这个页面会断开，要回到那台电脑上的桌面窗口再打开。', ok: '关闭', danger: true, run: () => set({ enabled: false }) })
+          else void set({ enabled: v }, v ? '网页访问已开启' : '网页访问已关闭')
+        }} aria-label="开启网页访问" />
+      </Row>
+      <Row title="端口" desc="1024～65535，被别的程序占用时换一个">
+        <span className="web-port">
+          <input className="field-input" value={port} onChange={(e) => setPort(e.target.value.replace(/\D/g, ''))} inputMode="numeric" aria-label="端口" />
+          {port !== String(st.port) && <Key size="sm" onPress={() => void set({ port: Number(port) }, '端口已改')}>保存</Key>}
+        </span>
+      </Row>
+      <Row title="允许局域网访问" desc={st.lan ? '同一网络里的电脑和手机输入地址和口令就能用' : '关着时只有这台电脑自己的浏览器能打开（127.0.0.1）'}>
+        <Toggle isSelected={st.lan} onChange={(v) => {
+          if (v) confirm({ title: '允许局域网访问？', body: '同一网络里知道地址和口令的人，都能用这个工作台在你电脑上读写文件、运行命令。只在可信的内网打开，口令不要外传。', ok: '允许', run: () => set({ lan: true }, '已允许局域网访问') })
+          else void set({ lan: false }, '只允许本机访问')
+        }} aria-label="允许局域网访问" />
+      </Row>
+      {st.enabled && (
+        <div className="set-group">
+          <div className="set-label">访问地址</div>
+          {st.urls.length ? st.urls.map((u) => (
+            <div key={u} className="web-url"><span className="mono">{u}</span><Key size="sm" onPress={() => copy(u, '地址')}>复制</Key></div>
+          )) : <div className="muted small">没找到这台电脑的局域网地址（没连网？）</div>}
+        </div>
+      )}
+      <div className="set-group">
+        <div className="set-label">访问口令</div>
+        <div className="web-url">
+          <span className="mono">{show ? st.token : '•'.repeat(st.token.length)}</span>
+          <Key size="sm" onPress={() => setShow(!show)}>{show ? '隐藏' : '显示'}</Key>
+          <Key size="sm" onPress={() => copy(st.token, '口令')}>复制</Key>
+          <Key size="sm" onPress={() => confirm({ title: '换一个口令？', body: '已经登录的浏览器都要用新口令重新登录。', ok: '换口令', run: () => set({ newToken: true }, '已换新口令') })}>换口令</Key>
+        </div>
+      </div>
+      <div className="sched-notes muted small">
+        <p>· 网页里“打开项目文件夹”要输入这台电脑上的路径；“用默认程序打开”“在文件夹中显示”改为下载文件。</p>
+        <p>· 同一个口令连错 10 次，那个地址锁 10 分钟。登录 7 天后要重新登录。</p>
+        <p>· 网页是 http（不加密），只在内网用；不要把端口映射到外网。</p>
+      </div>
     </section>
   )
 }

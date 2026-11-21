@@ -54,9 +54,14 @@ export async function initRepo(cwd, message = '初始版本') {
   await git(cwd, ['commit', '-q', '-m', message])
 }
 
-/** 当前工作区写成树对象（临时索引，不影响用户的暂存区） */
+/**
+ * 当前工作区写成树对象（临时索引，不影响用户的暂存区）。
+ * 临时索引每次调用一个新名字：任务结束时的改动统计和审核页的改动列表会同时算，共用一个文件会互相删掉、
+ * 覆盖对方的索引，得到半截的树（改动数算少，定时任务可能被误判成“没改文件”而不进审核）
+ */
+let indexSeq = 0
 async function worktreeTree(cwd, gitDir, name) {
-  const index = join(gitDir, `astrolab-${name}.index`)
+  const index = join(gitDir, `astrolab-${name}-${process.pid}-${++indexSeq}.index`)
   const env = { GIT_INDEX_FILE: index }
   try { unlinkSync(index) } catch { /* 没有旧文件 */ }
   let hasHead = true

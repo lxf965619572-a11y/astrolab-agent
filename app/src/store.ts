@@ -352,6 +352,7 @@ function onEvent(e: AstroEvent) {
     case 'library': useStore.setState({ libraries: e.payload, kbVersion: st.kbVersion + 1 }); break
     case 'update': if (st.app) useStore.setState({ app: { ...st.app, update: e.payload } }); break
     case 'schedules': useStore.setState({ schedVer: st.schedVer + 1 }); break
+    case 'web': break // 设置页自己取
     case 'recent': void st.loadRecent(); break
     case 'open': {
       if (e.payload.view) st.setView(e.payload.view)

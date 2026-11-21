@@ -250,3 +250,18 @@ test('代码模式：列出项目全部文件（不含忽略的），只读看�
   assert.throws(() => readProjectFile(d, '../etc/passwd'), /不在项目里/)
   assert.throws(() => readProjectFile(d, 'nope.c'), /不存在/)
 })
+
+test('改动列表并发算：互不干扰（任务结束时的统计和审核页同时取）', async () => {
+  const { mkdtempSync, writeFileSync, mkdirSync } = await import('node:fs')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const gm = await import('../main/git.mjs')
+  const ws = mkdtempSync(join(tmpdir(), 'astro-git-conc-'))
+  writeFileSync(join(ws, 'a.c'), 'a\n')
+  await gm.initRepo(ws, 'init')
+  const snap = await gm.snapshot(ws, 't-conc')
+  mkdirSync(join(ws, 'test'), { recursive: true })
+  for (let i = 0; i < 30; i++) writeFileSync(join(ws, 'test', `f${i}.c`), `int f${i};\n`)
+  const all = await Promise.all(Array.from({ length: 6 }, () => gm.changes(ws, snap.tree)))
+  for (const list of all) assert.equal(list.length, 30)
+})

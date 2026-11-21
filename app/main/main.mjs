@@ -14,6 +14,9 @@ import { ensureSample, findMentions, listFiles, prepareProject, ProjectStore, re
 import { deleteTaskRecord, listOutputs, patchTaskRecord, readHistory, readTaskFull, readTaskRecord, searchTasks, STAGES, TaskController } from './task.mjs'
 import { Scheduler, TEMPLATES as SCHEDULE_TEMPLATES } from './schedule.mjs'
 import { createLauncher } from './schedule-launch.mjs'
+import { WebService } from './web.mjs'
+// 网页入口的接口表（由 scripts/gen-api-map.mjs 从 preload.cjs 生成）：浏览器按它调用同一批接口
+import API_MAP from './api-map.json' with { type: 'json' }
 import { INBOX, Library } from './library.mjs'
 import { buildMaterial, distillPrompt, distillScope, pendingTasks, readState, writeState } from './distill.mjs'
 import { git } from './git.mjs'
@@ -86,6 +89,11 @@ let tray = null
 let keepAwake = null
 /** 开机自启时带 --hidden：只在托盘里，不弹窗口 */
 const START_HIDDEN = process.argv.includes('--hidden')
+/** 网页入口：在浏览器里经 http://IP:端口 用这个工作台（web.mjs）；apiHandlers 是桌面和网页共用的接口 */
+let web = null
+const apiHandlers = new Map()
+/** 关窗口时留在托盘：有启用的定时任务，或网页入口开着（浏览器还在用） */
+const keepAlive = () => !!((sched && sched.enabledCount > 0) || (web && web.running))
 let refs = null
 let notes = []
 /** 启动时的提醒（打开项目时 notes 会换成项目的，这些不跟着换） */
@@ -93,6 +101,7 @@ const bootNotes = []
 
 function send(type, payload) {
   if (win && !win.isDestroyed()) win.webContents.send('astro:event', { type, payload })
+  if (web) web.broadcast({ type, payload })
 }
 
 // 每个项目一个引擎进程，任务之间共用；收发记录先写 engine-<时间>.jsonl，发起任务后改写到 <任务>.jsonl
@@ -270,7 +279,7 @@ function updateKeepAwake() {
 const hm = (t) => new Date(t).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' })
 /** 托盘：有启用的定时任务时常驻（关窗口缩到这里，定时任务照常跑）；都停用了、窗口开着就收起来 */
 function updateTray() {
-  const need = !!(sched && sched.enabledCount > 0)
+  const need = keepAlive()
   if (!need) {
     if (tray && (!win || win.isDestroyed() || win.isVisible())) { tray.destroy(); tray = null }
     return
@@ -282,15 +291,18 @@ function updateTray() {
     tray = new Tray(img)
     tray.on('click', showWindow)
   }
-  const up = sched.upcoming()
+  // 网页服务比调度器先启动：那时还没有调度器
+  const up = sched ? sched.upcoming() : null
   const busy = allCtls().filter((c) => c.busy && c.task && c.task.schedule)
-  tray.setToolTip(['AstroLab', busy.length ? `定时任务进行中：${busy.map((c) => c.task.schedule.name).join('、')}` : '', up ? `下一个：${up.name}，${hm(up.nextRunAt)}` : ''].filter(Boolean).join('\n'))
+  const ws = web && web.running ? web.state() : null
+  tray.setToolTip(['AstroLab', busy.length ? `定时任务进行中：${busy.map((c) => c.task.schedule.name).join('、')}` : '', up ? `下一个：${up.name}，${hm(up.nextRunAt)}` : '', ws ? `网页入口：${ws.urls[0]}` : ''].filter(Boolean).join('\n'))
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开 AstroLab', click: showWindow },
     { label: '定时任务', click: () => { showWindow(); send('open', { view: 'schedules' }) } },
     ...(up ? [{ label: `下一个：${up.name}（${hm(up.nextRunAt)}）`, enabled: false }] : []),
+    ...(ws ? [{ label: `网页入口：${ws.urls[0]}`, enabled: false }] : []),
     { type: 'separator' },
-    { label: '退出 AstroLab（定时任务不再运行）', click: quitFromTray },
+    { label: '退出 AstroLab（定时任务和网页入口都停止）', click: quitFromTray },
   ]))
 }
 function quitFromTray() {
@@ -387,6 +399,7 @@ function projectPath(rel) {
 
 // 每个接口返回 { ok, data } 或 { ok:false, error }，界面拿到干净的错误信息
 function handle(channel, fn) {
+  apiHandlers.set(channel, fn)
   ipcMain.handle(channel, async (_e, ...args) => {
     try { return { ok: true, data: await fn(...args) } } catch (e) {
       mlog(`ipc ${channel} failed`, e)
@@ -529,6 +542,17 @@ function registerIpc() {
     if (p.hidden) store.update(p.id, { hidden: false }) // 以前移出过列表的文件夹：重新打开就回来，任务记录还在
     return openProject(p.id)
   })
+  // 网页里打开项目文件夹：浏览器弹不出这台电脑的选文件夹对话框，改为输入路径
+  handle('project:addPath', async (dir) => {
+    const abs = resolve(String(dir || '').trim().replace(/^"|"$/g, ''))
+    if (!String(dir || '').trim() || !existsSync(abs) || !statSync(abs).isDirectory()) throw new Error(`这台电脑上没有这个文件夹：${abs}`)
+    const p = store.add(abs)
+    if (p.hidden) store.update(p.id, { hidden: false })
+    return openProject(p.id)
+  })
+  // 网页访问：开关、端口、局域网、换口令
+  handle('web:state', () => web.state())
+  handle('web:set', (patch) => web.set(patch || {}))
   // 工作区：置顶（侧栏和工作区菜单里排在前面）；移出列表（只是不显示，文件夹和任务记录都不动）
   handle('project:pin', (id, on) => { if (!store.update(id, { pinned: !!on })) throw new Error('项目不存在'); return store.list() })
   // 工程主页右栏：工程说明（写进每个任务的第一条消息）、参考资料（工程内的相对路径）
@@ -838,7 +862,7 @@ async function createWindow() {
   })
   setTaskbarDetails(win)
   // 开机自启（--hidden）且有启用的定时任务：只在托盘里，不弹窗口
-  win.once('ready-to-show', () => { if (!(START_HIDDEN && sched && sched.enabledCount > 0)) win.show() })
+  win.once('ready-to-show', () => { if (!(START_HIDDEN && keepAlive())) win.show() })
   win.on('focus', () => win.flashFrame(false))
   // 从托盘打开窗口后：定时任务都停用了的话，托盘图标收起来
   win.on('show', () => updateTray())
@@ -851,14 +875,14 @@ async function createWindow() {
     if (!e.isMainFrame && !e.url.startsWith(`${PREVIEW}:`) && e.url !== 'about:blank') e.preventDefault()
   })
   win.on('close', (e) => {
-    // 有启用的定时任务：关窗口只是缩到托盘，定时任务和进行中的任务照常做（退出用托盘菜单）
-    if (!app.isQuitting && sched && sched.enabledCount > 0) {
+    // 有启用的定时任务或网页入口开着：关窗口只是缩到托盘，定时任务、进行中的任务和浏览器照常用（退出用托盘菜单）
+    if (!app.isQuitting && keepAlive()) {
       e.preventDefault()
       win.hide()
       updateTray()
       if (!trayHinted) {
         trayHinted = true
-        if (Notification.isSupported()) new Notification({ title: 'AstroLab 在托盘里继续运行', body: '有启用的定时任务，到点会自动运行。要完全退出，在托盘图标上点右键选“退出”。', silent: true }).show()
+        if (Notification.isSupported()) new Notification({ title: 'AstroLab 在托盘里继续运行', body: `${sched && sched.enabledCount > 0 ? '有启用的定时任务，到点会自动运行' : '网页入口开着，浏览器里照常能用'}。要完全退出，在托盘图标上点右键选“退出”。`, silent: true }).show()
       }
       return
     }
@@ -941,6 +965,22 @@ async function boot() {
   // 装过、后来并入内置的插件（如 info-flow-diagram）：已经不加载，提醒卸载
   for (const x of lib.absorbedPlugins()) bootNotes.push(`插件“${x.title}”已经内置（技能 ${x.skills.join('、')}），现在用的是内置版本；可以在“技能与插件”里把这个插件卸载`)
   registerIpc()
+  // 网页入口：和桌面窗口共用同一批接口和事件
+  web = new WebService({
+    file: join(P.data, 'web.json'), distDir: join(P.appDir, 'dist'), map: API_MAP, handlers: apiHandlers, platform: process.platform, log: mlog,
+    previewFile: (rel) => projectPath(rel),
+    projectFile: (pid, rel) => {
+      if (!pid) return projectPath(rel)
+      const p = store.get(pid)
+      if (!p) throw new Error('工程不存在')
+      const abs = resolve(p.path, String(rel || ''))
+      const r = relative(p.path, abs)
+      if (r.startsWith('..') || isAbsolute(r)) throw new Error('路径越出工程')
+      return abs
+    },
+    onState: (st) => { send('web', st); updateTray() },
+  })
+  if (web.state().enabled) await web.start()
   if (!store.list().length) {
     try {
       const sample = await ensureSample(P)
@@ -977,6 +1017,7 @@ app.on('second-instance', () => showWindow())
 app.on('before-quit', () => { app.isQuitting = true })
 app.on('window-all-closed', async () => {
   if (sched) sched.stop()
+  if (web) await web.stop().catch(() => {})
   for (const c of allCtls()) { try { await c.dispose() } catch { /* 退出时尽力而为 */ } }
   try { if (bridge) await bridge.close() } catch { /* 同上 */ }
   app.quit()
