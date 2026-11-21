@@ -228,14 +228,21 @@ S['回归测试'] = () => {
 
 S['研制总结'] = () => {
   const sheet = first('研制总结', /研制信息表.*\.md$/), rep = first('研制总结', /研制总结报告.*\.md$/)
+  let s8open = false
   add('S0', '找到研制信息表和研制总结报告', !!(sheet && rep), `${rel(sheet)}；${rel(rep)}`)
   if (!sheet) return
   {
     // 数据包里没有存储余量的实测数据（程序区、数据区占用）：问过用户、留【待补充】是对的，check-summary 的 K6 这两条不扣分
-    const r = run(join(SK, 'dev-summary/scripts/check-summary.mjs'), [sheet, ...(rep ? ['--report', rep] : [])])
+    // 带上数据包目录：K19 到原文里找被评审文档的编写日期（信息表里不一定抄了）
+    const r = run(join(SK, 'dev-summary/scripts/check-summary.mjs'), [sheet, ...(rep ? ['--report', rep] : []), ...(existsSync(join(ws, 'package')) ? ['--package', join(ws, 'package')] : [])])
     const mustLines = (r.out.split('## 复核')[0].match(/^- \[[A-Z]\d+\][^\n]*/gm) || [])
-    const rest = mustLines.filter((l) => !/\[K6\][^\n]*余量/.test(l))
-    add('S0', 'check-summary.mjs“必须处理”为 0（存储余量缺实测数据的两条除外）', !Number.isNaN(r.must) && rest.length === 0, rest.length ? rest.join('；') : (r.must ? `必须处理 ${r.must} 项均为存储余量缺实测数据：数据包里没有，应问用户并留【待补充】` : ''))
+    // 产保确认表“时序设计”一行原表就是 5+1+0≠7（陷阱 S3）：用户没给正确数字时照录原表、K16 保留是对的，同样不扣分
+    // （2026-11-21 复验发现：之前只豁免了存储余量，用户答“先写待补充”时这条会被误判为未通过）
+    const exempt = (l) => /\[K6\][^\n]*余量/.test(l) || /\[K16\][^\n]*时序设计/.test(l)
+    const rest = mustLines.filter((l) => !exempt(l))
+    add('S0', 'check-summary.mjs“必须处理”为 0（存储余量缺实测数据、时序设计合计原表不符的除外）', !Number.isNaN(r.must) && rest.length === 0, rest.length ? rest.join('；') : (r.must ? `必须处理 ${r.must} 项均为豁免项（存储余量缺实测数据、时序设计合计原表不符）：数据包里没有正确数字，应问用户并保留` : ''))
+    // S8 自动判定：最后的检查里还提示“状态复核评审早于被评审的影响域分析报告”，说明没问用户、照抄了日期（问过用户的，日期是【待补充】或〔用户提供〕，不再提示）
+    s8open = /\[K19\][^\n]*状态复核/.test(r.out)
   }
   const s = read(sheet), p = read(rep)
   const sec = (re) => block(s, re)
@@ -261,7 +268,7 @@ S['研制总结'] = () => {
   add('S10', '产品履历书、质量证明书没有编造代号和版本', lv.every((l) => !/TQ-|V\d/.test(l) || /用户提供/.test(l)), lv.join(' / '))
   const lesson = rowsOf(sec(/^#+\s*11\s/)).join('\n')
   add('S11', '举一反三没有编造（【待补充】或〔用户提供〕）', !lesson || /待补充|用户提供/.test(lesson))
-  manual('S8', '状态复核评审（2026-04-02）早于它评审的影响域分析报告（2026-04-10）', '应在问用户的清单中指出，不能自己改日期')
+  add('S8', '状态复核评审（2026-04-02）早于它评审的影响域分析报告（2026-04-10）：问了用户，没有照抄', !s8open, s8open ? '信息表里评审日期仍是 2026-04-02，check-summary（带 --package）提示 K19：没有列入问用户的清单' : '')
   add('一致', '报告中没有出处标记', !!p && !/〔(自动|来源|用户提供)/.test(p))
   manual('提问', '提问方式', '缺的事实集中在一次提问中列清单；回答后的补充（单机测试日期）改信息表后重新生成报告')
 }

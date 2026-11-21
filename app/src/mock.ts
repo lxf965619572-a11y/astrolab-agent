@@ -808,7 +808,8 @@ export function createMockApi(): AstroApi {
       nextRunAt: null, createdAt: sNow - 100 * H, updatedAt: sNow - 100 * H, pending: null, describe: '每周五 16:30', runs: [] },
   ]
   let loginOn = false
-  const webSt: WebState = { enabled: false, running: false, port: 8620, lan: false, token: 'k3Vq9xLm2Pd7', urls: ['http://127.0.0.1:8620'], clients: 0, error: null }
+  const webSt: WebState = { enabled: true, running: true, port: 8620, lan: true, token: 'k3Vq9xLm2Pd7', urls: ['http://119.80.252.59:8620'], clients: 1, error: null,
+    sessions: 2, subnets: ['119.80.252.59/255.255.255.0'], logins: [{ ip: '119.80.252.55', at: Date.now() - 120_000, ok: true }, { ip: '119.80.252.55', at: Date.now() - 150_000, ok: false }, { ip: '127.0.0.1', at: Date.now() - 600_000, ok: true }] }
   // URL 带 ?public：模拟用公网模型（定时任务只能在示例工程和标为非敏感的工程里跑）
   const scope: 'sample' | 'all' = new URLSearchParams(location.search).has('public') ? 'sample' : 'all'
   const blockedOf = (p: Project) => (p.library ? '“我的库”是做技能和插件用的，定时任务请选一个工程' : scope === 'sample' && !p.sample && !p.cloudOk ? `现在用的是公网模型，定时任务只能在示例工程或标为“非敏感”的工程里运行；“${p.name}”没有标过` : null)

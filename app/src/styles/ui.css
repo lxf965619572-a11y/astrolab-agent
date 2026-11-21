@@ -1273,3 +1273,5 @@ mark.hl.flash { box-shadow: 0 0 0 3px var(--accent-ring); }
 .web-url { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .web-url .mono { font-size: 13px; min-width: 220px; }
 .field-input { border: 0; outline: none; padding: 7px 10px; border-radius: var(--r); background: var(--field); box-shadow: var(--inset); font-size: 13.5px; color: var(--ink); font-family: var(--font); }
+.web-login { display: grid; grid-template-columns: 140px 150px 1fr; gap: 10px; padding: 3px 0; color: var(--ink-2); }
+.web-login.bad { color: var(--err-text); }

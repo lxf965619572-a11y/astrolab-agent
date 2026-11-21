@@ -485,9 +485,9 @@ function WebAccess() {
           {port !== String(st.port) && <Key size="sm" onPress={() => void set({ port: Number(port) }, '端口已改')}>保存</Key>}
         </span>
       </Row>
-      <Row title="允许局域网访问" desc={st.lan ? '同一网络里的电脑和手机输入地址和口令就能用' : '关着时只有这台电脑自己的浏览器能打开（127.0.0.1）'}>
+      <Row title="允许局域网访问" desc={st.lan ? `和这台电脑同一网段的电脑和手机输入地址和口令就能用；别的网段连不进来${st.subnets && st.subnets.length ? `（网段：${st.subnets.join('、')}）` : ''}` : '关着时只有这台电脑自己的浏览器能打开（127.0.0.1）'}>
         <Toggle isSelected={st.lan} onChange={(v) => {
-          if (v) confirm({ title: '允许局域网访问？', body: '同一网络里知道地址和口令的人，都能用这个工作台在你电脑上读写文件、运行命令。只在可信的内网打开，口令不要外传。', ok: '允许', run: () => set({ lan: true }, '已允许局域网访问') })
+          if (v) confirm({ title: '允许局域网访问？', body: '和这台电脑同一网段、知道地址和口令的人，都能用这个工作台在你电脑上读写文件、运行命令（拿到口令就等于是你）。只在可信的内网打开，口令只留给自己用。', ok: '允许', run: () => set({ lan: true }, '已允许局域网访问') })
           else void set({ lan: false }, '只允许本机访问')
         }} aria-label="允许局域网访问" />
       </Row>
@@ -508,7 +508,15 @@ function WebAccess() {
           <Key size="sm" onPress={() => confirm({ title: '换一个口令？', body: '已经登录的浏览器都要用新口令重新登录。', ok: '换口令', run: () => set({ newToken: true }, '已换新口令') })}>换口令</Key>
         </div>
       </div>
+      <div className="set-group">
+        <div className="set-label">最近登录{st.sessions ? `（${st.sessions} 个浏览器登录着）` : ''}</div>
+        {(st.logins || []).length ? (st.logins || []).slice(0, 8).map((l, i) => (
+          <div key={i} className={`web-login small ${l.ok ? '' : 'bad'}`}><span className="mono">{l.ip}</span><span>{new Date(l.at).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span><span>{l.ok ? '登录' : '口令错误'}</span></div>
+        )) : <div className="muted small">这次开启以来还没有人登录</div>}
+        {!!st.sessions && <div className="web-url"><Key size="sm" onPress={() => confirm({ title: '让所有浏览器下线？', body: `已登录的浏览器（${st.sessions} 个）都要重新输口令${viaWeb ? '，包括你现在这个页面' : ''}。口令不变。`, ok: '全部下线', danger: true, run: () => set({ kickAll: true }, '已全部下线') })}>全部下线</Key></div>}
+      </div>
       <div className="sched-notes muted small">
+        <p>· 拿到口令就等于是你：能看到这台电脑上的全部工作，也能让智能体在这里读写文件、运行命令。口令只留给自己用；同事要用，请在他自己的电脑上装 AstroLab。</p>
         <p>· 网页里“打开项目文件夹”要输入这台电脑上的路径；“用默认程序打开”“在文件夹中显示”改为下载文件。</p>
         <p>· 同一个口令连错 10 次，那个地址锁 10 分钟。登录 7 天后要重新登录。</p>
         <p>· 网页是 http（不加密），只在内网用；不要把端口映射到外网。</p>

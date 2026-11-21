@@ -2,19 +2,23 @@
 // 研制信息表（和研制总结报告）检查：按部门“软件研制总结报告评审要点”，核对事实的出处、版本、日期顺序、实测值、
 // 更改和数据包、覆盖性、产保确认的合计、固化语气、结论等。只读。“必须处理”项要改正；“复核”项逐条判断。
 //
-// 用法：node check-summary.mjs <研制信息表.md> [--report <研制总结报告.md>]
+// 用法：node check-summary.mjs <研制信息表.md> [--report <研制总结报告.md>] [--package <数据包目录>]
+//   --package：评审行里写到的文档编号，到数据包原文（.md、.txt）里找它的编写日期，评审早于文档就提示（K19）。
+//   信息表里不一定抄了文档日期（2026-11-21 G3 复验：数据包表的那一行没写日期，评审早于文档就漏了）
 // 退出码：0 = 没有“必须处理”项；1 = 有；2 = 用法或文件错误
 
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join } from 'node:path'
 import { readSheet, classOf, ELEMENTS, PROCESS_CHECKS, SHEET, TODO } from './sum-data.mjs'
 import { readText, sections } from './md-lib.mjs'
 
 const argv = process.argv.slice(2)
 const opt = (k) => { const i = argv.indexOf(k); if (i < 0) return null; const v = argv[i + 1]; argv.splice(i, 2); return v }
 const repP = opt('--report')
-if (argv.length !== 1) { console.error('用法：node check-summary.mjs <研制信息表.md> [--report <研制总结报告.md>]'); process.exit(2) }
+const pkgDir = opt('--package')
+if (argv.length !== 1) { console.error('用法：node check-summary.mjs <研制信息表.md> [--report <研制总结报告.md>] [--package <数据包目录>]'); process.exit(2) }
 const sheetP = argv[0]
-for (const p of [sheetP, repP].filter(Boolean)) if (!existsSync(p)) { console.error(`找不到：${p}`); process.exit(2) }
+for (const p of [sheetP, repP, pkgDir].filter(Boolean)) if (!existsSync(p)) { console.error(`找不到：${p}`); process.exit(2) }
 
 const out = []
 const must = (id, msg) => out.push({ level: '必须处理', id, msg })
@@ -140,6 +144,23 @@ if (cls === 'III') {
   if (imp < need) review('K8', `Ⅲ类第一个版本和每次更动都有更动影响域分析报告和回归测试报告：版本更改 ${n} 次${fromBase ? '（第一次是从继承基线改出）' : ''}，数据包中更动影响域分析报告 ${imp} 份（应有 ${need} 份）`)
 }
 
+// 数据包原文里各文档的编写日期：文件头几行里有“编号：XXX”和“编写日期/日期/出版日期”的，记为编号 XXX 这份文档的日期
+const docDates = new Map()
+if (pkgDir) {
+  const files = []
+  const walk = (d) => { for (const n of readdirSync(d)) { const f = join(d, n); if (statSync(f).isDirectory()) walk(f); else if (/\.(md|txt)$/i.test(n)) files.push(f) } }
+  walk(pkgDir)
+  for (const f of files) {
+    const head = readFileSync(f, 'utf8').split('\n').slice(0, 12).join('\n')
+    // 只认文件自己的编号（“编号：XXX”“报告编号：XXX”）：文档清单、评审纪要的表里也列着别的文档编号，不能把这份文件的日期算到它们头上
+    const codes = [...head.matchAll(/编号[：:]\s*([A-Z][A-Z0-9]*(?:-[A-Z0-9]+){2,})/g)].map((x) => x[1])
+    const m = /(编写日期|出版日期|日期)[：:]\s*(\d{4}\s*[-./年]\s*\d{1,2}\s*[-./月]\s*\d{1,2})/.exec(head)
+    if (!m || !codes.length) continue
+    const dd = toDate(m[2])
+    if (Number.isFinite(dd)) for (const c of new Set(codes)) docDates.set(c, [...(docDates.get(c) || []), dd])
+  }
+}
+
 // ---- K19 评审日期不能早于被评审的文档：评审行里的文件编号在数据包里找，数据包那一行写的日期晚于评审日期就提示（不要自己改，问用户）
 {
   const datesIn = (t) => (clean(t).match(/\d{4}\s*[-./年]\s*\d{1,2}\s*[-./月]\s*\d{1,2}/g) || []).map(toDate).filter(Number.isFinite)
@@ -149,9 +170,50 @@ if (cls === 'III') {
     const codes = new Set(Object.values(r).join(' ').match(/[A-Z][A-Z0-9]*(?:-[A-Z0-9]+){2,}/g) || [])
     for (const code of codes) {
       const p = pkg.find((x) => clean(x['代号']) === code)
-      if (!p) continue
-      const later = datesIn(Object.values(p).join(' ')).filter((x) => x > d)
+      // 日期来源：信息表数据包那一行；给了 --package 时再加数据包原文里这份文档的编写日期
+      const fromSheet = p ? datesIn(Object.values(p).join(' ')) : []
+      const fromPkg = docDates.get(code) || []
+      const later = [...fromSheet, ...fromPkg].filter((x) => x > d)
       if (later.length) review('K19', `“${clean(r['关键质量控制点'])}”评审日期 ${clean(r['日期'])} 早于被评审文档 ${code} 在软件数据包中的日期（${String(later[0]).replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')}）：评审不能早于文档完成，列入问用户的清单核对，不要自己改日期`)
+    }
+  }
+}
+
+// ---- K20 叙述和表格一致：研制概况等文字里写到的事件日期，要和表里同一事件的日期一致。
+// 表里那一行的日期是【待补充】（问过用户、用户说先写待补充）时，叙述里不能写具体日期；用户更正了日期，叙述要跟着改。
+// （2026-11-21 G3 复验：用户对有矛盾的评审日期答“先写【待补充】”，评审表改了，研制概况里还写着原来的日期）
+{
+  const DATE = /\d{4}-\d{1,2}-\d{1,2}/g
+  const norm = (d) => d.replace(/-(\d)(?=-|$)/g, '-0$1')
+  // 事件名的核心词：去掉“软件”“评审”“测试”这类通用字，太短（少于 3 个字）的保留原名，免得到处误中
+  const coreOf = (name) => {
+    const n = clean(name).replace(/[（(][^）)]*[）)]/g, '').replace(/\s/g, '')
+    const c = n.replace(/^软件/, '').replace(/(评审|会)$/, '')
+    return c.length >= 3 ? c : n
+  }
+  const events = [
+    ...S.t('关键质量控制点评审').map((r) => ({ name: r['关键质量控制点'], date: r['日期'], where: '关键质量控制点评审' })),
+    ...S.t('技术流程关键点').map((r) => ({ name: r['研制过程关键点'], date: r['时间'], where: '技术流程关键点' })),
+    ...['单机测试情况', '分系统测试情况', '分系统间联试情况'].flatMap((t) => S.t(t).map((r) => ({ name: r['测试名称'], date: r['测试时间'], where: t }))),
+  ].filter((e) => clean(e.name) && !isNoneV(e.name))
+  const texts = Object.entries(S.text || {}).filter(([, v]) => clean(v))
+  for (const [k, v] of texts) {
+    const clauses = clean(v).split(/[；;。，,\n]/) // 按小句比：一句话里常用逗号连着写好几件事
+    for (const e of events) {
+      const core = coreOf(e.name)
+      if (core.length < 2) continue
+      // 评审类的事件，小句里还要有“评审”二字：“任务书 A 版入受控库”“回归测试报告出版”不是那次评审
+      const kind = /评审$/.test(clean(e.name)) ? '评审' : ''
+      const hit = clauses.find((c) => { const t = c.replace(/\s/g, ''); return t.includes(core) && (!kind || t.includes(kind)) && DATE.test(c) })
+      DATE.lastIndex = 0
+      if (!hit) continue
+      const said = (hit.match(DATE) || []).map(norm)
+      if (!filled(e.date)) must('K20', `“${k}”写了“${hit.trim().slice(0, 40)}”，但${e.where}里“${clean(e.name)}”的日期是【待补充】：叙述里不写具体日期（写“……评审，日期待补充”），和表格一致`)
+      else {
+        const want = (clean(e.date).match(DATE) || []).map(norm)
+        DATE.lastIndex = 0
+        if (want.length && !said.some((d) => want.includes(d))) review('K20', `“${k}”里“${clean(e.name)}”写的日期（${said.join('、')}）和${e.where}里的（${want.join('、')}）不一致：以表格为准改叙述（用户更正过日期的，叙述也要改）`)
+      }
     }
   }
 }

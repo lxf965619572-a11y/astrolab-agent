@@ -5,7 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { WebService, parsePreloadMap } from '../main/web.mjs'
+import { WebService, parsePreloadMap, sameNetwork } from '../main/web.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PRELOAD = join(HERE, '..', 'main', 'preload.cjs')
@@ -160,4 +160,34 @@ test('连错 10 次锁 10 分钟', async (t) => {
   const base = `http://127.0.0.1:${port}`
   for (let i = 0; i < 10; i++) await login(base, 'wrong')
   assert.equal((await login(base, web.state().token)).status, 429)
+})
+
+test('网段限制：本机和同一网段可以（单位内网用公网段地址也行），别的网段不行', () => {
+  const nets = [{ address: '119.80.252.59', netmask: '255.255.255.0' }, { address: '192.168.233.1', netmask: '255.255.255.0' }]
+  assert.equal(sameNetwork('119.80.252.55', nets), true)
+  assert.equal(sameNetwork('::ffff:119.80.252.55', nets), true)
+  assert.equal(sameNetwork('192.168.233.7', nets), true)
+  assert.equal(sameNetwork('127.0.0.1', nets), true)
+  assert.equal(sameNetwork('::1', nets), true)
+  assert.equal(sameNetwork('119.80.253.55', nets), false)
+  assert.equal(sameNetwork('8.8.8.8', nets), false)
+  assert.equal(sameNetwork('fe80::1', nets), false)
+  assert.equal(sameNetwork('', nets), false)
+})
+
+test('登录记录和全部下线：记成功和失败；下线后会话失效、口令不变', async (t) => {
+  const { web } = rig(t)
+  const port = PORT()
+  await web.set({ enabled: true, port })
+  const base = `http://127.0.0.1:${port}`
+  await login(base, 'wrong')
+  const { cookie } = await login(base, web.state().token)
+  const st = web.state()
+  assert.deepEqual(st.logins.map((l) => [l.ip, l.ok]), [['127.0.0.1', true], ['127.0.0.1', false]])
+  assert.equal(st.sessions, 1)
+  const token = st.token
+  const after = await web.set({ kickAll: true })
+  assert.equal(after.sessions, 0)
+  assert.equal(after.token, token)
+  assert.equal((await fetch(`${base}/api/manifest`, { headers: { cookie } })).status, 401)
 })

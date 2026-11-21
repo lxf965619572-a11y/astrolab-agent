@@ -2,7 +2,8 @@
 // （同一套接口、同一份状态，桌面窗口和浏览器看到的一样）。只用 Node 自带模块。
 //
 // 安全：智能体能在这台电脑上读写文件、执行命令，所以网页入口一定要口令，默认只许本机访问（127.0.0.1），
-// “允许局域网访问”要在设置里明确打开。
+// “允许局域网访问”要在设置里明确打开；打开后也只接受和这台电脑同一网段的设备（按网卡的地址和子网掩码算，
+// 单位内网用公网段地址也照样能用），别的网段来的连接直接拒绝。
 //   - 登录：/login 输口令，换一个会话 Cookie（HttpOnly、SameSite=Strict）；口令比较用定长比较；同一地址连错 10 次锁 10 分钟
 //   - 接口：POST /api/invoke 要带 X-AstroLab 头（别的网站发不出这个头，挡跨站请求），Origin 要和 Host 一致
 //   - 事件：GET /api/events（Server-Sent Events），主进程发给界面的事件都广播到这里
@@ -38,6 +39,26 @@ export function parsePreloadMap(src) {
     if (m) map[group && /^ {4}/.test(line) ? `${group}.${m[1]}` : m[1]] = m[2]
   }
   return map
+}
+
+/** 本机网卡的 IPv4 网段：[{ address, netmask }]（不含 127.x） */
+export function localSubnets() {
+  const out = []
+  for (const list of Object.values(networkInterfaces())) for (const a of list || []) if (a.family === 'IPv4' && !a.internal && a.netmask) out.push({ address: a.address, netmask: a.netmask })
+  return out
+}
+const ipv4Int = (ip) => {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip)
+  if (!m || m.slice(1).some((x) => +x > 255)) return null
+  return ((+m[1] << 24) >>> 0) + (+m[2] << 16) + (+m[3] << 8) + +m[4]
+}
+/** 来访地址是不是本机或和本机同一网段（IPv6 只认本机） */
+export function sameNetwork(ip, subnets = localSubnets()) {
+  const v = String(ip || '').replace(/^::ffff:/i, '')
+  if (v === '::1' || /^127\./.test(v)) return true
+  const x = ipv4Int(v)
+  if (x === null) return false
+  return subnets.some((s) => { const a = ipv4Int(s.address); const m = ipv4Int(s.netmask); return a !== null && m !== null && ((x & m) >>> 0) === ((a & m) >>> 0) })
 }
 
 /** 本机的 IPv4 地址（局域网访问时显示给人看） */
@@ -88,6 +109,8 @@ export class WebService {
     this.clients = new Set()
     this.sessions = new Map() // 会话 id → 到期时间
     this.fails = new Map() // 地址 → { n, until }
+    this.logins = [] // 最近的登录：{ ip, at, ok }（设置页显示，最多 20 条）
+    this.rejected = new Map() // 被网段限制挡掉的地址 → 次数（只记，不刷日志）
     this.error = null
     this.cfg = { enabled: false, port: DEFAULT_PORT, lan: false, token: '' }
     try { Object.assign(this.cfg, JSON.parse(readFileSync(o.file, 'utf8'))) } catch { /* 还没配置 */ }
@@ -103,11 +126,24 @@ export class WebService {
     return {
       enabled: !!this.cfg.enabled, running: this.running, port: this.cfg.port, lan: !!this.cfg.lan, token: this.cfg.token,
       urls: hosts.map((h) => `http://${h}:${this.cfg.port}`), clients: this.clients.size, error: this.error,
+      sessions: [...this.sessions.values()].filter((t) => t > Date.now()).length, logins: this.logins.slice(0, 20),
+      subnets: this.cfg.lan ? localSubnets().map((s) => `${s.address}/${s.netmask}`) : [],
     }
   }
 
-  /** 改设置：{ enabled?, port?, lan?, newToken? }；改了就按新设置重启服务。换口令会让已登录的浏览器都要重新登录 */
+  /** 让所有已登录的浏览器下线（口令不变） */
+  kickAll() {
+    this.sessions.clear()
+    for (const c of this.clients) { try { c.end() } catch { /* 已断开 */ } }
+    this.clients.clear()
+    if (this.o.log) this.o.log('网页访问：全部下线')
+    this.emitState()
+    return this.state()
+  }
+
+  /** 改设置：{ enabled?, port?, lan?, newToken?, kickAll? }；改了就按新设置重启服务。换口令会让已登录的浏览器都要重新登录 */
   async set(patch = {}) {
+    if (patch.kickAll) return this.kickAll()
     if (patch.port !== undefined) {
       const p = Number(patch.port)
       if (!Number.isInteger(p) || p < 1024 || p > 65535) throw new Error('端口要在 1024～65535 之间')
@@ -194,7 +230,13 @@ export class WebService {
   async route(req, res) {
     const u = new URL(req.url, 'http://x')
     const path = decodeURIComponent(u.pathname)
-    const ip = req.socket.remoteAddress || ''
+    const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/i, '')
+    // 局域网访问也只认同一网段：别的网段来的直接拒绝（不给登录页，不暴露有这个服务以外的信息）
+    if (!sameNetwork(ip)) {
+      this.rejected.set(ip, (this.rejected.get(ip) || 0) + 1)
+      if (this.rejected.get(ip) === 1 && this.o.log) this.o.log(`网页访问：拒绝了别的网段的连接 ${ip}`)
+      return this.fail(res, 403, '只允许和这台电脑同一网段的设备访问')
+    }
     // 安全相关的响应头
     res.setHeader('x-content-type-options', 'nosniff')
     res.setHeader('referrer-policy', 'same-origin') // 不能用 no-referrer：那样浏览器同源 POST 的 Origin 会变成 null，过不了同源检查
@@ -211,6 +253,8 @@ export class WebService {
         const n = (f && !expired ? f.n : 0) + 1
         this.fails.set(ip, { n, until: n >= MAX_FAILS ? Date.now() + LOCK_MS : 0 })
         if (this.o.log) this.o.log(`网页登录失败：${ip}（第 ${n} 次）`)
+        this.logins.unshift({ ip, at: Date.now(), ok: false })
+        this.logins.length = Math.min(this.logins.length, 50)
         await new Promise((r) => setTimeout(r, 400))
         res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
         return res.end(loginPage('口令不对'))
@@ -219,6 +263,9 @@ export class WebService {
       const id = randomBytes(24).toString('base64url')
       this.sessions.set(id, Date.now() + SESSION_MS)
       if (this.o.log) this.o.log(`网页登录：${ip}`)
+      this.logins.unshift({ ip, at: Date.now(), ok: true })
+      this.logins.length = Math.min(this.logins.length, 50)
+      this.emitState()
       res.writeHead(303, { location: '/', 'set-cookie': `astrolab_session=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MS / 1000}`, 'cache-control': 'no-store' })
       return res.end()
     }

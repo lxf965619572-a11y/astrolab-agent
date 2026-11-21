@@ -213,7 +213,11 @@ export interface SearchResult {
 export interface StartInput { stage?: string; skills?: string[]; prompt: string; files: string[]; options: { report: boolean }; mode?: 'task' | 'code' }
 
 /** 网页访问（main/web.mjs）：在浏览器里经 http://IP:端口 用这个工作台 */
-export interface WebState { enabled: boolean; running: boolean; port: number; lan: boolean; token: string; urls: string[]; clients: number; error: string | null }
+export interface WebState {
+  enabled: boolean; running: boolean; port: number; lan: boolean; token: string; urls: string[]; clients: number; error: string | null
+  /** 已登录的会话数；最近的登录（成功和失败）；允许局域网访问时接受的网段（本机网卡的地址/掩码） */
+  sessions?: number; logins?: { ip: string; at: number; ok: boolean }[]; subnets?: string[]
+}
 
 export interface AstroApi {
   platform: string
@@ -248,7 +252,7 @@ export interface AstroApi {
     /** 产出页：所有工程的任务写过的文件 */
     outputs(): Promise<OutputFile[]>
   }
-  web: { state(): Promise<WebState>; set(patch: { enabled?: boolean; port?: number; lan?: boolean; newToken?: boolean }): Promise<WebState> }
+  web: { state(): Promise<WebState>; set(patch: { enabled?: boolean; port?: number; lan?: boolean; newToken?: boolean; kickAll?: boolean }): Promise<WebState> }
   schedule: {
     list(): Promise<ScheduleState>; save(d: ScheduleDraft): Promise<{ id: string; state: ScheduleState }>; remove(id: string): Promise<ScheduleState>
     enable(id: string, on: boolean): Promise<ScheduleState>; runNow(id: string): Promise<{ run: ScheduleRun | null; state: ScheduleState }>
