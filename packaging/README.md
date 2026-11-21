@@ -23,6 +23,8 @@ powershell -ExecutionPolicy Bypass -File packaging\build-offline.ps1
 
 `sandbox-online.wsb` 是联网的同一套环境，用来测试模型任务（要先在沙盒里的 `%LOCALAPPDATA%\AstroLab\local.env` 填 Key）。
 
+**真机验收**：步骤和计时记录表见 [Win10真机验收.md](Win10真机验收.md)。
+
 **验证情况**：10-26 的验证记录是阶段 0 的包（最小界面）。装阶段 2 工作台（下一节）的包 10-29 在沙盒中复测可用（用户实测，没有留下自检报告）。关口 G4 还要按“新用户 30 分钟内装好、配置并跑完一个示例”计时验收。
 
 ## 工作台和任务栏图标（阶段 2）

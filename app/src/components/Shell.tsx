@@ -248,6 +248,7 @@ export function Sidebar() {
         )}
         {!all.length && !!projects.length && <div className="side-empty muted small">{mode === 'code' ? '还没有代码任务。编码、单元测试、代码走查在这里做。' : '还没有任务。需求、设计、文档和图在这里做。'}</div>}
       </div>
+      <UpdateCard />
       <AccountRow />
       <SideResizer />
     </nav>
@@ -502,6 +503,67 @@ export function ModeSwitch() {
   )
 }
 
+const UPDATE_SEEN_KEY = 'astrolab.update.dismissed'
+const readSeen = () => { try { return localStorage.getItem(UPDATE_SEEN_KEY) || '' } catch { return '' } }
+
+/** 新版本提示：侧栏左下角、用户栏的上面（不挡用户栏）。告诉用户有新版本，可以展开看更新内容，
+ *  “立即更新并重启”一步做完下载和重启。点 × 后这个版本不再提示（左下角的蓝点和菜单里的“有新版本”还在）。
+ *  只在安装版出现：开发环境用 git pull。 */
+function UpdateCard() {
+  const up = useStore((s) => s.app?.update)
+  const ts = useStore((s) => s.ts)
+  const openSettings = useStore((s) => s.openSettings)
+  const [seen, setSeen] = useState(readSeen)
+  const [open, setOpen] = useState(false)
+  const [going, setGoing] = useState(false)
+  const [err, setErr] = useState('')
+  if (!up || !up.installed) return null
+  const next = up.staged?.version || (up.check?.available ? up.check.latest?.version : '') || ''
+  const working = going || up.working === 'stage' || up.working === 'apply'
+  if (!next || (seen === next && !working)) return null
+  const notes = (up.staged?.notes || up.check?.latest?.notes || '').trim()
+  const busy = ts ? ['starting', 'running', 'asking'].includes(ts.status) : false
+  const p = up.progress
+  const pct = p && p.totalBytes ? Math.round((100 * p.bytes) / p.totalBytes) : p && p.total ? Math.round((100 * p.files) / p.total) : 3
+  const close = () => { try { localStorage.setItem(UPDATE_SEEN_KEY, next) } catch { /* 存不下就只是这次关掉 */ } setSeen(next) }
+  const go = async () => {
+    const api = useStore.getState().api
+    if (!api) return
+    setErr(''); setGoing(true)
+    try {
+      if (!useStore.getState().app?.update?.staged) await api.update.stage()
+      await api.update.apply()
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); setGoing(false); play('error') }
+  }
+  return (
+    <div className="up-card" role="status" aria-label={`有新版本 ${next}`}>
+      <div className="up-card-head">
+        <Icon name="download" size={15} stroke={2} className="accent" />
+        <span className="up-card-title">有新版本 {next}</span>
+        {!working && <Button className="up-card-x" aria-label="这个版本不再提示" onPress={close}><Icon name="x" size={13} stroke={2.2} /></Button>}
+      </div>
+      <div className="muted small">当前 {up.version}。更新时软件会关闭再打开，任务记录、设置和技能库都不受影响。</div>
+      {open && (notes ? <div className="up-notes">{notes}</div> : <div className="muted small">这个版本没有写更新说明。</div>)}
+      {up.working === 'stage' && (
+        <div className="up-progress">
+          <div className="up-bar"><i style={{ width: `${pct}%` }} /></div>
+          <div className="muted small">{p ? `正在下载 ${p.files}/${p.total} 个文件` : '正在比较两个版本…'}</div>
+        </div>
+      )}
+      {up.working === 'apply' && <div className="muted small">正在退出并更新，换完文件会自动重新打开</div>}
+      {busy && !working && <div className="muted small">任务还在进行，结束或停止后再更新</div>}
+      {err && <div className="up-err small">{err}</div>}
+      {!working && (
+        <div className="up-card-actions">
+          <Key size="sm" variant="ghost" onPress={() => setOpen(!open)}>{open ? '收起' : '更新内容'}</Key>
+          <Key size="sm" variant="ghost" onPress={() => openSettings('about')}>详情</Key>
+          <Key size="sm" variant="primary" isDisabled={busy} onPress={() => void go()}><Icon name="refresh" size={13} stroke={2} />立即更新并重启</Key>
+        </div>
+      )}
+    </div>
+  )
+}
+
 /** 侧栏底部账户区（和 Claude 一样）：本机用户名，点开是设置、模型状态、更新、皮肤、提示音、关于。
  *  有新版本时名字右边亮蓝点，模型连不上时亮红点。右边小盾牌提示“只写工作区、不提交 Git”。 */
 function AccountRow() {
@@ -514,14 +576,16 @@ function AccountRow() {
   const next = up?.staged?.version || (up?.check?.available ? up.check.latest?.version : '') || ''
   const m = modelText(app)
   const name = app?.user || '本机用户'
-  const dot = app && !m.ok ? 'bad' : next ? 'new' : ''
+  // 两个点各管各的，同时显示：模型连不上是红点，有新版本是蓝点（11-21：原来红点优先，把新版本的蓝点盖住了）
+  const bad = !!app && !m.ok
   return (
     <div className="side-account">
       <MenuTrigger>
-        <Button className="acct-btn" aria-label={`${name}：设置和更多${dot === 'bad' ? '（模型连不上）' : dot === 'new' ? `（有新版本 ${next}）` : ''}`}>
+        <Button className="acct-btn" aria-label={`${name}：设置和更多${bad ? '（模型连不上）' : ''}${next ? `（有新版本 ${next}）` : ''}`}>
           <span className="acct-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
           <span className="acct-name">{name}</span>
-          {dot && <span className={`acct-dot ${dot}`} aria-hidden="true" />}
+          {next && <span className="acct-dot new" title={`有新版本 ${next}`} aria-hidden="true" />}
+          {bad && <span className="acct-dot bad" title={m.text} aria-hidden="true" />}
           <Icon name="chevron" size={12} stroke={2.2} className="acct-chev" />
         </Button>
         <Popover className="menu-pop" placement="top start">

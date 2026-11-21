@@ -497,6 +497,7 @@ function WebAccess() {
           {st.urls.length ? st.urls.map((u) => (
             <div key={u} className="web-url"><span className="mono">{u}</span><Key size="sm" onPress={() => copy(u, '地址')}>复制</Key></div>
           )) : <div className="muted small">没找到这台电脑的局域网地址（没连网？）</div>}
+          {st.lan && st.urls.length > 0 && <div className="muted small">同网段的电脑打不开时，多半是 Windows 防火墙拦了：第一次打开局域网访问时弹出的防火墙提示要选“允许”（需要管理员），或者请管理员放行 AstroLab.exe 的入站连接。</div>}
         </div>
       )}
       <div className="set-group">

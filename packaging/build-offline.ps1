@@ -105,7 +105,7 @@ $dshWant = ([IO.File]::ReadAllText((Join-Path $Root 'config\dsh.json'), [Text.En
 $dshBinSrc = Join-Path $Root 'runtime\dsh\node_modules\@deepseek-ai\dsh\lib\bin.js'
 if (-not (Test-Path $dshBinSrc)) { throw 'runtime\dsh is missing: run scripts\setup.ps1' }
 $dshHave = "$(& node $dshBinSrc --version)".Trim()
-if ($dshHave -ne $dshWant) { throw "runtime\dsh has DSH $dshHave but config\dsh.json pins $dshWant: run scripts\setup.ps1 first" }
+if ($dshHave -ne $dshWant) { throw "runtime\dsh has DSH $dshHave but config\dsh.json pins ${dshWant}: run scripts\setup.ps1 first" }
 Say "   DSH $dshHave (config\dsh.json)"
 Robo (Join-Path $Root 'runtime\dsh') (Join-Path $Dist 'app\runtime\dsh') @()
 

@@ -1056,6 +1056,14 @@ mark.hl.flash { box-shadow: 0 0 0 3px var(--accent-ring); }
 .search-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 .search-foot { display: flex; gap: 4px; align-items: center; padding: 8px 14px; border-top: 1px solid var(--line); }
 
+.up-card { margin: 6px 2px 4px; padding: 10px 12px; display: grid; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--card-shadow); }
+.up-card-head { display: flex; align-items: center; gap: 8px; }
+.up-card-title { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--ink); }
+.up-card-x { flex: none; display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 6px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.up-card-x[data-hovered] { background: var(--surface-2); color: var(--ink); }
+.up-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.up-card .up-notes { max-height: 140px; }
+.acct-dot + .acct-dot { margin-left: -6px; }
 .side-account { display: flex; align-items: center; gap: 4px; padding: 8px 8px 10px; border-top: 1px solid var(--line); }
 .acct-btn { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; text-align: left; }
 .acct-btn[data-hovered], .acct-btn[aria-expanded="true"] { background: var(--surface-2); }
